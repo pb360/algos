@@ -1,3 +1,14 @@
+#
+data/
+machine_specfic/
+local/
+.ssh/
+
+
+# ### below is that standard .gitignore github provieds for python repositories
+#
+#
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
