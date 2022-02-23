@@ -13,7 +13,6 @@ import time
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
-
 # ###PAUL critical directory here... this must be correct for wherever the
 # ###PAUL algos folder is on the  machine running it, then everything else will fall into line
 algos_dir = '/mnt/'
@@ -40,12 +39,12 @@ ports = {'email_port': 1025}
 constants = {
     'secs_of_trades_to_keep_live': 60,  # number of minutes to keep trades in live file
     'live_trade_trim_interval': 30,  # how mnay seconds betweeen trimming live files
-    'no_trade_message_timeout': 10,  # secs required for no msg until new scraping process starts
+    'no_trade_message_timeout': 30,  # secs required for no msg until new scraping process starts
     'data_scrape_heartbeat': 8,  # check no_trade_message_timeout in heartbeat_check()
     'make_prices_from_trades_interval': 10,  # currently located in orders.py
     'update_signal_interval': 10,  # how many seconds between MACD signal update
     'order_sma_v1_interval': 15,  # order on signal interval   ###PAUL_migration should move to algos
-    'secondary_order_interval': 2, # update market status and adjust orders ###PAUL_migration needs to mention binance
+    'secondary_order_interval': 2,  # update market status and adjust orders ###PAUL_migration needs to mention binance
     'trade_watch_dog_interval': 20,
     # how long if no trade to restart trade collection w/ system-d ###PAUL_migration needs to mention binance
     'price_watch_dog_interval': 45,
@@ -58,7 +57,6 @@ constants = {
 
 
 exchanges = ['binance_foreign', 'binance_us', 'kucoin']
-
 
 # ###PAUL_migration .... this should probably just go away, or be migrated to ./utils.py thats the only thing that'll
 # ###PAUL_migration .... us it with get_data_fp()
@@ -82,34 +80,43 @@ dirs = {'algos_dir': algos_dir,  # this is where the the algos directory is loca
 #
 #
 universe = dict()
+"""doc string for this dictionary because it is a bitch 
+###PAUL_todo make a universial entry such that 
+universe['universe']
+is a reference to all or as many of the individual tickers for each exchange. this will make comparitive work easier 
+can then make a 
+for exchange in exchanges: 
+    get_data(prices / trades, ticker, exchange) and do what you want to do (combine, compare...)  
+"""
 
-universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp'],
+universal = {}
 
-                            'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
-                                                     'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
-                                                     'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
-                                                     'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
-                                                     'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
-                                                     'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
-                                                     'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
-                                                     'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                                     'xrpusdt@trade', 'xrpbtc@trade', 'xrpusd@trade',
+universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
+
+                            'tick_collection_list': ['adausdt@trade', 'adabtc@trade',
+                                                     'bnbusdt@trade', 'bnbbtc@trade',
+                                                     'btcusdt@trade',
+                                                     'dogeusdt@trade', 'dogebtc@trade',
+                                                     'ethusdt@trade', 'ethbtc@trade',
+                                                     'linkusdt@trade', 'linkbtc@trade',
+                                                     'ltcusdt@trade', 'ltcbtc@trade',
+                                                     'xlmusdt@trade', 'xlmbtc@trade',
+                                                     'xrpusdt@trade', 'xrpbtc@trade',
+                                                     'xtzusdt@trade', 'xtzbtc@trade', 'xtzeth@trade',
                                                      ],
                             # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
 
-                            'tickers_tracked': ['ADAUSDT', 'ADABTC',
-                                                'BNBUSDT', 'BNBBTC',
-                                                'BTCUSDT',  # this doesnt exist either 'BTCBTC',
-                                                'DOGEUSDT',
-                                                'ETHUSDT', 'ETHBTC',
+                            'tickers_tracked': ['ADAUSDT',  'ADABTC',
+                                                'BNBUSDT',  'BNBBTC',
+                                                'BTCUSDT',
+                                                'DOGEUSDT', 'DOGEBTC',
+                                                'ETHUSDT',  'ETHBTC',
                                                 'LINKUSDT', 'LINKBTC',
-                                                'LTCUSDT', 'LTCBTC',
-                                                'XLMUSDT',
-                                                'XRPUSDT', 'XRPBTC',
+                                                'LTCUSDT',  'LTCBTC',
+                                                'XLMUSDT',  'XLMBTC',
+                                                'XRPUSDT',  'XRPBTC',
+                                                'XTZUSDT',  'XTZBTC',  'XTZETH',
                                                 ],
-
-                            'tickers_traded': ['BTCUSDT'
-                                               ],
 
                             'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
                                                            'BNBUSDT': 'BNBUSD', 'BNBBTC': 'BNBBTC',
@@ -119,7 +126,8 @@ universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth'
                                                            'LINKUSDT': 'LINKUSD', 'LINKBTC': 'LINKBTC',
                                                            'LTCUSDT': 'LTCUSD', 'LTCBTC': 'LTCBTC',
                                                            'XLMUSDT': 'XLMUSD',
-                                                           'XRPUSDT': 'XRPUSD', 'XRPBTC': 'XRPBTC'
+                                                           'XRPUSDT': 'XRPUSD', 'XRPBTC': 'XRPBTC',
+                                                           'XTZUSDT': 'XTZUSD', 'XTZBTC': 'XTZBTC',
                                                            },
 
                             'tickers_us_to_foreign_dict': {'ADAUSD': 'ADAUSDT', 'ADABTC': 'ADABTC',
@@ -131,60 +139,66 @@ universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth'
                                                            'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
                                                            'XLMUSD': 'XLMUSDT',
                                                            'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                           'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
                                                            }
                             }  # ###PAUL just a copy paster from binance foreign, needs editing
 
 # ###PAUL just a copy paster from binance foreign, needs editing
-universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp'],
+universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
 
-                            'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
-                                                     'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
-                                                     'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
-                                                     'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
-                                                     'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
-                                                     'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
-                                                     'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
-                                                     'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                                     'xrpusdt@trade', 'xrpbtc@trade', 'xrpusd@trade',
-                                                     ],
-                            # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
-
-                            'tickers_tracked': ['ADAUSDT', 'ADABTC',
-                                                'BNBUSDT', 'BNBBTC',
-                                                'BTCUSDT',  # this doesnt exist either 'BTCBTC',
-                                                'DOGEUSDT',
-                                                'ETHUSDT', 'ETHBTC',
-                                                'LINKUSDT', 'LINKBTC',
-                                                'LTCUSDT', 'LTCBTC',
-                                                'XLMUSDT',
-                                                'XRPUSDT', 'XRPBTC',
+                       'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
+                                                'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
+                                                'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
+                                                'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
+                                                'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
+                                                'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
+                                                'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
+                                                'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
+                                                'xrpusdt@trade', 'xrpbtc@trade', # 'xrpusd@trade',  # trades still come?
+                                                                 'xtzbtc@trade', 'xtzusd@trade',
                                                 ],
+                       # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
 
-                            'tickers_traded': ['BTCUSDT'
-                                               ],
+                       'tickers_tracked': ['ADAUSDT',  'ADABTC',  'ADAUSD',
+                                           'BNBUSDT',  'BNBBTC',  'BNBUSD',
+                                           'BTCUSDT',             'BTCUSD',
+                                           'DOGEUSDT', 'DOGEUSD',
+                                           'ETHUSDT',  'ETHBTC',  'ETHUSD',
+                                           'LINKUSDT', 'LINKBTC', 'LINKUSD',
+                                           'LTCUSDT',  'LTCBTC',  'LTCUSD',
+                                           'XLMUSDT',             'XLMUSD',
+                                           'XRPUSDT',  'XRPBTC',  # 'XRPUSD', commented out from here because no USD
+                                                       'XTZBTC',  'XTZUSD',
+                                           ],
 
-                            'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
-                                                           'BNBUSDT': 'BNBUSD', 'BNBBTC': 'BNBBTC',
-                                                           'BTCUSDT': 'BTCUSD',  # this doesnt exist either 'BTCBTC',
-                                                           'DOGEUSDT': 'DOGEUSD',
-                                                           'ETHUSDT': 'ETHUSD', 'ETHBTC': 'ETHBTC',
-                                                           'LINKUSDT': 'LINKUSD', 'LINKBTC': 'LINKBTC',
-                                                           'LTCUSDT': 'LTCUSD', 'LTCBTC': 'LTCBTC',
-                                                           'XLMUSDT': 'XLMUSD',
-                                                           'XRPUSDT': 'XRPUSD', 'XRPBTC': 'XRPBTC'
-                                                           },
+                       'tickers_traded': ['BTCUSDT'
+                                          ],
 
-                            'tickers_us_to_foreign_dict': {'ADAUSD': 'ADAUSDT', 'ADABTC': 'ADABTC',
-                                                           'BNBUSD': 'BNBUSDT', 'BNBBTC': 'BNBBTC',
-                                                           'BTCUSD': 'BTCUSDT',  # this doesnt exist either 'BTCBTC',
-                                                           'DOGEUSD': 'DOGEUSDT',
-                                                           'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
-                                                           'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
-                                                           'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
-                                                           'XLMUSD': 'XLMUSDT',
-                                                           'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
-                                                           }
-                            }  # ###PAUL just a copy paster from binance foreign, needs editing
+                       'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
+                                                      'BNBUSDT': 'BNBUSD', 'BNBBTC': 'BNBBTC',
+                                                      'BTCUSDT': 'BTCUSD',  # this doesnt exist either 'BTCBTC',
+                                                      'DOGEUSDT': 'DOGEUSD',
+                                                      'ETHUSDT': 'ETHUSD', 'ETHBTC': 'ETHBTC',
+                                                      'LINKUSDT': 'LINKUSD', 'LINKBTC': 'LINKBTC',
+                                                      'LTCUSDT': 'LTCUSD', 'LTCBTC': 'LTCBTC',
+                                                      'XLMUSDT': 'XLMUSD',
+                                                      'XRPUSDT': 'XRPUSD', 'XRPBTC': 'XRPBTC',
+                                                      'XTZUSDT': 'XTZUSD', 'XTZBTC': 'XTZBTC',
+                                                      },  # ###PAUL this can be copied from binance_foreign
+
+                       'tickers_us_to_foreign_dict': {'ADAUSD': 'ADAUSDT', 'ADABTC': 'ADABTC',
+                                                      'BNBUSD': 'BNBUSDT', 'BNBBTC': 'BNBBTC',
+                                                      'BTCUSD': 'BTCUSDT',  # this doesnt exist either 'BTCBTC',
+                                                      'DOGEUSD': 'DOGEUSDT',
+                                                      'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
+                                                      'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
+                                                      'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
+                                                      'XLMUSD': 'XLMUSDT',
+                                                      'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                      'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
+                                                      },  # ###PAUL this can be copied from binance_foreign
+                       }  # ###PAUL just a copy paster from binance foreign, needs editing
+
 universe_kucoin = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp'],
 
                    'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
@@ -236,10 +250,10 @@ universe_kucoin = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link',
                    }  # ###PAUL just a copy paster from binance foreign, needs editing
 # ###PAUL just a copy paster from binance foreign, needs editing
 
+universe['universal'] = universal
 universe['binance_foreign'] = universe_binance_foreign
 universe['binance_us'] = universe_binance_us
 universe['kucoin'] = universe_kucoin
-
 
 # ### data format ---- for pretty much everything in the repo
 #
@@ -546,18 +560,15 @@ data_format['binance_foreign'] = data_format_binance_foreign
 data_format['binance_us'] = data_format_binance_us
 data_format['kucoin'] = data_format_kucoin
 
-
 # ### addresses
 #
 #
 adresses = {'nano1_eth': '0x1f05cb5b0d8aab9299dBC6a0254432907B928843'}
 
-
 # ### initialize ---- parameters and create the dictionary
 #
 #
 params = dict()
-
 
 params['constants'] = constants
 params['exchanges'] = exchanges

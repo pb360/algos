@@ -38,7 +38,7 @@ from utils import send_email, get_data_file_path, convert_date_format
 # needed to let the package to see itself for interior self imports
 sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
 from binance.client import Client
-from binance.websockets import BinanceSocketManager
+from binance.websockets_us import BinanceSocketManager
 
 # ### variable definitions
 #
@@ -46,7 +46,7 @@ from binance.websockets import BinanceSocketManager
 START_TIME = time.time()
 params = config.params
 
-exchange = 'binance_foreign'  # exchange we are collecting data for
+exchange = 'binance_us'  # exchange we are collecting data for
 params['exchange'] = exchange
 
 lock = threading.Lock()  # locks other threads from writing to daily trade file
@@ -198,6 +198,7 @@ def process_message(msg):
 
         # ### write to live data file
         live_data_file_path = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
+
         check_if_file_make_dirs_then_write(file_path=live_data_file_path, new_line=new_line, thread_lock=True)
 
         # ### WRITE TO HISTORICAL DATA FILES
@@ -222,10 +223,10 @@ def trim_live_files(params=params):
     # # #######   ---------------------------------------------------------------- START: debug
     # global iter_count_live_file_trim
     # iter_count_live_file_trim += 1
-    # print('iter #: ',  str(iter_count_live_file_trim), ' of live data purge')
+    # print('iter #: ',  str(iter_count_live_file_trim), ' of live data purge', flush=True)
     #
     # if iter_count_live_file_trim > 10:
-    #     print('hur-dee-dur... i stopped \n'*10)
+    #     print('hur-dee-dur... i stopped \n'*10, flush=True)
     #     raise ValueError
     # # #######   ---------------------------------------------------------------- END: debug
     # # #######   ---------------------------------------------------------------- END: debug
@@ -253,7 +254,7 @@ def trim_live_files(params=params):
 
         # happens auto for new tickers
         except FileNotFoundError:
-            print('debug 1: FileNotFoundError: ' + str(live_fp), flush=True)
+            print('debug 1: FileNotFoundError: ' + str(live_fp) , flush=True)
             pass
         except TypeError:
             print('we have a problem \n' * 10, flush=True)
@@ -290,6 +291,7 @@ def kill_scraper_for_sysd_autostart(conn_key, reason=""):
     try:
         reactor.stop()
     except:
+        print('debug spot 2', flush=True)
         pass
 
     # sys.exit() ### this is providing problems because it is held in a try/catch statement use line below
@@ -300,7 +302,7 @@ def kill_scraper_for_sysd_autostart(conn_key, reason=""):
 def heartbeat_check(params=params):
     # # DEBUG conditional... stop the script after 1 min 20 seconds
     # if now > START_TIME + 40:
-    #     print('DEBUG: Starting new script')
+    #     print('DEBUG: Starting new script', flush=True)
     #     start_backup_scraper(conn_key)
 
     global conn_key
@@ -355,8 +357,9 @@ def main(params=params):
 
 try:
     main()
-    print('----------------------   data_scrape.py ran fully  ------------------', flush=True)
+    print('------------   data_scrape ---- trades ---- binance_us ----- ran fully  ------------', flush=True)
 except Exception as e:
+    print('debug spot 3', flush=True)
     exc_type, exc_value, exc_traceback = sys.exc_info()
     issues = traceback.format_exception(exc_type, exc_value, exc_traceback)
 
