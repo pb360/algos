@@ -4,6 +4,10 @@
 
 ### this hard drive is meant to house trading algorithms and the data that they need to operate along with the data they produce during their operations
 
+* <b> code that needs to be changed for each implementation </b> 
+  * ./algos/config.py  - algos_dir must be defined
+  
+
 * drive layout - this drive should be placed at the root directory at <i> /mnt/algos/ </i>
   * <i> ./data/ </i>is the most important directory in the drive is specifically <i> /mnt/algos/data/* </i> which has a few main folders:
     * <i> live </i> -  data that is maintained in a live manner by some processes
@@ -33,3 +37,21 @@
   * the approach will be copy the whole file over (we wont be pushing anything to git yet) 
     * then to remove and copy things to the new places they need to be 
     
+
+## systemd services
+* <b> located: </b>  <i> /usr/lib/systemd/system/  </i>
+
+* general services 
+    * <i> algos_binance_foreign_trades.service </i>  ---- gets the trades
+* # all systemd services below still need re-working  
+    * <i> algo2_binance_prices.service </i> creates price feed 
+    * <i> algo2_watchdog.service </i>
+        * makes sure we are running 
+        * <b> need to add / remove bots that should be running on deployment / decomission </b> 
+* bots 
+    * <i> algo2_binance_bot_equal_split </i>
+        * as the name says. splits investment in all tracked tickers equally, redistributes after $10 deviation 
+
+* depricated services which need to be removed      
+      * <i> algo2_binance_trades.service </i>
+        * gets the trades

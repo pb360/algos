@@ -1,8 +1,26 @@
+#!/home/paul/miniconda3/envs/binance/bin/python3
+# -*- coding: utf-8 -*-
+
+# ### imports
+#
+#
 import platform
 import sys
+import os
+import time
 
-from machine_specfic.config_machine_specific import params_machine_specific
-from local.config_local import params_local
+# ### time zone change... this must happen first and utils must be imported first
+os.environ['TZ'] = 'UTC'
+time.tzset()
+
+
+# ###PAUL critical directory here... this must be correct for wherever the
+# ###PAUL algos folder is on the  machine running it, then everything else will fall into line
+algos_dir = '/mnt/'
+sys.path.append(algos_dir)
+
+from algos.machine_specfic.config_machine_specific import params_machine_specific
+from algos.local.configs_local import params_local
 
 # ### stuff from outside sources
 #
@@ -39,15 +57,22 @@ constants = {
 # ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
 
 
+exchanges = ['binance_foreign', 'binance_us', 'kucoin']
+
+
 # ###PAUL_migration .... this should probably just go away, or be migrated to ./utils.py thats the only thing that'll
 # ###PAUL_migration .... us it with get_data_fp()
-dirs = {'repo_dir': '/mnt/algos/',
-        'data_dir': '/mnt/algos/data/',
-        'book_data_dir': '/mnt/algos/data/book/',
-        'trade_data_dir': '/mnt/algos/data/trade/',
-        'price_data_dir': '/mnt/algos/data/price/',
-        'live_trade_data_dir': '/mnt/algos/data/live_trades/',
-        'order_data_dir': '/mnt/algos/data/orders/',
+dirs = {'algos_dir': algos_dir,  # this is where the the algos directory is located on the machine
+        'repo_dir': algos_dir + 'algos/',
+        'data_dir': algos_dir + 'algos/data/',
+        'ext_pack_dir': algos_dir + 'algos/ext_packages',
+        'book_data_dir': algos_dir + 'algos/data/book/',
+        'trade_data_dir': algos_dir + 'algos/data/trade/',
+        'price_data_dir': algos_dir + 'algos/data/price/',
+        'live_trade_data_dir': algos_dir + 'algos/data/live_trades/',
+        'order_data_dir': algos_dir + 'algos/data/orders/',
+        'live_data_dir': algos_dir + 'algos/data/live/',
+        'port_data_dir': algos_dir + 'algos/data/ports/',
         }
 # ###PAUL_migration .... this should probably just go away, or be migrated to ./utils.py thats the only thing that'll
 # ###PAUL_migration .... us it with get_data_fp()
@@ -58,8 +83,59 @@ dirs = {'repo_dir': '/mnt/algos/',
 #
 universe = dict()
 
-# ###PAUL just a copy paster from binance foreign, needs editing
 universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp'],
+
+                            'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
+                                                     'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
+                                                     'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
+                                                     'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
+                                                     'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
+                                                     'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
+                                                     'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
+                                                     'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
+                                                     'xrpusdt@trade', 'xrpbtc@trade', 'xrpusd@trade',
+                                                     ],
+                            # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
+
+                            'tickers_tracked': ['ADAUSDT', 'ADABTC',
+                                                'BNBUSDT', 'BNBBTC',
+                                                'BTCUSDT',  # this doesnt exist either 'BTCBTC',
+                                                'DOGEUSDT',
+                                                'ETHUSDT', 'ETHBTC',
+                                                'LINKUSDT', 'LINKBTC',
+                                                'LTCUSDT', 'LTCBTC',
+                                                'XLMUSDT',
+                                                'XRPUSDT', 'XRPBTC',
+                                                ],
+
+                            'tickers_traded': ['BTCUSDT'
+                                               ],
+
+                            'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
+                                                           'BNBUSDT': 'BNBUSD', 'BNBBTC': 'BNBBTC',
+                                                           'BTCUSDT': 'BTCUSD',  # this doesnt exist either 'BTCBTC',
+                                                           'DOGEUSDT': 'DOGEUSD',
+                                                           'ETHUSDT': 'ETHUSD', 'ETHBTC': 'ETHBTC',
+                                                           'LINKUSDT': 'LINKUSD', 'LINKBTC': 'LINKBTC',
+                                                           'LTCUSDT': 'LTCUSD', 'LTCBTC': 'LTCBTC',
+                                                           'XLMUSDT': 'XLMUSD',
+                                                           'XRPUSDT': 'XRPUSD', 'XRPBTC': 'XRPBTC'
+                                                           },
+
+                            'tickers_us_to_foreign_dict': {'ADAUSD': 'ADAUSDT', 'ADABTC': 'ADABTC',
+                                                           'BNBUSD': 'BNBUSDT', 'BNBBTC': 'BNBBTC',
+                                                           'BTCUSD': 'BTCUSDT',  # this doesnt exist either 'BTCBTC',
+                                                           'DOGEUSD': 'DOGEUSDT',
+                                                           'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
+                                                           'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
+                                                           'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
+                                                           'XLMUSD': 'XLMUSDT',
+                                                           'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                           }
+                            }  # ###PAUL just a copy paster from binance foreign, needs editing
+
+# ###PAUL just a copy paster from binance foreign, needs editing
+universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp'],
 
                             'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
                                                      'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
@@ -164,7 +240,6 @@ universe['binance_foreign'] = universe_binance_foreign
 universe['binance_us'] = universe_binance_us
 universe['kucoin'] = universe_kucoin
 
-# ###PAUL_migration ... should houses each set of websocket responses into its own exchange
 
 # ### data format ---- for pretty much everything in the repo
 #
@@ -471,21 +546,24 @@ data_format['binance_foreign'] = data_format_binance_foreign
 data_format['binance_us'] = data_format_binance_us
 data_format['kucoin'] = data_format_kucoin
 
+
 # ### addresses
 #
 #
 adresses = {'nano1_eth': '0x1f05cb5b0d8aab9299dBC6a0254432907B928843'}
+
 
 # ### initialize ---- parameters and create the dictionary
 #
 #
 params = dict()
 
+
 params['constants'] = constants
+params['exchanges'] = exchanges
 params['universe'] = universe
 params['keys'] = keys  ###PAUL consider not including in params
 params['ports'] = ports
 params['dirs'] = dirs
-params['websocket_responses'] = websocket_responses
 params['data_format'] = data_format
 params['addresses'] = adresses

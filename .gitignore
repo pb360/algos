@@ -1,5 +1,6 @@
 #
 data/
+ext_packages/
 machine_specfic/
 local/
 .ssh/

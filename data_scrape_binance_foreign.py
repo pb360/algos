@@ -6,65 +6,75 @@
 
 """
 This script creates a websocket connection to binance and listens and records all trades for relevant tickers
+on or around 2/20/2022 the repo was migrated from algo2 --> algos allowing for easier data collection
+the data for 'tickers_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
+ 'ETHBTC', 'LINKUSDT', 'LINKBTC', 'LTCUSDT', 'LTCBTC', 'XLMUSDT', 'XRPUSDT', 'XRPBTC', ] goes back much earlier
+ other tickers' data collection starts after
 """
-from data import config
-from utils import check_if_file_in_directory, send_email, get_data_file_path, convert_date_format
 
-
+# ### imports
+#
+#
 import os
+import time
+# ### time zone change... this must happen first and utils must be imported first
+os.environ['TZ'] = 'UTC'
+time.tzset()
+
 import pandas as pd
-import sys
-import signal
-import subprocess
+import sys  # ###PAUL_del_later_if_not_needed
 import threading
 import traceback
-import time
 from twisted.internet import task, reactor
 
+# ### local imports
+#
+#
+import config
+from utils import send_email, get_data_file_path, convert_date_format
 
-# local imports
-sys.path.append('/Users/paul/Documents/Monkey/algo2')
-sys.path.append('/Users/paul/Documents/Monkey/algo2/sams_binance_api')
-from sams_binance_api.binance.client import Client
-from sams_binance_api.binance.websockets import BinanceSocketManager
-
+# needed to let the package to see itself for interior self imports
+sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
+from binance.client import Client
+from binance.websockets import BinanceSocketManager
 
 # ### variable definitions
 #
 #
 START_TIME = time.time()
 params = config.params
-lock = threading.Lock() # locks other threads from writing to daily trade file
+
+exchange = 'binance_foreign'  # exchange we are collecting data for
+params['exchange'] = exchange
+
+lock = threading.Lock()  # locks other threads from writing to daily trade file
 
 # global variables used in various functions
 this_scripts_process_ID = os.getpid()
-conn_key = 0 ### used to close binance connections... is int, need one to start so zero
+conn_key = 0  ### used to close binance connections... is int, need one to start so zero
 last_msg_time = time.time() + 1.5
 consecutive_error_messages = 0
-message_counter = 0   # for debug only
-
-
-# directories
-repo_dir = params['dirs']['repo_dir']
-data_dir = params['dirs']['data_dir']
-book_data_dir  = params['dirs']['book_data_dir']
-live_trade_data_dir  = params['dirs']['live_trade_data_dir']
-trade_data_dir = params['dirs']['trade_data_dir']
+message_counter = 0  # for debug only
 
 # api keys
-api_key = params['keys']['data_key_1']
-secret_key = params['keys']['data_secret_1']
+api_key = params['keys']['binance_foreign_data_key_1']
+secret_key = params['keys']['binance_foreign_data_key_secret_1']
 
 # parameters about investment universe
-coins_tracked = params['universe']['coins_tracked']
-tick_collection_list = params['universe']['tick_collection_list']
+coins_tracked = params['universe'][exchange]['coins_tracked']
+tick_collection_list = params['universe'][exchange]['tick_collection_list']
+
+if exchange == 'binance_us':
+    tld = 'us'
+else:
+    tld = 'com'
 
 # binance client
 client = Client(
-    api_key = api_key,
-    api_secret = secret_key,
-    requests_params = None,
-    tld='us'  # ###PAUL this is for the country... need to set that for sure.... careful on other exchanges
+    api_key=api_key,
+    api_secret=secret_key,
+    requests_params=None,
+    tld=tld  # ###PAUL this is for the country... need to set that for sure.... careful on other exchanges
 )
 
 # initiate client instance
@@ -83,7 +93,7 @@ def lock_thread_append_to_file(file_path, new_line):
     out:
         none
     """
-    lock.acquire() # thread must aquire lock to write to file
+    lock.acquire()  # thread must aquire lock to write to file
     # in this section, only one thread can be present at a time.
     with open(file_path, "a") as f:
         f.write(new_line)
@@ -113,22 +123,30 @@ def make_new_trade_observation_for_trade_file(trade_info):
                + str(trade_info['m']) + '\n'
     return new_line
 
-# ###PAUL delete this if uncommenting doesn't break anything in systemd job
-# def make_new_trade_observation_for_df(trade_info):
-#     """NOT USED left here as it provides lavels for what each of the message parameters is in the function above
-#     """
-#
-#     new_line_dict = {'msg_time':        trade_info['E'] / 1000, # times come in microseconds
-#                      'ticker':          trade_info['s'],
-#                      'trade_id':        trade_info['t'],
-#                      'price':           trade_info['p'],
-#                      'quantity':        trade_info['q'],
-#                      'buy_id':          trade_info['b'],
-#                      'sell_id':         trade_info['a'],
-#                      'trade_time':      trade_info['T'] / 1000, # times come in microseconds
-#                      'buyer_is_maker':  trade_info['m']
-#                      }
-#     return new_line_dict
+
+def check_if_file_make_dirs_then_write(file_path, new_line, header=None, thread_lock=False):
+    # check that the file exists for the correct time period
+    if os.path.isfile(file_path):
+        if thread_lock == True:
+            lock_thread_append_to_file(file_path, new_line)
+        if thread_lock == False:
+            # write trade to historical file... no lock as this script only appends to these files
+            with open(file_path, "a") as f:
+                f.write(new_line)
+            os.chmod(file_path, 0o777)
+
+    else:  # file does not exist
+        # check if directory heading to file exists, if not make all required on the way
+        fp_dirname = os.path.dirname(file_path)
+        if os.path.isdir(fp_dirname) == False:
+            os.makedirs(fp_dirname)
+
+        # write the new line, and header if requestd
+        with open(file_path, "a") as f:
+            if header is not None:
+                f.write(header)
+            f.write(new_line)
+        os.chmod(file_path, 0o777)
 
 
 def process_message(msg):
@@ -142,10 +160,10 @@ def process_message(msg):
     # # #######   ---------------------------------------------------------------- END: debug
     # # #######   ---------------------------------------------------------------- END: debug
 
-    # important variable definitions
     global conn_key
-    global this_scripts_process_ID
+    global exchange
     global last_msg_time
+    global this_scripts_process_ID
     global consecutive_error_messages
 
     # reset last message time for heartbeat check... if too long script assumes problem and restarts
@@ -168,36 +186,24 @@ def process_message(msg):
 
     # if normal trade message received process it
     else:
-        consecutive_error_messages = 0 # since its a good message, reset the error counter
+        consecutive_error_messages = 0  # since its a good message, reset the error counter
 
         # get trade info from message
         ticker = trade_info['s']
         new_line = make_new_trade_observation_for_trade_file(trade_info)
 
         # ### write to live data file
-        live_data_file_path = get_data_file_path(data_type='trade', ticker=ticker, date='live')
-        lock_thread_append_to_file(file_path=live_data_file_path, new_line=new_line)
+        live_data_file_path = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
+        check_if_file_make_dirs_then_write(file_path=live_data_file_path, new_line=new_line, thread_lock=True)
 
         # ### WRITE TO HISTORICAL DATA FILES
-        trade_info_epoch_time = trade_info['E']/1000
+        trade_info_epoch_time = trade_info['E'] / 1000
         date_tuple = convert_date_format(trade_info_epoch_time, 'tuple_to_day')
 
-        daily_trade_fp = get_data_file_path('trade', ticker, date=date_tuple)
+        daily_trade_fp = get_data_file_path('trade', ticker, date=date_tuple, exchange=exchange)
+        header = 'msg_time,ticker,trade_id,price,quantity,buy_order_id,sell_order_id,trade_time,buyer_is_maker\n'
 
-        # check that the file exists for the correct time period
-        if os.path.isfile(daily_trade_fp):
-            # write trade to historical file... no lock as this script only appends to these files
-            with open(daily_trade_fp, "a") as f:
-                f.write(new_line)
-            os.chmod(daily_trade_fp, 0o777)
-
-        # if file does not exist also write the column names
-        else:
-            header = 'msg_time,ticker,trade_id,price,quantity,buy_order_id,sell_order_id,trade_time,buyer_is_maker\n'
-            with open(daily_trade_fp, "a") as f:
-                f.write(header)
-                f.write(new_line)
-            os.chmod(daily_trade_fp, 0o777)
+        check_if_file_make_dirs_then_write(file_path=daily_trade_fp, new_line=new_line, header=header)
 
     return None
 
@@ -221,13 +227,12 @@ def trim_live_files(params=params):
     # # #######   ---------------------------------------------------------------- END: debug
 
     # variable definitions
-    trade_col_names = params['data_format']['trade']
-    live_trade_data_dir = params['dirs']['live_trade_data_dir']
-    tickers = os.listdir(live_trade_data_dir)
+    global exchange
+    trade_col_names = params['data_format'][exchange]['trade_col_name_list']
 
-    for ticker in tickers:
+    for ticker in tick_collection_list:
         lock.acquire()
-        live_fp = get_data_file_path(data_type='trade', ticker=ticker, date='live')
+        live_fp = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
 
         try:
             recent_trades = pd.read_csv(live_fp, names=trade_col_names, index_col=False)
@@ -240,11 +245,11 @@ def trim_live_files(params=params):
             # re-write live trade file
             recent_trades.to_csv(live_fp, header=False, index=False)
 
-        # ###PAUL TODO look into this exception.. im confused but too busy now
-        except FileNotFoundError: # this could happen if new ticker. no trades recorded.
+        # happens auto for new tickers
+        except FileNotFoundError:
             pass
         except TypeError:
-            print('we have a problem \n'*10, flush=True)
+            print('we have a problem \n' * 10, flush=True)
             print('msg_time type:  ', type(recent_trades['msg_time']), flush=True)
 
             send_email(subject='BINANCE DATA SCRAPE: unk error, needs debug',
@@ -253,6 +258,7 @@ def trim_live_files(params=params):
         lock.release()
 
     pass
+
 
 ###PAUL may need a new function as shown below
 def kill_scraper_for_sysd_autostart(conn_key, reason=""):
@@ -299,7 +305,7 @@ def heartbeat_check(params=params):
     # if no msg in last 30 seconds
     no_trade_message_timeout = params['constants']['no_trade_message_timeout']
 
-    if now > last_msg_time + no_trade_message_timeout: # ###PAUL consider using global var heartbeat_check_interval
+    if now > last_msg_time + no_trade_message_timeout:  # ###PAUL consider using global var heartbeat_check_interval
         print('NO MESSAGE FOR TOO LONG: STARTING BACKUP SCRIPT', flush=True)
         kill_scraper_for_sysd_autostart(conn_key, reason='   heartbeat_check() time out v4')
 
@@ -310,7 +316,7 @@ def notify_of_process_start():
 
     subject = 'DATA SCRAPER STARTED: BINANCE'
     message = 'Process ID: ' + str(this_scripts_process_ID) + '\n' + \
-                'Start Time: ' + now_time_string
+              'Start Time: ' + now_time_string
 
     send_email(subject, message)
 
@@ -327,17 +333,18 @@ def main(params=params):
     conn_key = bm.start_multiplex_socket(tick_collection_list, process_message)
 
     # live file trim task
-    live_file_trim_interval = params['constants']['live_trade_trim_interval']  # interval between cleaning
+    live_trade_trim_interval = params['constants']['live_trade_trim_interval']  # interval between cleaning
     file_trim_task = task.LoopingCall(f=trim_live_files)
-    file_trim_task.start(live_file_trim_interval)  # call every sixty seconds
+    file_trim_task.start(live_trade_trim_interval)  # call every sixty seconds
 
     # heartbeat check task... make sure still recieving messages
-    heartbeat_check_interval = params['constants']['data_scrape_heartbeat']
+    data_scrape_heartbeat = params['constants']['data_scrape_heartbeat']
     heartbeat_check_task = task.LoopingCall(f=heartbeat_check)
-    heartbeat_check_task.start(heartbeat_check_interval)
+    heartbeat_check_task.start(data_scrape_heartbeat)
 
     # then start the socket manager
     bm.start()
+
 
 try:
     main()
@@ -358,17 +365,3 @@ except Exception as e:
     # final layer of quitting, incase all else fails
     raise TimeoutError
     sys.exit()
-
-
-###PAUL TODO this api apparently is better for websockets...
-# oliver-zehentleitner/unicorn-binance-websocket-api
-
-
-
-
-
-
-
-
-
-

@@ -1,11 +1,19 @@
+#!/home/paul/miniconda3/envs/binance/bin/python3
+# -*- coding: utf-8 -*-
+
 # ### imports
 #
 #
 import os
 import time
+
 # ### time zone change... this must happen first and utils must be imported first
 os.environ['TZ'] = 'UTC'
 time.tzset()
+
+import sys
+
+sys.path.append('/mnt/algos/')
 
 import datetime
 import dateutil
@@ -16,25 +24,19 @@ from email.mime.text import MIMEText
 import numpy as np
 import os
 import pandas as pd
-import pandas.api.types # not sure if needed but added from notebook so ill keep dis here for now
+# import pandas.api.types  # not sure if needed but added from notebook so ill keep dis here for now
 import re
 import smtplib
 from typing import Union
 
 # local packages
-from data import config
+
+import config
 
 # ### variable definitions
 #
 #
 params = config.params
-
-price_data_dir = params['dirs']['price_data_dir']
-trade_data_dir = params['dirs']['trade_data_dir']
-live_trade_data_dir = params['dirs']['live_trade_data_dir']
-order_data_dir = params['dirs']['order_data_dir']
-# order_closed_data_dir = params['dirs']['order_closed_data_dir']
-# order_open_data_dir = params['dirs']['order_open_data_dir']
 
 
 def convert_date_format(date, output_type):
@@ -61,14 +63,14 @@ def convert_date_format(date, output_type):
             year, month, day = date
             if output_type == 'datetime' or output_type == 'datetime.date':
                 return datetime.date(year=year, month=month, day=day)
-            if output_type == 'tuple_to_day': 
-                y, m, d = str(date[0]),  str(date[1]), str(date[2])
-                return (y, m ,d)
+            if output_type == 'tuple_to_day':
+                y, m, d = str(date[0]), str(date[1]), str(date[2])
+                return (y, m, d)
 
         # tuple to sec  resolution... ie: [2021, 01, 31, 23, 59, 1]
         if len(date) == 6:
             year, month, day, hour, minute, second = date
-            if output_type == 'datetime'or output_type == 'datetime.datetime':
+            if output_type == 'datetime' or output_type == 'datetime.datetime':
                 return datetime.date(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
 
         print("###PAUL make    tuple     to desired output work please")
@@ -140,7 +142,8 @@ def check_if_file_in_directory(file, directory):
         return False
 
 
-def send_email(subject, message, params=params):
+# ###PAUL_aws migration concern... may need different mail function
+def send_email(subject, message, to='paulboehringer0989@gmail.com', params=params):
     """sends an email from my protonmail to the
     input:
         subject (str): subject for email
@@ -158,7 +161,7 @@ def send_email(subject, message, params=params):
 
         msg = MIMEMultipart()
         msg['From'] = sender_email
-        msg['To'] = 'paulboehringer0989@gmail.com'
+        msg['To'] = to
 
         msg['Subject'] = subject
 
@@ -169,13 +172,16 @@ def send_email(subject, message, params=params):
         mailserver.login(sender_email, email_password)
         mailserver.sendmail('paulboehringer@protonmail.com', 'paulboehringer0989@gmail.com', msg.as_string())
         mailserver.quit()
-    except:
-        print('---- an email failed to send')
+    except Exception as e:
+        print('---- an email failed to send \n the error will print out below \n \n \n ')
+        print(e)
+        print('\n \n \n')
         pass
+
     return True
 
 
-def get_last_line_of_file(filepath, filesize='small'):
+def get_last_line_of_file(filepath, filesize='large'):
     """gets the last line of a file.. see link for second way to do it
     https://stackoverflow.com/questions/46258499/read-the-last-line-of-a-file-in-python
     """
@@ -197,7 +203,7 @@ def get_last_line_of_file(filepath, filesize='small'):
 
 
 def make_date_suffix(date, file_type='.csv'):
-    """ makes as suffix of the form:
+    """ makes as suffix for file paths of the form: "----2020-12-31.csv"
 
     input
         date (tuple):     (year, month, day) such as (2021, 01, 31)... leading zeros not required
@@ -222,7 +228,19 @@ def make_date_suffix(date, file_type='.csv'):
     return suffix
 
 
-def get_data_file_path(data_type, ticker, date='live', port=None, params=params):
+price_data_dir = params['dirs']['price_data_dir']
+trade_data_dir = params['dirs']['trade_data_dir']
+live_trade_data_dir = params['dirs']['live_trade_data_dir']
+order_data_dir = params['dirs']['order_data_dir']
+live_data_dir = params['dirs']['live_data_dir']
+port_data_dir = params['dirs']['port_data_dir']
+
+
+# order_closed_data_dir = params['dirs']['order_closed_data_dir']
+# order_open_data_dir = params['dirs']['order_open_data_dir']
+
+
+def get_data_file_path_OLD_VERSION(data_type, ticker, date='live', port=None, params=params):
     """returns string of filepath to requested datafile
 
     :param port: (str) naming the portfolio strategy for orders and preformance data
@@ -234,7 +252,7 @@ def get_data_file_path(data_type, ticker, date='live', port=None, params=params)
         date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
     """
     # first handle if date is live... if not we attempt to convert it if not a tuple
-    if date == 'live' or date=='open':
+    if date == 'live' or date == 'open':
         if data_type == 'trade':
             fp = live_trade_data_dir + ticker + '/' + ticker + '_live_trades.csv'
         ###PAUL_DEV_SPOT
@@ -252,7 +270,7 @@ def get_data_file_path(data_type, ticker, date='live', port=None, params=params)
                 return IOError
             else:
                 fp = order_data_dir + port + '/whose_turn.csv'
-        if data_type=='last_order_check':
+        if data_type == 'last_order_check':
             if port is None:
                 return IOError
             else:
@@ -268,7 +286,7 @@ def get_data_file_path(data_type, ticker, date='live', port=None, params=params)
     # if ~isinstance(date, tuple):
     #     date = convert_date_format(date=date, output_type='tuple_to_day')
 
-    elif date == 'ticker_folder': # just gets the ticker's folder.. will direct to folder of dates for data type
+    elif date == 'ticker_folder':  # just gets the ticker's folder.. will direct to folder of dates for data type
         if data_type == 'price' or data_type == 'prices':
             fp = price_data_dir + ticker + '/'
         elif data_type == 'trade' or data_type == 'trades':
@@ -279,7 +297,7 @@ def get_data_file_path(data_type, ticker, date='live', port=None, params=params)
             fp = order_data_dir + port + '/closed/' + ticker + '/'
 
 
-    elif date != 'live': # date is actually supplied
+    elif date != 'live':  # date is actually supplied
         suffix = make_date_suffix(date)
 
         if data_type == 'price' or data_type == 'prices':
@@ -299,7 +317,107 @@ def get_data_file_path(data_type, ticker, date='live', port=None, params=params)
     return fp
 
 
-def get_live_trades_data(ticker, params=params):
+def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None, params=params):
+    """returns string of filepath to requested datafile
+
+    :param port: (str) naming the portfolio strategy for orders and preformance data
+    inputs
+        data_type (str): options ----  ['price', 'trade', 'order', 'book']  ----
+            TODO add live order which means all open orders
+            TODO daily data files  add support for book eventually
+        ticker (str):    ticker  ---- 'BTCUSDT'
+        date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
+    """
+    fp = None
+
+    # first handle if date is live... if not we attempt to convert it if not a tuple
+    if date == 'live' or date == 'open':
+        # ### live kept data
+        #
+        #
+        if data_type == 'trade' or data_type == 'trades' or data_type == 'price' or data_type == 'prices':
+            if exchange is None:
+                return IOError
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_live/' + exchange + '/' + ticker + '/' \
+                     + exchange + '_' + ticker + '_live_trades.csv'
+
+            # ###PAUL i believe this is handled in get_data instead of this function... just gets last 24 hours in that
+            elif data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + ticker + '/' + ticker + '_live_trades.csv'
+
+        # ### portfolio data
+        #
+        #
+        if data_type == 'orders' or data_type == 'order' or data_type == 'open_orders' \
+                or data_type == 'whose_turn' or data_type == 'last_order_check' \
+                or data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path' \
+                or data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
+            # if port not provided can't get any of these
+            if port is None:
+                return IOError
+            elif data_type == 'orders' or data_type == 'order' or data_type == 'open_orders':
+                fp = port_data_dir + port + '/open_orders.csv'
+            elif data_type == 'whose_turn':
+                fp = port_data_dir + port + '/whose_turn.csv'
+            elif data_type == 'last_order_check':
+                fp = port_data_dir + port + '/last_check.txt'
+            elif data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path':
+                fp = port_data_dir + port + '/'
+            elif data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
+                print('###PAUL need to get this to return the closed date  ')
+
+    # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
+    # if ~isinstance(date, tuple):
+    #     date = convert_date_format(date=date, output_type='tuple_to_day')
+
+    elif date == 'ticker_folder':  # just gets the ticker's folder.. will direct to folder of dates for data type
+        if exchange is not None:
+            if data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + 'price/' + exchange + '/' + ticker + '/'
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + ticker + '/'
+            elif data_type == 'book':
+                fp = live_data_dir + 'book_daily/' + exchange + '/' + ticker + '/'
+        elif port is not None:
+            if data_type == 'order_closed':
+                fp = port_data_dir + port + '/closed/' + ticker + '/'
+        else:
+            return IOError
+
+    elif date != 'live':  # date is actually supplied
+        suffix = make_date_suffix(date)
+
+        # live maintained data (historical, but still folder is managed in real time)
+        if exchange is not None:
+            if data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + 'price/' + exchange + '/' + ticker \
+                     + '/prices----' + exchange + '_' + ticker + suffix
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + ticker  \
+                     + '/trades----' + exchange + '_' + ticker + suffix
+            elif data_type == 'book':
+                fp = live_data_dir + 'book/' + exchange + '/' + ticker \
+                     + '/book----' + exchange + '_' + ticker + suffix
+
+        # port related data
+        elif port is not None:
+            if data_type == 'order' or data_type == 'orders' or data_type == 'closed_orders':
+                fp = port_data_dir + port + '/closed/' + ticker + '/orders---' + ticker + suffix
+        else:
+            return IOError
+
+    if fp is not None:
+        return fp
+    else:
+        print('Nothing in data file path function matched the request')
+        print('the request was:')
+        print('    data_type=' + str(data_type) + ', ticker=' + str(ticker) + ', date=' + str(date) \
+              + ', port=' + str(port) +  ', exchange=' + str(exchange) )
+        return IOError
+
+
+def get_live_trades_data(ticker, exchange, params=params):
     """gets dataframe of live data... most recent trades for last 10 mins
 
     input
@@ -307,8 +425,8 @@ def get_live_trades_data(ticker, params=params):
     returns
         - trades (pd.DataFrame): trades for last 10 minutes
     """
-    col_dtype_dict = params['data_format']['trade_name_and_type']
-    fp = get_data_file_path(data_type='trade', ticker=ticker, date='live')
+    col_dtype_dict = params['data_format'][exchange]['trade_name_and_type']
+    fp = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
 
     return pd.read_csv(fp,
                        header=0,  # ignore col_names... dont treat as data
@@ -318,20 +436,22 @@ def get_live_trades_data(ticker, params=params):
                        )
 
 
-def get_price_data(ticker, date='live', params=params):
-    """
-
-    :param ticker:
-    :param date:
-    :param params:
-    :return:
-    """
-    fp = get_data_file_path(data_type='price')
-
-    prices = pd.read_csv(fp)
+# ###PAUL_algos_refractor... doesnt appear to be used anywhere
+# def get_price_data(ticker, date='live', params=params):
+#     """
+#     :param ticker:
+#     :param date:
+#     :param params:
+#     :return:
+#     """
+#
+#     fp = get_data_file_path(data_type='price')
+#
+#     prices = pd.read_csv(fp)
 
 
 # from datetime import date, timedelta
+
 def get_date_range(start_date, end_date, output_type='datetime.datetime'):
     """makes list from start_date to end date
 
@@ -352,7 +472,7 @@ def get_date_range(start_date, end_date, output_type='datetime.datetime'):
         date_i = start_date + datetime.timedelta(days=i)
 
         if output_type != 'datetime.datetime':
-            date_i = convert_date_format(date=date_i, output_type='tuple_to_day')
+            date_i = convert_date_format(date=date_i, output_type=output_type)
 
         date_list.append(date_i)
 
@@ -360,12 +480,15 @@ def get_date_range(start_date, end_date, output_type='datetime.datetime'):
 
 
 def get_data(data_type,
-                  ticker,
-                  params=params,
-                  date=None,
-                  start_date=None,
-                  end_date=None,
-                  duration=None):
+             ticker,
+             params=params,
+             date=None,
+             start_date=None,
+             end_date=None,
+             duration=None,
+             port=None,
+             exchange=None,
+):
     """master data retriving function
 
     input:
@@ -374,14 +497,14 @@ def get_data(data_type,
         date: datetime.datetime
         start_date (tuple): ('2021', '01', '31') will work... all others not gaurenteed
     """
+
     # handle timing requests  ###PAUL TODO make this part of get_date_range function
 
-    # convert any fed in dates to datetime as we do relative calculations with them
+    # convert any dates to datetime as we do relative calculations with them
     if start_date is not None:
         start_date = convert_date_format(start_date, 'datetime')
     if end_date is not None:
         end_date = convert_date_format(end_date, 'datetime')
-
     if start_date is None and end_date is None and date is None:
         date = 'live'
 
@@ -401,7 +524,7 @@ def get_data(data_type,
         start_date = date
         end_date = date
 
-    # only start date given --> use start AND duration argument
+    # only start date given --> use start_date  AND  duration argument
     elif start_date is not None and end_date is None:
         if duration is None:
             end_date = start_date  # do this because only return start_date's data
@@ -410,7 +533,7 @@ def get_data(data_type,
         if end_date > datetime.date.fromtimestamp(time.time()):
             end_date = datetime.date.fromtimestamp(time.time())
 
-    # only end date given --> use end end duration argument
+    # only end date given --> use end_date  and  duration argument
     elif end_date is not None and start_date is None:
         if duration is None:
             start_date = end_date  # do this because only return start_date's data
@@ -438,8 +561,7 @@ def get_data(data_type,
     date_list = get_date_range(start_date, end_date)
 
     for idx, data_date in enumerate(date_list):
-        # import pdb
-        fp = get_data_file_path(data_type, ticker, data_date, params=params)
+        fp = get_data_file_path(data_type, ticker, data_date, port, exchange, params=params)
 
         if idx == 0:
             # pdb.set_trace()
@@ -467,33 +589,29 @@ def get_data(data_type,
         data.dropna(inplace=True)
         data.sort_index(inplace=True)
 
-        ### the below takes too long, and arguably for live bots shouldn't be included
-        ### do for neural networks on hand as needed
-        # some seconds have missing enteries.. this handles that
+        # fill in missing observations using this dictionary
         observation_dict = {'buyer_is_maker': 0, 'buyer_is_taker': 0, 'buy_vol': 0, 'sell_vol': 0,
                             'buy_base_asset': 0, 'sell_base_asset': 0, 'buy_vwap': np.nan, 'sell_vwap': np.nan}
 
-        empty_ts = pd.Series(data=pd.date_range(start=data.index[0], end=data.index[-1], freq='s'))
-
         empty_ts = pd.Series(data=pd.date_range(start=min(data.index), end=max(data.index), freq='s'))
-
         mask = empty_ts.isin(data.index)
         mask = ~mask
-
         missing_times = empty_ts[mask]
-
         missing_data = pd.DataFrame(observation_dict, index=missing_times)
-
         data = pd.concat([data, missing_data])
 
+        # sort everything with the missing enteries filled in as 0
         data.sort_index(inplace=True)
 
+        # and fill in the NaNs from the missing enteries
         data.fillna(method='ffill', inplace=True)
         data.fillna(method='bfill', inplace=True)
         data.fillna(method='ffill', inplace=True)
 
     return data
 
+
+###PAUL eventually may need to take into account the data source (hopefully can put that off as long as possible)
 def convert_trades_df_to_prices(trades):
     """reads CSV of trades. converts to prices in some interval
 
@@ -565,7 +683,7 @@ def trim_data_frame_by_time(df,
     return df
 
 
-def make_day_of_prices_from_day_of_trades(ticker, date, params=params):
+def make_day_of_prices_from_day_of_trades(ticker, date, exchange, params=params):
     """makes prices historical price csv using trades.
 
     input:
@@ -577,16 +695,16 @@ def make_day_of_prices_from_day_of_trades(ticker, date, params=params):
     if type(date) != tuple:
         date = convert_date_format(date, 'tuple_to_day')
 
-    trades = get_data(data_type='trade', ticker=ticker, date=date)
+    trades = get_data(data_type='trade', ticker=ticker, date=date, exchange=exchange)
 
     prices = convert_trades_df_to_prices(trades)
 
-    prices_fp = get_data_file_path(data_type='prices', ticker=ticker, date=date)
+    prices_fp = get_data_file_path(data_type='prices', ticker=ticker, date=date, exchange=exchange)
 
     prices.to_csv(prices_fp)
 
 
-def remake_price_files(params=params, start_date=None, end_date=None):
+def remake_price_files(start_date=None, end_date=None, exchange=None, params=params, ):
     """scans the trade history directory for each ticker and remakes the price file
 
     input:
@@ -611,7 +729,8 @@ def remake_price_files(params=params, start_date=None, end_date=None):
         ticker_trade_dir = get_data_file_path(data_type='trade',
                                               ticker=ticker,
                                               date='ticker_folder',
-                                              params=params)
+                                              exchange=exchange,
+                                              params=params,)
         trs = os.listdir(ticker_trade_dir)
 
         # identify dates with trading data`
@@ -647,8 +766,8 @@ def remake_price_files(params=params, start_date=None, end_date=None):
 
             try:
                 if make_ticker_date_prices:
-                    print('MAKING:     ticker:  ' + ticker + '  date: ' + date)
-                    make_day_of_prices_from_day_of_trades(ticker, file_date_tup)
+                    print('MAKING:     ticker:  ' + ticker + '  date: ' + date + '  exchange: ' + exchange)
+                    make_day_of_prices_from_day_of_trades(ticker, file_date_tup, exchange)
 
             except:
                 print("  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n ")
@@ -736,11 +855,14 @@ def make_alternating_buy_sell_signal(buy_idxs, sell_idxs, signal_shape):
 
     return signal
 
+
 def convert_ticker_us_to_foreign(us_ticker):
     return params['universe']['tickers_foreign_to_us_dict'][us_ticker]
 
+
 def convert_ticker_us_to_foreign(us_ticker):
     return params['universe']['tickers_us_to_foreign_dict'][us_ticker]
+
 
 def convert_ticker_foreign_to_us(foreign_ticker):
     return params['universe']['tickers_foreign_to_us_dict'][foreign_ticker]
@@ -755,7 +877,8 @@ def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Dec
     precision: int = int(round(-math.log(step_size, 10), 0))
     return float(round(quantity, precision))
 
-def round_decimals_up(number:float, decimals:int=2):
+
+def round_decimals_up(number: float, decimals: int = 2):
     """
     Returns a value rounded up to a specific number of decimal places.
     """
@@ -769,7 +892,8 @@ def round_decimals_up(number:float, decimals:int=2):
     factor = 10 ** decimals
     return math.ceil(number * factor) / factor
 
-def round_decimals_down(number:float, decimals:int=2):
+
+def round_decimals_down(number: float, decimals: int = 2):
     """
     Returns a value rounded down to a specific number of decimal places.
     """
