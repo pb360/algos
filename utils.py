@@ -193,11 +193,26 @@ def get_last_line_of_file(filepath, filesize='large'):
             last_line = line
 
     if filesize == 'large':
-        with open(filepath, 'rb') as f:
-            f.seek(-2, os.SEEK_END)
-            while f.read(1) != b'\n':
-                f.seek(-2, os.SEEK_CUR)
-            last_line = f.readline().decode()
+        # if the file is one line this method will fail, revert to small file method
+        try:
+            with open(filepath, 'rb') as f:
+                f.seek(-2, os.SEEK_END)
+                while f.read(1) != b'\n':
+                    f.seek(-2, os.SEEK_CUR)
+                last_line = f.readline().decode()
+        # turns out the file was one line
+        except OSError:
+            print('\n the file was too short for the long method \n ')
+            # if the file is empty then this try except will hit
+            try:
+                with open(filepath) as f:
+                    for line in f:
+                        pass
+                    last_line = line
+            except NameError as e:
+                print(e)
+                print('\n \n this file is empty  \n ')
+                raise FileExistsError
 
     return last_line
 
@@ -342,7 +357,7 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
                 fp = live_data_dir + 'trades_live/' + exchange + '/' + ticker + '/' \
                      + exchange + '_' + ticker + '_live_trades.csv'
 
-            # ###PAUL i believe this is handled in get_data instead of this function... just gets last 24 hours in that
+            # ###PAUL this should be handled one day... maybe return just the price file for time.time()
             elif data_type == 'price' or data_type == 'prices':
                 fp = live_data_dir + ticker + '/' + ticker + '_live_trades.csv'
 

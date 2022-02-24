@@ -56,7 +56,9 @@ constants = {
 # ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
 
 
-exchanges = ['binance_foreign', 'binance_us', 'kucoin']
+exchanges = ['binance_foreign', 'binance_us']
+
+exchanges_we_want_to_add_end_to_end_support_for = ['kucoin', ]
 
 # ###PAUL_migration .... this should probably just go away, or be migrated to ./utils.py thats the only thing that'll
 # ###PAUL_migration .... us it with get_data_fp()
