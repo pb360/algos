@@ -47,7 +47,7 @@ constants = {
     'secondary_order_interval': 2,  # update market status and adjust orders ###PAUL_migration needs to mention binance
     'trade_watch_dog_interval': 20,
     # how long if no trade to restart trade collection w/ system-d ###PAUL_migration needs to mention binance
-    'price_watch_dog_interval': 45,
+    'price_watch_dog_interval': 25,
     # how long if no price update to re-run orders.py w/ system-d ###PAUL_migration needs to mention binance
     'order_watch_dog_interval': 5 * 60,
     # how long if no orders to reset any given bot ###PAUL_migration needs to mention binance
@@ -57,6 +57,31 @@ constants = {
 
 
 exchanges = ['binance_foreign', 'binance_us']
+
+systemd_control = dict()
+
+active_exchanges = ['binance_foreign', 'binance_us']
+
+# names of systemd services used to collect trades for each exchange
+active_services = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_foreign',
+                              'binance_us': 'algos_scrape_trades_binance_us',
+                              'kucoin': 'algos_scrape_trades_binance_kucoin',
+                              },
+                   'prices': {'crypto': 'algos_pipe_trades_to_prices',
+                              },
+
+                   # ### active portfolios
+                   'ports': {'sma_v1_equal_dist': 'trading_service_name'}
+                   }
+
+ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
+                          'binance_us': 'BTCUSD',
+                          'kucoin': '????'
+                          }
+
+systemd_control['active_exchanges'] = active_exchanges
+systemd_control['active_services'] = active_services
+systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
 
 exchanges_we_want_to_add_end_to_end_support_for = ['kucoin', ]
 
@@ -108,16 +133,16 @@ universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth'
                                                      ],
                             # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
 
-                            'tickers_tracked': ['ADAUSDT',  'ADABTC',
-                                                'BNBUSDT',  'BNBBTC',
+                            'tickers_tracked': ['ADAUSDT', 'ADABTC',
+                                                'BNBUSDT', 'BNBBTC',
                                                 'BTCUSDT',
                                                 'DOGEUSDT', 'DOGEBTC',
-                                                'ETHUSDT',  'ETHBTC',
+                                                'ETHUSDT', 'ETHBTC',
                                                 'LINKUSDT', 'LINKBTC',
-                                                'LTCUSDT',  'LTCBTC',
-                                                'XLMUSDT',  'XLMBTC',
-                                                'XRPUSDT',  'XRPBTC',
-                                                'XTZUSDT',  'XTZBTC',  'XTZETH',
+                                                'LTCUSDT', 'LTCBTC',
+                                                'XLMUSDT', 'XLMBTC',
+                                                'XRPUSDT', 'XRPBTC',
+                                                'XTZUSDT', 'XTZBTC', 'XTZETH',
                                                 ],
 
                             'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
@@ -156,21 +181,22 @@ universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'li
                                                 'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
                                                 'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
                                                 'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                                'xrpusdt@trade', 'xrpbtc@trade', # 'xrpusd@trade',  # trades still come?
-                                                                 'xtzbtc@trade', 'xtzusd@trade',
+                                                'xrpusdt@trade', 'xrpbtc@trade',
+                                                # 'xrpusd@trade',  # trades still come?
+                                                'xtzbtc@trade', 'xtzusd@trade',
                                                 ],
                        # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
 
-                       'tickers_tracked': ['ADAUSDT',  'ADABTC',  'ADAUSD',
-                                           'BNBUSDT',  'BNBBTC',  'BNBUSD',
-                                           'BTCUSDT',             'BTCUSD',
+                       'tickers_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
+                                           'BNBUSDT', 'BNBBTC', 'BNBUSD',
+                                           'BTCUSDT', 'BTCUSD',
                                            'DOGEUSDT', 'DOGEUSD',
-                                           'ETHUSDT',  'ETHBTC',  'ETHUSD',
+                                           'ETHUSDT', 'ETHBTC', 'ETHUSD',
                                            'LINKUSDT', 'LINKBTC', 'LINKUSD',
-                                           'LTCUSDT',  'LTCBTC',  'LTCUSD',
-                                           'XLMUSDT',             'XLMUSD',
-                                           'XRPUSDT',  'XRPBTC',  # 'XRPUSD', commented out from here because no USD
-                                                       'XTZBTC',  'XTZUSD',
+                                           'LTCUSDT', 'LTCBTC', 'LTCUSD',
+                                           'XLMUSDT', 'XLMUSD',
+                                           'XRPUSDT', 'XRPBTC',  # 'XRPUSD', commented out from here because no USD
+                                           'XTZBTC', 'XTZUSD',
                                            ],
 
                        'tickers_traded': ['BTCUSDT'
@@ -574,6 +600,7 @@ params = dict()
 
 params['constants'] = constants
 params['exchanges'] = exchanges
+params['systemd_control'] = systemd_control
 params['universe'] = universe
 params['keys'] = keys  ###PAUL consider not including in params
 params['ports'] = ports

@@ -567,10 +567,10 @@ def get_data(data_type,
         raise DateError
 
     if data_type == 'price' or data_type == 'prices':
-        col_dtype_dict = params['data_format']['price_name_and_type']
+        col_dtype_dict = params['data_format'][exchange]['price_name_and_type']
 
     if data_type == 'trade' or data_type == 'trades':
-        col_dtype_dict = params['data_format']['trade_name_and_type']
+        col_dtype_dict = params['data_format'][exchange]['trade_name_and_type']
 
     # for now these must get fed in as datetime
     date_list = get_date_range(start_date, end_date)
