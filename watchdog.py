@@ -34,11 +34,28 @@ for ex in params['exchanges']:
     error_count_dict['price'][ex] = 0
 
 
+# used a few times to restart services, good because it allows for mode switching easily for manual updates
+def restart_service(service, word=word, mode='restart'):
+    if mode == 'restart':
+        command = 'sudo systemctl restart ' + service + '.service '
+        p = os.system('echo %s|sudo -S %s' % (word, command))
+
+    if mode == 'hard_restart':
+        command = 'sudo systemctl stop ' + service + '.service ' \
+                  + '&& sudo systemctl daemon-reload' \
+                  + '&& sudo systemctl enable ' + service + '.service' \
+                  + '&& sudo systemctl restart ' + service + '.service'
+
+        p = os.system('echo %s|sudo -S %s' % (word, command))
+
+    return None
+
+
 def trade_watchdog():
     """checks if we are getting trades and will hard reset the trade datascrape service
     """
 
-    print(2 * "-=-=-=-=-=-=-=-= ALGOS WATCHDOG: checking if we are GETTING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
+    print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
 
     for exchange in params['systemd_control']['active_exchanges']:
         try:
@@ -47,16 +64,17 @@ def trade_watchdog():
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
 
             if time_since_last_btc_trade > 30:  # restart systemd service
-                service_name = params['systemd_control']['active_services']['trades'][exchange]
-                command = 'sudo systemctl restart ' + service_name + '.service '
-                print(10 * 'NOT GETTING TRADES -  exchange: ' + exchange +  ' - RESTARTING  -  ' + service_name + '\n',
+                service = params['systemd_control']['active_services']['trades'][exchange]
+                print(10 * 'NOT GETTING TRADES -  exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n',
                       flush=True)
 
                 # restart it
-                p = os.system('echo %s|sudo -S %s' % (word, command))
+                restart_service(service)
+
             else:
                 error_count_dict['trade'][exchange] = 0
-                print("-=-=-=-=-=-=-=-= trades being received for   " + exchange + "   -=-=-=-=-=-=-=-=\n", flush=True)
+                print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: trades being received for     " + exchange + "    -=-=-=-=-=\n",
+                      flush=True)
 
         except FileNotFoundError:  # sometimes the price may not have been made
             error_count_dict['trade'][exchange] += 1
@@ -74,7 +92,7 @@ def price_crypto_making_watchdog():
 
     global error_count_dict
 
-    print(2 * '-=-=-=-=-=-=-=-= ALGOS WATCHDOG: checking if we are MAKING PRICES -=-=-=-=-=-=-=-=\n', flush=True)
+    print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING PRICES -=-=-=-=-=-=-=-=\n', flush=True)
     for exchange in params['systemd_control']['active_exchanges']:
         try:
             check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
@@ -88,30 +106,31 @@ def price_crypto_making_watchdog():
             seconds_since_last_msg = time.time() - epoch_msg_time
 
             if seconds_since_last_msg > 35:
-                service_name = params['systemd_control']['active_services']['prices']['crypto']
-                command = 'sudo systemctl restart ' + service_name + '.service '
-                print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service_name + ' -=-=-=-=-=-=-',
+                service = params['systemd_control']['active_services']['prices']['crypto']
+                print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)
 
-                p = os.system('echo %s|sudo -S %s' % (word, command))
+                # restart it
+                restart_service(service)
+
             else:
-                print('-=-=-=-=-=-=-=-= prices being made for   ' + exchange + '   -=-=-=-=-=-=-=-=\n', flush=True)
+                print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG prices being made for    ' + exchange + '    -=-=-=-=-=-=-=-=\n',
+                      flush=True)
                 error_count_dict['price'][exchange] = 0
 
-        except FileNotFoundError:  # sometimes the price may not have been made
+        except FileNotFoundError:  # sometimes the price may not have been made ... weird stuff happens...
             error_count_dict['price'][exchange] += 1
 
             if error_count_dict['price'][exchange] > 3:
                 # ###PAUL_debug i dont think this is the right way to handle this but its late
-                print('-=-=-=-=-=- ALGOS WATCHDOG: price making error  -=-=-=-=-=-')
+                print('-=-=-=-=-=- ALGOS WATCHDOG: price making error  -=-=-=-=-=-', flush=True)
                 # raise RuntimeError
-                service_name = params['systemd_control']['active_services']['prices']['crypto']
-                command = 'sudo systemctl restart ' + service_name + '.service '
-                print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service_name + ' -=-=-=-=-=-=-',
+                service = params['systemd_control']['active_services']['prices']['crypto']
+                print(2 * '-=-=-=-=- ALGOS - RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)
 
-                p = os.system('echo %s|sudo -S %s' % (word, command))
-
+                # restart service
+                restart_service(service)
 
     return None
 
@@ -122,15 +141,23 @@ def check_if_orders_being_updated():
     if True, then orders are being updated then we are good.
     """
 
-    # ###PAUL debug this shitshow of a loop
-    print('\n \n -------  debug output \n \n  ')
-    print(params['systemd_control']['active_exchanges']['active_ports'])
-    for port_name in params['systemd_control']['active_exchanges']['active_ports']:
+    print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING LIVE BOTS -=-=-=-=-=-=-=-=\n', flush=True)
+
+    active_ports = params['systemd_control']['active_ports']
+
+    for port_name in active_ports:
+        exchange = params['systemd_control']['active_services']['ports'][port_name]['exchange']
+        service = params['systemd_control']['active_services']['ports'][port_name]['service_name']
 
         try:
-            fp = get_data_file_path(data_type='last_order_check', ticker=None, date='live', port=port_name)
+            fp = get_data_file_path(data_type='last_order_check',
+                                    ticker=None,
+                                    date='live',
+                                    port=port_name,
+                                    exchange=exchange)
         except FileNotFoundError:
-            print('---- ALGOS - LIVEBOT CHECK: order file not found  --> ' + str(fp))
+            print(2 * '\n ---- ALGOS - LIVEBOT CHECK: order file not found  --> \n' + str(fp), flush=True)
+            print('---- PROBLEM: last_order_check not found for port ---- ' + port_name, flush=True)
             return None
 
         with open(fp, 'r') as f:
@@ -141,13 +168,17 @@ def check_if_orders_being_updated():
         time_since_last_order_update = time.time() - last_update_time
 
         if time_since_last_order_update > 60:
-            service = params['systemd_control']['active_services']['ports'][port_name]
-            command = 'sudo systemctl restart ' + service + '.service'
-            p = os.system('echo %s|sudo -S %s' % (word, command))
+            print(2 * '-=-=-=-=- ALGOS - RESTARTING LIVE BOT: ' + service + ' -=-=-=-=-=-=-',
+                  flush=True)
+
+            # restart it
+            restart_service(service)
 
         else:  # orders being checked / placed for this portfolio
-            print('-=-=-=-=-=-=-=-= orders are being placed for port =  ' + port_name + '   -=-=-=-=-=-=-=-=\n',
+            print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG:   port   ' + port_name + '  ---- is active on   ' + exchange
+                  + '   -=-=-=-=-=\n',
                   flush=True)
+
 
 # trade reception watchdog
 trade_watch_dog_interval = params['constants']['trade_watch_dog_interval']  # interval between cleaning

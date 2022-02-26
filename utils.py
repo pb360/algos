@@ -155,7 +155,7 @@ def send_email(subject, message, to='paulboehringer0989@gmail.com', params=param
     """
     # pull variables out of params
     try:
-        port_number = params['ports']['email_port']
+        port_number = params['constants']['email_port']
         sender_email = params['keys']['mail_user']
         email_password = params['keys']['mail_password']
 
@@ -891,12 +891,12 @@ def make_alternating_buy_sell_signal(buy_idxs, sell_idxs, signal_shape):
 # ###PAUL_refractor
 # ###PAUL_refractor for initial algos refractor may want to remove these conversion
 # ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
-def convert_ticker_us_to_foreign(us_ticker):
-    return params['universe']['tickers_us_to_foreign_dict'][us_ticker]
+def convert_ticker_us_to_foreign(us_ticker, exchange):
+    return params['universe'][exchange]['tickers_us_to_foreign_dict'][us_ticker]
 
 
-def convert_ticker_foreign_to_us(foreign_ticker):
-    return params['universe']['tickers_foreign_to_us_dict'][foreign_ticker]
+def convert_ticker_foreign_to_us(foreign_ticker, exchange):
+    return params['universe'][exchange]['tickers_foreign_to_us_dict'][foreign_ticker]
 
 
 # ###PAUL_refractor for initial algos refractor may want to remove these conversion

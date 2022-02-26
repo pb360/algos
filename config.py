@@ -33,9 +33,6 @@ keys = params_local['keys']
 # ### important constants
 #
 #
-ports = {'email_port': 1025}
-
-# ###PAUL_migration ... this can stay however will need some updates
 constants = {
     'secs_of_trades_to_keep_live': 60,  # number of minutes to keep trades in live file
     'live_trade_trim_interval': 30,  # how mnay seconds betweeen trimming live files
@@ -49,10 +46,11 @@ constants = {
     # how long if no trade to restart trade collection w/ system-d ###PAUL_migration needs to mention binance
     'price_watch_dog_interval': 25,
     # how long if no price update to re-run orders.py w/ system-d ###PAUL_migration needs to mention binance
-    'order_watch_dog_interval': 5 * 60,
-    # how long if no orders to reset any given bot ###PAUL_migration needs to mention binance
+    'order_watch_dog_interval': 15,
+    # how long if order check not updated to restart any live_bot
     'os': str(platform.system()),
     'signal_based_order_interval': 10,
+    'email_port': 1025,
 }
 # ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
 
@@ -72,8 +70,15 @@ active_services = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_fo
                               },
                    'prices': {'crypto': 'algos_pipe_trades_to_prices',
                               },
-                   'ports': {'sma_v1_equal_dist': 'algos_bot_sma_v1_equal_dist',
-                             # 'markowitz_v1': 'algos_bot_markowitz_v1',
+                   'ports': {'sma_v1_equal_dist': {'service_name': 'algos_live_bot_sma_v1_equal_dist',
+                                                   'exchange': 'binance_us',
+                                                   },
+                             'markowitz_v1': {'service_name': 'algos_live_bot_markowitz_v1',
+                                              'exchange': 'binance_us',
+                                              },
+                             'ml_v1': {'service_name': 'algos_live_bot_ml_v1',
+                                       'exchange': 'binance_us',
+                                       },
                              },
                    }
 
@@ -125,7 +130,6 @@ for exchange in exchanges:
 
 # ###PAUL_refractor for the live bot some temporary variables that will be in the universial dict will be below
 # ###PAUL_refracto eventually these will need to move to params['universe']['universal']
-
 
 
 universal = {}
@@ -619,7 +623,6 @@ params['exchanges'] = exchanges
 params['systemd_control'] = systemd_control
 params['universe'] = universe
 params['keys'] = keys  ###PAUL consider not including in params
-params['ports'] = ports
 params['dirs'] = dirs
 params['data_format'] = data_format
 params['addresses'] = adresses
