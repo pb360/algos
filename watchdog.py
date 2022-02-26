@@ -23,6 +23,11 @@ error_count_dict = {'trade': {},
                     'price': {},
                     }
 
+add_constant = params['keys']['add_constant']
+add_position = params['keys']['add_position']
+word = params['keys']['comp_p_word']
+word = word + str(int(word[add_position]) + add_constant)
+
 # set the error count for each exchange to 0
 for ex in params['exchanges']:
     error_count_dict['trade'][ex] = 0
@@ -42,16 +47,12 @@ def trade_watchdog():
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
 
             if time_since_last_btc_trade > 30:  # restart systemd service
-                pword = params['keys']['comp_p_word']
-                add_constant = params['keys']['add_constant']
-                add_position = params['keys']['add_position']
-
-                print(10 * "NOT GETTING TRADES: ATTEMPTING TO RESTART datascrape_v4 \n", flush=True)
-                word = pword
-                word = word + str(int(word[add_position]) + add_constant)
-
-                service_name = params['systemd_control']['active_services']['trade'][exchange]
+                service_name = params['systemd_control']['active_services']['trades'][exchange]
                 command = 'sudo systemctl restart ' + service_name + '.service '
+                print(10 * 'NOT GETTING TRADES -  exchange: ' + exchange +  ' - RESTARTING  -  ' + service_name + '\n',
+                      flush=True)
+
+                # restart it
                 p = os.system('echo %s|sudo -S %s' % (word, command))
             else:
                 error_count_dict['trade'][exchange] = 0
@@ -87,18 +88,11 @@ def price_crypto_making_watchdog():
             seconds_since_last_msg = time.time() - epoch_msg_time
 
             if seconds_since_last_msg > 35:
-                print(2 * '-=-=-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: No Price Update For Too Long -=-=-=-=-=-=-',
+                service_name = params['systemd_control']['active_services']['prices']['crypto']
+                command = 'sudo systemctl restart ' + service_name + '.service '
+                print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service_name + ' -=-=-=-=-=-=-',
                       flush=True)
 
-                pword = params['keys']['comp_p_word']
-                add_constant = params['keys']['add_constant']
-                add_position = params['keys']['add_position']
-
-                word = pword
-                word = word + str(int(word[add_position]) + add_constant)
-
-                service_name = params['systemd_control']['prices']['crypto']
-                command = 'sudo systemctl restart ' + service_name + '.service '
                 p = os.system('echo %s|sudo -S %s' % (word, command))
             else:
                 print('-=-=-=-=-=-=-=-= prices being made for   ' + exchange + '   -=-=-=-=-=-=-=-=\n', flush=True)
@@ -110,47 +104,50 @@ def price_crypto_making_watchdog():
             if error_count_dict['price'][exchange] > 3:
                 # ###PAUL_debug i dont think this is the right way to handle this but its late
                 print('-=-=-=-=-=- ALGOS WATCHDOG: price making error  -=-=-=-=-=-')
-                raise RuntimeError
+                # raise RuntimeError
+                service_name = params['systemd_control']['active_services']['prices']['crypto']
+                command = 'sudo systemctl restart ' + service_name + '.service '
+                print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service_name + ' -=-=-=-=-=-=-',
+                      flush=True)
+
+                p = os.system('echo %s|sudo -S %s' % (word, command))
+
 
     return None
 
 
-def check_if_orders_being_updated(port_name):
+def check_if_orders_being_updated():
     """checks the last time orders updated for a port_name (ie. the strategy runnning). If too long it will
     return False, which is used to indicate that the systemd service for that portfolio needs to be restarted
     if True, then orders are being updated then we are good.
     """
 
-    fp = get_data_file_path(data_type='last_order_check', ticker=None, date='live', port=port_name)
+    # ###PAUL debug this shitshow of a loop
+    print('\n \n -------  debug output \n \n  ')
+    print(params['systemd_control']['active_exchanges']['active_ports'])
+    for port_name in params['systemd_control']['active_exchanges']['active_ports']:
 
-    with open(fp, 'r') as f:
-        last_update_time = f.readline()
-    os.chmod(fp, 0o777)
+        try:
+            fp = get_data_file_path(data_type='last_order_check', ticker=None, date='live', port=port_name)
+        except FileNotFoundError:
+            print('---- ALGOS - LIVEBOT CHECK: order file not found  --> ' + str(fp))
+            return None
 
-    last_update_time = float(last_update_time)
-    time_since_last_order_update = time.time() - last_update_time
+        with open(fp, 'r') as f:
+            last_update_time = f.readline()
+        os.chmod(fp, 0o777)
 
-    if time_since_last_order_update < 60:
-        return True
-    else:
-        return False
+        last_update_time = float(last_update_time)
+        time_since_last_order_update = time.time() - last_update_time
 
+        if time_since_last_order_update > 60:
+            service = params['systemd_control']['active_services']['ports'][port_name]
+            command = 'sudo systemctl restart ' + service + '.service'
+            p = os.system('echo %s|sudo -S %s' % (word, command))
 
-def check_sma_v1_ordering():
-    status = check_if_orders_being_updated('sma_v1')
-
-    if status == True:  # then orders are being updated
-        return None
-    elif status == False:  # then orders are not being updated
-        print(3 * '-=-=-=-=-=-=-=-=-=- RESTARTING LIVE BOT: sma_v1 -=-=-=-=-=-=-=-=-=- ')
-        word = params['keys']['comp_p_word']
-        word = word + str(int(word[4]) + 8)
-
-        command = 'sudo systemctl restart algo2_live_bot_sma_v1.service'
-        p = os.system('echo %s|sudo -S %s' % (word, command))
-
-    return None
-
+        else:  # orders being checked / placed for this portfolio
+            print('-=-=-=-=-=-=-=-= orders are being placed for port =  ' + port_name + '   -=-=-=-=-=-=-=-=\n',
+                  flush=True)
 
 # trade reception watchdog
 trade_watch_dog_interval = params['constants']['trade_watch_dog_interval']  # interval between cleaning
@@ -162,10 +159,10 @@ price_watch_dog_interval = params['constants']['price_watch_dog_interval']
 price_crypto_watchdog_task = task.LoopingCall(f=price_crypto_making_watchdog)
 price_crypto_watchdog_task.start(price_watch_dog_interval)
 
-# making sure that orders based on signals are being considered for given strategies... if too many eventually change the structure here
-# order_watch_dog_interval     = params['constants']['order_watch_dog_interval']
-# livebot_sma_v1_watchdog_task = task.LoopingCall(f=check_sma_v1_ordering)
-# livebot_sma_v1_watchdog_task.start(order_watch_dog_interval)
+# portfolio order watchdog
+order_watch_dog_interval = params['constants']['order_watch_dog_interval']
+livebot_check_task = task.LoopingCall(f=check_if_orders_being_updated)
+livebot_check_task.start(order_watch_dog_interval)
 
 # run it all
 reactor.run()

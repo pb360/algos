@@ -52,6 +52,7 @@ constants = {
     'order_watch_dog_interval': 5 * 60,
     # how long if no orders to reset any given bot ###PAUL_migration needs to mention binance
     'os': str(platform.system()),
+    'signal_based_order_interval': 10,
 }
 # ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
 
@@ -60,27 +61,33 @@ exchanges = ['binance_foreign', 'binance_us']
 
 systemd_control = dict()
 
-active_exchanges = ['binance_foreign', 'binance_us']
+active_exchanges = ['binance_foreign', 'binance_us']  # where trades are able to be collected live
+active_ports = ['sma_v1_equal_dist', ]  # portfolios we are trading
 
 # names of systemd services used to collect trades for each exchange
 active_services = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_foreign',
                               'binance_us': 'algos_scrape_trades_binance_us',
                               'kucoin': 'algos_scrape_trades_binance_kucoin',
+                              'silver': 'get to it',
                               },
                    'prices': {'crypto': 'algos_pipe_trades_to_prices',
                               },
-
-                   # ### active portfolios
-                   'ports': {'sma_v1_equal_dist': 'trading_service_name'}
+                   'ports': {'sma_v1_equal_dist': 'algos_bot_sma_v1_equal_dist',
+                             # 'markowitz_v1': 'algos_bot_markowitz_v1',
+                             },
                    }
 
+# used for watchdog... ticker of interest...
 ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
                           'binance_us': 'BTCUSD',
-                          'kucoin': '????'
+                          'kucoin': '????',
                           }
 
 systemd_control['active_exchanges'] = active_exchanges
+systemd_control['active_ports'] = active_ports
 systemd_control['active_services'] = active_services
+systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
+
 systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
 
 exchanges_we_want_to_add_end_to_end_support_for = ['kucoin', ]
@@ -115,6 +122,11 @@ can then make a
 for exchange in exchanges: 
     get_data(prices / trades, ticker, exchange) and do what you want to do (combine, compare...)  
 """
+
+# ###PAUL_refractor for the live bot some temporary variables that will be in the universial dict will be below
+# ###PAUL_refracto eventually these will need to move to params['universe']['universal']
+
+
 
 universal = {}
 
@@ -199,8 +211,12 @@ universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'li
                                            'XTZBTC', 'XTZUSD',
                                            ],
 
-                       'tickers_traded': ['BTCUSDT'
-                                          ],
+                       # ###PAUL_refractor
+                       # ###PAUL_refractor... temp hoder while. shouldn't be here
+                       'tickers_traded': ['ADAUSDT', 'BNBUSDT', 'BTCUSDT', 'DOGEUSDT',
+                                          'ETHUSDT', 'LINKUSDT', 'LTCUSDT', 'XLMUSDT', ],
+                       # ###PAUL_refractor... temp hoder while. shouldn't be here
+                       # ###PAUL_refractor
 
                        'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
                                                       'BNBUSDT': 'BNBUSD', 'BNBBTC': 'BNBBTC',

@@ -225,6 +225,11 @@ def make_date_suffix(date, file_type='.csv'):
 
         file_type (str):  '.csv',  '.pickle',   ect..
     """
+
+    # if live is sent to this function we likely want the file for today...
+    if date == 'live' or date == 'open':
+        date = convert_date_format(time.time(), 'tuple_to_day')
+
     if type(date) != tuple:
         date = convert_date_format(date, 'tuple_to_day')
 
@@ -345,6 +350,8 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
     """
     fp = None
 
+    suffix = make_date_suffix(date)
+
     # first handle if date is live... if not we attempt to convert it if not a tuple
     if date == 'live' or date == 'open':
         # ### live kept data
@@ -372,15 +379,16 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
             if port is None:
                 return IOError
             elif data_type == 'orders' or data_type == 'order' or data_type == 'open_orders':
-                fp = port_data_dir + port + '/open_orders.csv'
+                fp = port_data_dir + exchange + '/' + port + '/open_orders.csv'
             elif data_type == 'whose_turn':
-                fp = port_data_dir + port + '/whose_turn.csv'
+                fp = port_data_dir + exchange + '/' + port + '/whose_turn.csv'
             elif data_type == 'last_order_check':
-                fp = port_data_dir + port + '/last_check.txt'
+                fp = port_data_dir + exchange + '/' + port + '/last_check.txt'
             elif data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path':
-                fp = port_data_dir + port + '/'
+                fp = port_data_dir + exchange + '/' + port + '/'
             elif data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
-                print('###PAUL need to get this to return the closed date  ')
+                fp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
+                     + 'orders----' + ticker + '----' + suffix
 
     # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
     # if ~isinstance(date, tuple):
@@ -396,20 +404,20 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
                 fp = live_data_dir + 'book_daily/' + exchange + '/' + ticker + '/'
         elif port is not None:
             if data_type == 'order_closed':
-                fp = port_data_dir + port + '/closed/' + ticker + '/'
+                fp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
+                     + 'orders----' + ticker + '----' + suffix
         else:
             return IOError
 
     elif date != 'live':  # date is actually supplied
-        suffix = make_date_suffix(date)
 
         # live maintained data (historical, but still folder is managed in real time)
-        if exchange is not None:
+        if exchange is not None and port is None:
             if data_type == 'price' or data_type == 'prices':
                 fp = live_data_dir + 'price/' + exchange + '/' + ticker \
                      + '/prices----' + exchange + '_' + ticker + suffix
             elif data_type == 'trade' or data_type == 'trades':
-                fp = live_data_dir + 'trades_daily/' + exchange + '/' + ticker  \
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + ticker \
                      + '/trades----' + exchange + '_' + ticker + suffix
             elif data_type == 'book':
                 fp = live_data_dir + 'book/' + exchange + '/' + ticker \
@@ -418,7 +426,8 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
         # port related data
         elif port is not None:
             if data_type == 'order' or data_type == 'orders' or data_type == 'closed_orders':
-                fp = port_data_dir + port + '/closed/' + ticker + '/orders---' + ticker + suffix
+                ffp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
+                     + 'orders----' + ticker + '----' + suffix
         else:
             return IOError
 
@@ -428,7 +437,7 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
         print('Nothing in data file path function matched the request')
         print('the request was:')
         print('    data_type=' + str(data_type) + ', ticker=' + str(ticker) + ', date=' + str(date) \
-              + ', port=' + str(port) +  ', exchange=' + str(exchange) )
+              + ', port=' + str(port) + ', exchange=' + str(exchange))
         return IOError
 
 
@@ -503,7 +512,7 @@ def get_data(data_type,
              duration=None,
              port=None,
              exchange=None,
-):
+             ):
     """master data retriving function
 
     input:
@@ -627,34 +636,41 @@ def get_data(data_type,
 
 
 ###PAUL eventually may need to take into account the data source (hopefully can put that off as long as possible)
-def convert_trades_df_to_prices(trades):
+def convert_trades_df_to_prices(trades, exchange='binance_foreign'):
     """reads CSV of trades. converts to prices in some interval
 
     input :
         trades (pd.dataframe): trades df output by utils.get_live_trades_data()
+        exchange (str): helps tell the format
     """
-    trades.index = pd.to_datetime(trades.index, unit='s')
-    trades['buyer_is_maker'] = trades['buyer_is_maker'].astype('int')
-    trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
-    trades['buy_vol'] = trades['quantity'] * trades['buyer_is_maker']
-    trades['sell_vol'] = trades['quantity'] * trades['buyer_is_taker']
-    trades['buy_base_asset'] = trades['price'] * trades['buy_vol']
-    trades['sell_base_asset'] = trades['price'] * trades['sell_vol']
 
-    trades.drop(columns=['buy_order_id', 'sell_order_id', 'trade_time', 'trade_id'], inplace=True)
-    prices = trades.groupby(pd.Grouper(freq='s')).sum()
+    if exchange == 'binance_us' or exchange == 'binance_foreign':
+        trades.index = pd.to_datetime(trades.index, unit='s')
+        trades['buyer_is_maker'] = trades['buyer_is_maker'].astype('int')
+        trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
+        trades['buy_vol'] = trades['quantity'] * trades['buyer_is_maker']
+        trades['sell_vol'] = trades['quantity'] * trades['buyer_is_taker']
+        trades['buy_base_asset'] = trades['price'] * trades['buy_vol']
+        trades['sell_base_asset'] = trades['price'] * trades['sell_vol']
 
-    prices['buy_vwap'] = prices['buy_base_asset'] / prices['buy_vol']
-    prices['sell_vwap'] = prices['sell_base_asset'] / prices['sell_vol']
+        trades.drop(columns=['buy_order_id', 'sell_order_id', 'trade_time', 'trade_id'], inplace=True)
+        prices = trades.groupby(pd.Grouper(freq='s')).sum()
 
-    prices.drop(columns=['price', 'quantity'], inplace=True)
+        prices['buy_vwap'] = prices['buy_base_asset'] / prices['buy_vol']
+        prices['sell_vwap'] = prices['sell_base_asset'] / prices['sell_vol']
 
-    # fill in VWAP NaN's due to volume being 0 in a second...
-    prices.fillna(method='ffill', inplace=True)
-    prices.fillna(method='bfill', inplace=True)
-    prices.fillna(method='ffill', inplace=True)
+        prices.drop(columns=['price', 'quantity'], inplace=True)
 
-    return prices
+        # fill in VWAP NaN's due to volume being 0 in a second...
+        prices.fillna(method='ffill', inplace=True)
+        prices.fillna(method='bfill', inplace=True)
+        prices.fillna(method='ffill', inplace=True)
+
+        if exchange == ' kucoin':
+            print(3 * 'kucoin not yet supported \n')
+            raise FileExistsError
+
+        return prices
 
 
 # pdb.set_trace()
@@ -745,7 +761,7 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, params=par
                                               ticker=ticker,
                                               date='ticker_folder',
                                               exchange=exchange,
-                                              params=params,)
+                                              params=params, )
         trs = os.listdir(ticker_trade_dir)
 
         # identify dates with trading data`
@@ -871,10 +887,10 @@ def make_alternating_buy_sell_signal(buy_idxs, sell_idxs, signal_shape):
     return signal
 
 
-def convert_ticker_us_to_foreign(us_ticker):
-    return params['universe']['tickers_foreign_to_us_dict'][us_ticker]
-
-
+# ###PAUL_refractor
+# ###PAUL_refractor
+# ###PAUL_refractor for initial algos refractor may want to remove these conversion
+# ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
 def convert_ticker_us_to_foreign(us_ticker):
     return params['universe']['tickers_us_to_foreign_dict'][us_ticker]
 
@@ -882,6 +898,11 @@ def convert_ticker_us_to_foreign(us_ticker):
 def convert_ticker_foreign_to_us(foreign_ticker):
     return params['universe']['tickers_foreign_to_us_dict'][foreign_ticker]
 
+
+# ###PAUL_refractor for initial algos refractor may want to remove these conversion
+# ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
+# ###PAUL_refractor
+# ###PAUL_refractor
 
 def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
     """Rounds a given quantity to a specific step size
@@ -921,3 +942,11 @@ def round_decimals_down(number: float, decimals: int = 2):
 
     factor = 10 ** decimals
     return math.floor(number * factor) / factor
+
+
+def check_if_dir_exists_and_make(dir):
+    # check if directory heading to file exists, if not make all required on the way
+    if os.path.isdir(dir) == False:
+        os.makedirs(dir)
+
+    return None

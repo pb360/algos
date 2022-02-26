@@ -78,15 +78,17 @@ def add_prices_from_live_trade_data(ticker, exchange):
         # ### first handle the rest of the data from yesterday's trades
         #
         #
+        # get datetime variable that is exactly midnight
+        dt = datetime.datetime.fromtimestamp(now)
+        dt = dt - datetime.timedelta(hours=dt.hour, minutes=dt.minute, seconds=dt.second, microseconds=dt.microsecond)
+
+
         yesterday_price_fp = get_data_file_path(data_type='price',
                                                 ticker=ticker,
                                                 date=now - 24 * 60 * 60,
                                                 exchange=exchange)
         yesterdays_prices = prices[prices.index < dt]
 
-        # get datetime variable that is exactly midnight
-        dt = datetime.datetime.fromtimestamp(now)
-        dt = dt - datetime.timedelta(hours=dt.hour, minutes=dt.minute, seconds=dt.second, microseconds=dt.microsecond)
 
         #
         #
