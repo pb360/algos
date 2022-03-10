@@ -37,8 +37,9 @@ from utils import send_email, get_data_file_path, convert_date_format
 
 # needed to let the package to see itself for interior self imports
 sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
-from binance.client import Client
-from binance.websockets_us import BinanceSocketManager
+from ext_packages.sams_binance_api.binance.client import Client
+from ext_packages.sams_binance_api.binance.websockets_us import  BinanceSocketManager
+# from binance.websockets_us import BinanceSocketManager
 
 # ### variable definitions
 #

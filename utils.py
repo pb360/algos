@@ -73,7 +73,7 @@ def convert_date_format(date, output_type):
             if output_type == 'datetime' or output_type == 'datetime.datetime':
                 return datetime.date(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
 
-        print("###PAUL make    tuple     to desired output work please")
+        print("###PAUL make    tuple     to desired output work please", flush=True)
 
     if isinstance(date, datetime.date) or isinstance(date, datetime.datetime):
         if output_type == 'epoch':
@@ -110,7 +110,7 @@ def convert_date_format(date, output_type):
     # convert string to various formats
     elif isinstance(date, str):
         if len(date) == 19:  ### i.e. 2020-01-08 22:55:32
-            print("###PAUL make    string_to_sec     to desired output work please")
+            print("###PAUL make    string_to_sec     to desired output work please", flush=True)
 
         if len(date) == 10:  ### i.e. 2020-01-08
             if output_type == 'datetime' or output_type == 'datetime.date':
@@ -120,10 +120,10 @@ def convert_date_format(date, output_type):
                 return (y, m, d)
 
             else:
-                print(' string to date time does not work yet... get on it if you needful')
+                print(' string to date time does not work yet... get on it if you needful', flush=True)
 
     else:
-        print('cant do that yet')
+        print('cant do that yet', flush=True)
         raise TypeError
 
 
@@ -173,9 +173,9 @@ def send_email(subject, message, to='paulboehringer0989@gmail.com', params=param
         mailserver.sendmail('paulboehringer@protonmail.com', 'paulboehringer0989@gmail.com', msg.as_string())
         mailserver.quit()
     except Exception as e:
-        print('---- an email failed to send \n the error will print out below \n \n \n ')
-        print(e)
-        print('\n \n \n')
+        print('---- an email failed to send \n the error will print out below \n \n \n ', flush=True)
+        print(e, flush=True)
+        print('\n \n \n', flush=True)
         pass
 
     return True
@@ -202,7 +202,7 @@ def get_last_line_of_file(filepath, filesize='large'):
                 last_line = f.readline().decode()
         # turns out the file was one line
         except OSError:
-            print('\n the file was too short for the long method \n ')
+            print('\n the file was too short for the long method \n ', flush=True)
             # if the file is empty then this try except will hit
             try:
                 with open(filepath) as f:
@@ -210,8 +210,8 @@ def get_last_line_of_file(filepath, filesize='large'):
                         pass
                     last_line = line
             except NameError as e:
-                print(e)
-                print('\n \n this file is empty  \n ')
+                print(e, flush=True)
+                print('\n \n this file is empty  \n ', flush=True)
                 raise FileExistsError
 
     return last_line
@@ -331,7 +331,7 @@ def get_data_file_path_OLD_VERSION(data_type, ticker, date='live', port=None, pa
 
     # needs to be commented.. data scrape critical error if live
     # else:
-    #     print("error creating data filepath")
+    #     print("error creating data filepath", flush=True)
     #     raise TypeError
 
     return fp
@@ -427,17 +427,17 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
         elif port is not None:
             if data_type == 'order' or data_type == 'orders' or data_type == 'closed_orders':
                 ffp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
-                     + 'orders----' + ticker + '----' + suffix
+                      + 'orders----' + ticker + '----' + suffix
         else:
             return IOError
 
     if fp is not None:
         return fp
     else:
-        print('Nothing in data file path function matched the request')
-        print('the request was:')
+        print('Nothing in data file path function matched the request', flush=True)
+        print('the request was:', flush=True)
         print('    data_type=' + str(data_type) + ', ticker=' + str(ticker) + ', date=' + str(date) \
-              + ', port=' + str(port) + ', exchange=' + str(exchange))
+              + ', port=' + str(port) + ', exchange=' + str(exchange), flush=True)
         return IOError
 
 
@@ -512,6 +512,7 @@ def get_data(data_type,
              duration=None,
              port=None,
              exchange=None,
+             fill_in=True
              ):
     """master data retriving function
 
@@ -572,7 +573,7 @@ def get_data(data_type,
 
     # something wrong about the date request to this function. Its not worth trying to handle
     else:
-        print('I cant handle the dates as given')
+        print('I cant handle the dates as given', flush=True)
         raise DateError
 
     if data_type == 'price' or data_type == 'prices':
@@ -606,7 +607,7 @@ def get_data(data_type,
 
             data = pd.concat([data, data_t])
 
-    # convert index_col "YYYY-MM-DD HH:MM:SS" to pd.datetime    AFTER price read... trade data is epoch time int, so OK
+    # convert index_col "YYYY-MM-DD HH:MM:SS" to pd.datetime AFTER price read... trade data is epoch time int, so OK
     if data_type == 'price':
         data.index = pd.to_datetime(data.index)
         data.drop_duplicates(inplace=True)
@@ -622,7 +623,9 @@ def get_data(data_type,
         mask = ~mask
         missing_times = empty_ts[mask]
         missing_data = pd.DataFrame(observation_dict, index=missing_times)
-        data = pd.concat([data, missing_data])
+
+        if fill_in == True:
+            data = pd.concat([data, missing_data])
 
         # sort everything with the missing enteries filled in as 0
         data.sort_index(inplace=True)
@@ -667,7 +670,7 @@ def convert_trades_df_to_prices(trades, exchange='binance_foreign'):
         prices.fillna(method='ffill', inplace=True)
 
         if exchange == ' kucoin':
-            print(3 * 'kucoin not yet supported \n')
+            print(3 * 'kucoin not yet supported \n', flush=True)
             raise FileExistsError
 
         return prices
@@ -797,11 +800,11 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, params=par
 
             try:
                 if make_ticker_date_prices:
-                    print('MAKING:     ticker:  ' + ticker + '  date: ' + date + '  exchange: ' + exchange)
+                    print('MAKING:     ticker:  ' + ticker + '  date: ' + date + '  exchange: ' + exchange, flush=True)
                     make_day_of_prices_from_day_of_trades(ticker, file_date_tup, exchange)
 
             except:
-                print("  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n ")
+                print("  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n ", flush=True)
                 tick_and_date_errored.append((ticker, date))
 
     return tick_and_date_errored
