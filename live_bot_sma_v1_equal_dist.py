@@ -292,8 +292,8 @@ def get_initial_signal_batch(params=params):
     for ticker in tickers_tracked:
         prices = prices_dfs_dict[ticker]
 
-        sma_short = prices['buy_vwap'].rolling(window=3400).mean().fillna(method='bfill')[-1]
-        sma_long = prices['buy_vwap'].rolling(window=3400 * 9).mean().fillna(method='bfill')[-1]
+        sma_short = prices['buy_vwap'].rolling(window=3400 * 3).mean().fillna(method='bfill')[-1]
+        sma_long = prices['buy_vwap'].rolling(window=3400 * 10).mean().fillna(method='bfill')[-1]
 
         # buy if shorter SMA is bigger than longer SMA
         if sma_short > sma_long:
@@ -438,7 +438,17 @@ def update_short_term_prices(ticker, params=params):
 
     global data_exchange
     global short_term_prices_dict
-    latest_price_written = max(short_term_prices_dict[ticker].index)
+
+    ##############################################################################################
+    ##############################################################################################
+    ##############################################################################################
+    try:
+        latest_price_written = max(short_term_prices_dict[ticker].index)
+    except:
+        import pdb; pdb.set_trace()
+    ##############################################################################################
+    ##############################################################################################
+    ##############################################################################################
 
     # get all the new trades
     # ###PAUL_refractor... wrong exchange cause dealing with binance prices.. dont know how to handle rn
@@ -487,8 +497,8 @@ def update_signals(params=params):
     for ticker in tickers_tracked:
         prices = prices_dfs_dict[ticker]
 
-        sma_short = prices['buy_vwap'].rolling(window=3400).mean().fillna(method='bfill')[-1]
-        sma_long = prices['buy_vwap'].rolling(window=3400 * 12).mean().fillna(method='bfill')[-1]
+        sma_short = prices['buy_vwap'].rolling(window=3400 * 3).mean().fillna(method='bfill')[-1]
+        sma_long = prices['buy_vwap'].rolling(window=3400 * 10).mean().fillna(method='bfill')[-1]
 
         # buy if shorter SMA is bigger than longer SMA
         if sma_short > sma_long:

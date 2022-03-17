@@ -42,11 +42,11 @@ constants = {
     'update_signal_interval': 10,  # how many seconds between MACD signal update
     'order_sma_v1_interval': 15,  # order on signal interval   ###PAUL_migration should move to algos
     'secondary_order_interval': 2,  # update market status and adjust orders ###PAUL_migration needs to mention binance
-    'trade_watch_dog_interval': 20,
+    'trade_watch_dog_interval': 30,
     # how long if no trade to restart trade collection w/ system-d ###PAUL_migration needs to mention binance
-    'price_watch_dog_interval': 25,
+    'price_watch_dog_interval': 60,
     # how long if no price update to re-run orders.py w/ system-d ###PAUL_migration needs to mention binance
-    'order_watch_dog_interval': 15,
+    'order_watch_dog_interval': 60,
     # how long if order check not updated to restart any live_bot
     'os': str(platform.system()),
     'signal_based_order_interval': 10,
@@ -60,8 +60,17 @@ exchanges = ['binance_foreign', 'binance_us']
 systemd_control = dict()
 
 active_exchanges = ['binance_foreign', 'binance_us']  # where trades are able to be collected live
-active_ports = ['sma_v1_equal_dist', ]  # portfolios we are trading
+active_ports = [
+                # 'sma_v1_equal_dist',
+               ]  # portfolios we are trading
 
+
+# ###PAUL_todo
+# ### this dictionary is not currently used. but this is the format i would like to move to
+# ### maybe rename it the watchdog dictionary. also consider moving this to its own file or something which would
+# ### be checked every so often to know whether to pull services or something.
+#
+#
 # names of systemd services used to collect trades for each exchange
 active_services = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_foreign',
                               'binance_us': 'algos_scrape_trades_binance_us',
@@ -88,12 +97,17 @@ ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
                           'kucoin': '????',
                           }
 
+no_trade_time = {'binance_foreign': 45,
+                 'binance_us': 90,  # binance_us kept restarting so give it a longer time...
+                 'kucoin': 'gotta do dis',
+                 }
+
 systemd_control['active_exchanges'] = active_exchanges
 systemd_control['active_ports'] = active_ports
 systemd_control['active_services'] = active_services
 systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
-
 systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
+systemd_control['no_trade_time'] = no_trade_time
 
 exchanges_we_want_to_add_end_to_end_support_for = ['kucoin', ]
 

@@ -44,6 +44,8 @@ def add_prices_from_live_trade_data(ticker, exchange):
     try:
         trades = get_live_trades_data(ticker, exchange)
 
+        print(trades.shape)
+
         # if there are no trades for ticker's live file skip for this round (else it errors)
         if trades.shape[0] == 0:
             return None
@@ -137,7 +139,7 @@ def add_prices_to_all_tickers(exchange):
     tickers_tracked = params['universe'][exchange]['tickers_tracked']
 
     for ticker in tickers_tracked:
-        # print('---- exchange: ' + str(exchange) + '      ticker: ' + str(ticker), flush=True)  # ###PAUL_debug
+        print('---- exchange: ' + str(exchange) + '      ticker: ' + str(ticker), flush=True)  # ###PAUL_debug
         add_prices_from_live_trade_data(ticker, exchange)
 
     ET = time.perf_counter()

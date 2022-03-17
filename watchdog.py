@@ -35,10 +35,10 @@ for ex in params['exchanges']:
 
 
 # used a few times to restart services, good because it allows for mode switching easily for manual updates
-def restart_service(service, word=word, mode='restart'):
+def restart_service(service, pword=word, mode='restart'):
     if mode == 'restart':
         command = 'sudo systemctl restart ' + service + '.service '
-        p = os.system('echo %s|sudo -S %s' % (word, command))
+        p = os.system('echo %s|sudo -S %s' % (pword, command))
 
     if mode == 'hard_restart':
         command = 'sudo systemctl stop ' + service + '.service ' \
@@ -46,7 +46,7 @@ def restart_service(service, word=word, mode='restart'):
                   + '&& sudo systemctl enable ' + service + '.service' \
                   + '&& sudo systemctl restart ' + service + '.service'
 
-        p = os.system('echo %s|sudo -S %s' % (word, command))
+        p = os.system('echo %s|sudo -S %s' % (pword, command))
 
     return None
 
@@ -58,17 +58,19 @@ def trade_watchdog():
     print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
 
     for exchange in params['systemd_control']['active_exchanges']:
+        service = params['systemd_control']['active_services']['trades'][exchange]
+        restart_notification_string = 3 * ('NOT GETTING TRADES - exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n')
+
         try:
             check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
+            no_trade_time = params['systemd_control']['no_trade_time'][exchange]
             trades = get_live_trades_data(check_ticker, exchange=exchange)
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
 
-            if time_since_last_btc_trade > 30:  # restart systemd service
-                service = params['systemd_control']['active_services']['trades'][exchange]
-                print(10 * 'NOT GETTING TRADES -  exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n',
-                      flush=True)
+            if time_since_last_btc_trade > no_trade_time:  # restart systemd service
 
                 # restart it
+                print(restart_notification_string, flush=True)
                 restart_service(service)
 
             else:
@@ -76,12 +78,15 @@ def trade_watchdog():
                 print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: trades being received for     " + exchange + "    -=-=-=-=-=\n",
                       flush=True)
 
-        except FileNotFoundError:  # sometimes the price may not have been made
+        # some exchanges are slow, so we will give 3 checks untill we force a restart
+        except (FileNotFoundError, IndexError):
             error_count_dict['trade'][exchange] += 1
-
             if error_count_dict['trade'][exchange] > 3:
-                print('-=-=-=-=-=- ALGO2 WATCHDOG: Errored in trade recording watchdog -=-=-=-=-=-', flush=True)
-                raise RuntimeError
+                # restart it
+                print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: max error count for exchange: ' + exchange, flush=True)
+                print(restart_notification_string, flush=True)
+                restart_service(service)
+
 
     return None
 

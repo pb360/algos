@@ -350,7 +350,8 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
     """
     fp = None
 
-    suffix = make_date_suffix(date)
+    if date != 'ticker_folder':
+        suffix = make_date_suffix(date)
 
     # first handle if date is live... if not we attempt to convert it if not a tuple
     if date == 'live' or date == 'open':
@@ -585,27 +586,35 @@ def get_data(data_type,
     # for now these must get fed in as datetime
     date_list = get_date_range(start_date, end_date)
 
-    for idx, data_date in enumerate(date_list):
+    idx = 0
+
+    for data_date in date_list:
         fp = get_data_file_path(data_type, ticker, data_date, port, exchange, params=params)
 
-        if idx == 0:
-            # pdb.set_trace()
-            data = pd.read_csv(fp,
-                               header=0,  # ignore col_names... dont treat as data
-                               # names=col_dtype_dict.keys(),     # name of columns
-                               # dtype=col_dtype_dict,            # data type of cols
-                               index_col='msg_time'
-                               )
-        if idx > 0:
-            # pdb.set_trace()
-            data_t = pd.read_csv(fp,
-                                 header=0,  # ignore col_names... dont treat as data
-                                 # names=col_dtype_dict.keys(),  # name of columns
-                                 # dtype=col_dtype_dict,  # data type of cols
-                                 index_col='msg_time'
-                                 )
+        try:
+            if idx == 0:
+                # pdb.set_trace()
+                data = pd.read_csv(fp,
+                                   header=0,  # ignore col_names... dont treat as data
+                                   # names=col_dtype_dict.keys(),     # name of columns
+                                   # dtype=col_dtype_dict,            # data type of cols
+                                   index_col='msg_time'
+                                   )
+            if idx > 0:
+                # pdb.set_trace()
+                data_t = pd.read_csv(fp,
+                                     header=0,  # ignore col_names... dont treat as data
+                                     # names=col_dtype_dict.keys(),  # name of columns
+                                     # dtype=col_dtype_dict,  # data type of cols
+                                     index_col='msg_time'
+                                     )
 
-            data = pd.concat([data, data_t])
+                data = pd.concat([data, data_t])
+        except FileNotFoundError:
+            print('---- file missing: ' + fp, flush=True)
+            continue
+
+        idx += 1 # cant enumerate... only increase count if the file is found, otherwise breaks if first file not there
 
     # convert index_col "YYYY-MM-DD HH:MM:SS" to pd.datetime AFTER price read... trade data is epoch time int, so OK
     if data_type == 'price':
@@ -748,7 +757,7 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, params=par
     """
 
     tick_and_date_errored = []
-    tickers_tracked = params['universe']['tickers_tracked']
+    tickers_tracked = params['universe'][exchange]['tickers_tracked']
 
     # try converting the start_date and end_date
     if start_date is not None:
