@@ -186,6 +186,10 @@ def get_last_line_of_file(filepath, filesize='large'):
     https://stackoverflow.com/questions/46258499/read-the-last-line-of-a-file-in-python
     """
 
+    if not os.path.isfile(filepath):
+        print('FileNotFoundError: ' + filepath + 'in get_last_line_of_file()')
+        raise FileNotFoundError
+
     if filesize == 'small':
         with open(filepath) as f:
             for line in f:
@@ -202,7 +206,7 @@ def get_last_line_of_file(filepath, filesize='large'):
                 last_line = f.readline().decode()
         # turns out the file was one line
         except OSError:
-            print('\n the file was too short for the long method \n ', flush=True)
+            print(2*('file too short for the long method ---- ' +  filepath + '\n'), flush=True)
             # if the file is empty then this try except will hit
             try:
                 with open(filepath) as f:

@@ -28,6 +28,8 @@ add_position = params['keys']['add_position']
 word = params['keys']['comp_p_word']
 word = word + str(int(word[add_position]) + add_constant)
 
+device_name = params['device_info']['device_name']
+
 # set the error count for each exchange to 0
 for ex in params['exchanges']:
     error_count_dict['trade'][ex] = 0
@@ -57,7 +59,7 @@ def trade_watchdog():
 
     print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
 
-    for exchange in params['systemd_control']['active_exchanges']:
+    for exchange in params['systemd_control']['active_data_exchanges']:
         service = params['systemd_control']['active_services']['trades'][exchange]
         restart_notification_string = 3 * ('NOT GETTING TRADES - exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n')
 
@@ -98,7 +100,7 @@ def price_crypto_making_watchdog():
     global error_count_dict
 
     print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING PRICES -=-=-=-=-=-=-=-=\n', flush=True)
-    for exchange in params['systemd_control']['active_exchanges']:
+    for exchange in params['systemd_control']['active_data_exchanges']:
         try:
             check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
             prices = get_data(data_type='prices', ticker=check_ticker, exchange=exchange)
@@ -150,6 +152,8 @@ def check_if_orders_being_updated():
 
     active_ports = params['systemd_control']['active_ports']
 
+    if len(active_ports) == 0:
+        print('-=-=-=-=-=-=-=-= no bots running on ---- ' + device_name)
     for port_name in active_ports:
         exchange = params['systemd_control']['active_services']['ports'][port_name]['exchange']
         service = params['systemd_control']['active_services']['ports'][port_name]['service_name']

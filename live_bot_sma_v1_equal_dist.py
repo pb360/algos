@@ -86,7 +86,7 @@ op_sys = params['constants']['os']
 # #
 # ##
 # ### for deployment only
-# assert(exchange in params['systemd_control']['active_exchanges'])
+# assert(exchange in params['systemd_control']['active_data_exchanges'])
 # assert(port_name in params['systemd_control']['active_ports'])
 # ###
 # ##

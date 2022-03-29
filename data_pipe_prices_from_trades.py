@@ -41,18 +41,16 @@ def add_prices_from_live_trade_data(ticker, exchange):
     """
 
     # get trades
-    try:
-        trades = get_live_trades_data(ticker, exchange)
+    # try:
+    trades = get_live_trades_data(ticker, exchange)
 
-        print(trades.shape)
-
-        # if there are no trades for ticker's live file skip for this round (else it errors)
-        if trades.shape[0] == 0:
-            return None
-    except:
-        print('\n \n \n errored here once ---- could not figure ---- try except here too ###PAUL_debug later \n \n \n',
-              flush=True)
+    # if there are no trades for ticker's live file skip for this round (else it errors)
+    if trades.shape[0] == 0:
         return None
+    # except:
+    #     print('\n \n \n errored here once ---- could not figure ---- try except here too ###PAUL_debug later \n \n \n',
+    #           flush=True)
+    #     return None
 
     prices = convert_trades_df_to_prices(trades)
     prices = prices.iloc[:-1]  # remove last second as this second could still be happening
@@ -89,39 +87,22 @@ def add_prices_from_live_trade_data(ticker, exchange):
                                                 ticker=ticker,
                                                 date=now - 24 * 60 * 60,
                                                 exchange=exchange)
+
         yesterdays_prices = prices[prices.index < dt]
-
-
-        #
-        #
-        # ###PAUL i think this try except should be not needed by tomorrow going to comment it out and if it makes
-        # ###PAUL a few day getting through midnight UTC time then i'll be happy and can get rid of this shit
-        # try:
-        #
-        #
-
-        latest_time_price_written = get_last_line_of_file(yesterday_price_fp)[:19]   # isolate 19 char date YYYY-MM...
-
-        # yesterday could have no trades.. if this happens then we still make file, but dont have early cutoff
-        if latest_time_price_written != 'msg_time,buyer_is_m':
-            latest_time_price_written = pd.to_datetime(latest_time_price_written)
-            yesterdays_prices = yesterdays_prices[yesterdays_prices.index > latest_time_price_written]
-
         check_if_head_dir_if_no_make_path(yesterday_price_fp)
-        yesterdays_prices.to_csv(yesterday_price_fp, header=None, mode='a')
 
-        #
-        #
-        # # no file for yesterday's prices... pass on writing anything not worth whole day file for
-        # # less than  10 seconds of prices for yesterday
-        # except FileNotFoundError:
-        #     print('\n \n  FILE NOT FOUND spot 2:  ' + str(yesterday_price_fp) + ' \n '
-        #           + ' Likely a new ticker and data for yesterday not available' + '\n',
-        #           flush=True)
-        # except AssertionError:
-        #     print('\n \n Got one of those where there was no file from yesterday  \n \n ', flush=True)
-        #
-        #
+        try:
+            latest_time_price_written = get_last_line_of_file(yesterday_price_fp)[:19]   # isolate 19 char date YYYY-MM...
+
+            # yesterday could have no trades.. if this happens then we still make file, but dont have early cutoff
+            if latest_time_price_written != 'msg_time,buyer_is_m':
+                latest_time_price_written = pd.to_datetime(latest_time_price_written)
+                yesterdays_prices = yesterdays_prices[yesterdays_prices.index > latest_time_price_written]
+
+            yesterdays_prices.to_csv(yesterday_price_fp, header=None, mode='a')
+
+        except FileNotFoundError:
+            yesterdays_prices.to_csv(yesterday_price_fp)
 
         # create file and with first observed prices today after we finished updating yesterday's prices
 
@@ -139,7 +120,6 @@ def add_prices_to_all_tickers(exchange):
     tickers_tracked = params['universe'][exchange]['tickers_tracked']
 
     for ticker in tickers_tracked:
-        print('---- exchange: ' + str(exchange) + '      ticker: ' + str(ticker), flush=True)  # ###PAUL_debug
         add_prices_from_live_trade_data(ticker, exchange)
 
     ET = time.perf_counter()
@@ -160,7 +140,7 @@ def add_prices_for_all_exchanges():
     ET = time.perf_counter()
     TT = ET - ST
 
-    print('\n \n price updates for all exchanges ---- took: ' + str(TT) + '\n', flush=True)
+    print('\n' + 'price updates for all exchanges ---- took: ' + str(TT) + '\n', flush=True)
 
     return None
 

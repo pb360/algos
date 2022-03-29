@@ -59,10 +59,8 @@ exchanges = ['binance_foreign', 'binance_us']
 
 systemd_control = dict()
 
-active_exchanges = ['binance_foreign', 'binance_us']  # where trades are able to be collected live
-active_ports = [
-                # 'sma_v1_equal_dist',
-               ]  # portfolios we are trading
+active_data_exchanges = ['binance_foreign', 'binance_us']  # where trades are able to be collected live
+active_ports = params_machine_specific['active_ports']
 
 
 # ###PAUL_todo
@@ -102,7 +100,7 @@ no_trade_time = {'binance_foreign': 45,
                  'kucoin': 'gotta do dis',
                  }
 
-systemd_control['active_exchanges'] = active_exchanges
+systemd_control['active_data_exchanges'] = active_data_exchanges
 systemd_control['active_ports'] = active_ports
 systemd_control['active_services'] = active_services
 systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
@@ -211,7 +209,7 @@ universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'li
                                                 'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
                                                 'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
                                                 'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                                'xrpusdt@trade', 'xrpbtc@trade',
+                                                # 'xrpusdt@trade', 'xrpbtc@trade',
                                                 # 'xrpusd@trade',  # trades still come?
                                                 'xtzbtc@trade', 'xtzusd@trade',
                                                 ],
@@ -225,7 +223,7 @@ universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'li
                                            'LINKUSDT', 'LINKBTC', 'LINKUSD',
                                            'LTCUSDT', 'LTCBTC', 'LTCUSD',
                                            'XLMUSDT', 'XLMUSD',
-                                           'XRPUSDT', 'XRPBTC',  # 'XRPUSD', commented out from here because no USD
+                                           # 'XRPUSDT', 'XRPBTC',  # 'XRPUSD', commented out from here because no USD
                                            'XTZBTC', 'XTZUSD',
                                            ],
 
@@ -632,6 +630,7 @@ adresses = {'nano1_eth': '0x1f05cb5b0d8aab9299dBC6a0254432907B928843'}
 #
 params = dict()
 
+params['device_info'] = device_info
 params['constants'] = constants
 params['exchanges'] = exchanges
 params['systemd_control'] = systemd_control
