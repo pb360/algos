@@ -60,6 +60,10 @@ def trade_watchdog():
     print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
 
     for exchange in params['systemd_control']['active_data_exchanges']:
+        # if exchange == 'kucoin':
+        #     import pdb; pdb.set_trace()
+
+
         service = params['systemd_control']['active_services']['trades'][exchange]
         restart_notification_string = 3 * ('NOT GETTING TRADES - exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n')
 
@@ -68,6 +72,9 @@ def trade_watchdog():
             no_trade_time = params['systemd_control']['no_trade_time'][exchange]
             trades = get_live_trades_data(check_ticker, exchange=exchange)
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
+
+            # if exchange == 'kucoin':
+            #     import pdb; pdb.set_trace()
 
             if time_since_last_btc_trade > no_trade_time:  # restart systemd service
 
@@ -85,7 +92,7 @@ def trade_watchdog():
             error_count_dict['trade'][exchange] += 1
             if error_count_dict['trade'][exchange] > 3:
                 # restart it
-                print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: max error count for exchange: ' + exchange, flush=True)
+                print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: max ERROR count for exchange: ' + exchange, flush=True)
                 print(restart_notification_string, flush=True)
                 restart_service(service)
 
@@ -130,7 +137,7 @@ def price_crypto_making_watchdog():
 
             if error_count_dict['price'][exchange] > 3:
                 # ###PAUL_debug i dont think this is the right way to handle this but its late
-                print('-=-=-=-=-=- ALGOS WATCHDOG: price making error  -=-=-=-=-=-', flush=True)
+                print('-=-=-=-=-=- ALGOS WATCHDOG: price making ERROR  -=-=-=-=-=-', flush=True)
                 # raise RuntimeError
                 service = params['systemd_control']['active_services']['prices']['crypto']
                 print(2 * '-=-=-=-=- ALGOS - RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',

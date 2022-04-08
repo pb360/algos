@@ -34,7 +34,7 @@ keys = params_local['keys']
 #
 #
 constants = {
-    'secs_of_trades_to_keep_live': 60,  # number of minutes to keep trades in live file
+    'secs_of_trades_to_keep_live': 120,  # number of minutes to keep trades in live file
     'live_trade_trim_interval': 30,  # how mnay seconds betweeen trimming live files
     'no_trade_message_timeout': 30,  # secs required for no msg until new scraping process starts
     'data_scrape_heartbeat': 8,  # check no_trade_message_timeout in heartbeat_check()
@@ -55,13 +55,14 @@ constants = {
 # ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
 
 
-exchanges = ['binance_foreign', 'binance_us']
+exchanges = ['binance_foreign', 'binance_us', ]
 
 systemd_control = dict()
 
-active_data_exchanges = ['binance_foreign', 'binance_us']  # where trades are able to be collected live
+active_data_exchanges = ['binance_foreign', 'binance_us',
+                         'kucoin',
+                         ]  # where trades are able to be collected live
 active_ports = params_machine_specific['active_ports']
-
 
 # ###PAUL_todo
 # ### this dictionary is not currently used. but this is the format i would like to move to
@@ -72,7 +73,7 @@ active_ports = params_machine_specific['active_ports']
 # names of systemd services used to collect trades for each exchange
 active_services = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_foreign',
                               'binance_us': 'algos_scrape_trades_binance_us',
-                              'kucoin': 'algos_scrape_trades_binance_kucoin',
+                              'kucoin': 'algos_scrape_trades_kucoin',
                               'silver': 'get to it',
                               },
                    'prices': {'crypto': 'algos_pipe_trades_to_prices',
@@ -92,12 +93,12 @@ active_services = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_fo
 # used for watchdog... ticker of interest...
 ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
                           'binance_us': 'BTCUSD',
-                          'kucoin': '????',
+                          'kucoin': 'BTC-USDT',
                           }
 
 no_trade_time = {'binance_foreign': 45,
                  'binance_us': 90,  # binance_us kept restarting so give it a longer time...
-                 'kucoin': 'gotta do dis',
+                 'kucoin': 60,
                  }
 
 systemd_control['active_data_exchanges'] = active_data_exchanges
@@ -195,7 +196,35 @@ universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth'
                                                            'XLMUSD': 'XLMUSDT',
                                                            'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
                                                            'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
-                                                           }
+                                                           },
+
+                            # not correct, just place holder because it will be needed
+                            'exchange_to_universial_tick_dict': {'ADAUSD': 'ADA-USDT', 'ADABTC': 'ADABTC',
+                                                                 'BNBUSD': 'BNB-USDT', 'BNBBTC': 'BNBBTC',
+                                                                 'BTCUSD': 'BTC-USDT',
+                                                                 # this doesnt exist either 'BTCBTC',
+                                                                 'DOGEUSD': 'DOGE-USDT',
+                                                                 'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
+                                                                 'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
+                                                                 'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
+                                                                 'XLMUSD': 'XLMUSDT',
+                                                                 'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                                 'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
+                                                                 },
+
+                            # not correct, just place holder because it will be needed
+                            'universial_to_exchange_tick_dict': {'ADAUSD': 'ADA-USDT', 'ADABTC': 'ADABTC',
+                                                                 'BNBUSD': 'BNB-USDT', 'BNBBTC': 'BNBBTC',
+                                                                 'BTCUSD': 'BTC-USDT',
+                                                                 # this doesnt exist either 'BTCBTC',
+                                                                 'DOGEUSD': 'DOGE-USDT',
+                                                                 'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
+                                                                 'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
+                                                                 'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
+                                                                 'XLMUSD': 'XLMUSDT',
+                                                                 'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                                 'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
+                                                                 },
                             }  # ###PAUL just a copy paster from binance foreign, needs editing
 
 # ###PAUL just a copy paster from binance foreign, needs editing
@@ -257,56 +286,83 @@ universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'li
                                                       'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
                                                       'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
                                                       },  # ###PAUL this can be copied from binance_foreign
+
+                       # not correct, just place holder because it will be needed
+                       'exchange_to_universial_tick_dict': {'ADAUSD': 'ADA-USDT', 'ADABTC': 'ADABTC',
+                                                            'BNBUSD': 'BNB-USDT', 'BNBBTC': 'BNBBTC',
+                                                            'BTCUSD': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
+                                                            'DOGEUSD': 'DOGE-USDT',
+                                                            'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
+                                                            'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
+                                                            'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
+                                                            'XLMUSD': 'XLMUSDT',
+                                                            'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                            'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
+                                                            },
+
+                       # not correct, just place holder because it will be needed
+                       'universial_to_exchange_tick_dict': {'ADAUSD': 'ADA-USDT', 'ADABTC': 'ADABTC',
+                                                            'BNBUSD': 'BNB-USDT', 'BNBBTC': 'BNBBTC',
+                                                            'BTCUSD': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
+                                                            'DOGEUSD': 'DOGE-USDT',
+                                                            'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
+                                                            'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
+                                                            'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
+                                                            'XLMUSD': 'XLMUSDT',
+                                                            'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
+                                                            'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
+                                                            },
                        }  # ###PAUL just a copy paster from binance foreign, needs editing
 
-universe_kucoin = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp'],
+universe_kucoin = {'coins_tracked': ['btc', 'dag', 'eth', 'fil', 'icp', 'kava', 'kda', 'link', 'ltc', 'noia', 'qrdo',
+                                     'req', 'tel', 'vra', 'xlm', 'xmr', 'xpr', 'xrp', 'xtz'
+                                     ],
 
-                   'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
-                                            'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
-                                            'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
-                                            'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
-                                            'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
-                                            'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
-                                            'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
-                                            'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                            'xrpusdt@trade', 'xrpbtc@trade', 'xrpusd@trade',
-                                            ],  # MUST BE ALL LOWER CASE.. not all exist but too busy to update now
+                   # list which is looped over for in data scraper (sometimes funny format like '@trade' needed...)
+                   'tick_collection_list': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
+                                            'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
+                                            'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
+                                            'XTZ-USDT',
+                                            ],
 
-                   'tickers_tracked': ['ADAUSDT', 'ADABTC',
-                                       'BNBUSDT', 'BNBBTC',
-                                       'BTCUSDT',  # this doesnt exist either 'BTCBTC',
-                                       'DOGEUSDT',
-                                       'ETHUSDT', 'ETHBTC',
-                                       'LINKUSDT', 'LINKBTC',
-                                       'LTCUSDT', 'LTCBTC',
-                                       'XLMUSDT',
-                                       'XRPUSDT', 'XRPBTC',
+                   # identical list as  tick_collection_list above (for kucoin)
+                   'tickers_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
+                                       'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
+                                       'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
+                                       'XTZ-USDT',
                                        ],
 
-                   'tickers_traded': ['BTCUSDT'
+                   # this variable should really be individually generated in each live_bot script.. ###PAUL maybe is?
+                   'tickers_traded': ['KDA-USDT'
+                                      # some day youll have more here........
                                       ],
 
-                   'tickers_foreign_to_us_dict': {'ADAUSDT': 'ADAUSD', 'ADABTC': 'ADABTC',
-                                                  'BNBUSDT': 'BNBUSD', 'BNBBTC': 'BNBBTC',
-                                                  'BTCUSDT': 'BTCUSD',  # this doesnt exist either 'BTCBTC',
-                                                  'DOGEUSDT': 'DOGEUSD',
-                                                  'ETHUSDT': 'ETHUSD', 'ETHBTC': 'ETHBTC',
-                                                  'LINKUSDT': 'LINKUSD', 'LINKBTC': 'LINKBTC',
-                                                  'LTCUSDT': 'LTCUSD', 'LTCBTC': 'LTCBTC',
-                                                  'XLMUSDT': 'XLMUSD',
-                                                  'XRPUSDT': 'XRPUSD', 'XRPBTC': 'XRPBTC'
-                                                  },
+                   # I like the <base>-<quote> structure in all caps... this will be the universial standard.. for when
+                   # that actually needs to happen
+                   'exchange_to_universial_tick_dict': {'BTC-USDT': 'BTC-USDT', 'DAG-USDT': 'DAG-USDT',
+                                                        'ETH-USDT': 'ETH-USDT', 'FIL-USDT': 'FIL-USDT',
+                                                        'ICP-USDT': 'ICP-USDT', 'KAVA-USDT': 'KAVA-USDT',
+                                                        'KDA-USDT': 'KDA-USDT', 'LINK-USDT': 'LINK-USDT',
+                                                        'LTC-USDT': 'LTC-USDT', 'NOIA-USDT': 'NOIA-USDT',
+                                                        'QRDO-USDT': 'QRDO-USDT', 'REQ-USDT': 'REQ-USDT',
+                                                        'TEL-USDT': 'TEL-USDT', 'VRA-USDT': 'VRA-USDT',
+                                                        'XLM-USDT': 'XLM-USDT', 'XMR-USDT': 'XMR-USDT',
+                                                        'XPR-USDT': 'XPR-USDT', 'XRP-USDT': 'XRP-USDT',
+                                                        'XTZ-USDT': 'XTZ-USDT',
+                                                        },
 
-                   'tickers_us_to_foreign_dict': {'ADAUSD': 'ADAUSDT', 'ADABTC': 'ADABTC',
-                                                  'BNBUSD': 'BNBUSDT', 'BNBBTC': 'BNBBTC',
-                                                  'BTCUSD': 'BTCUSDT',  # this doesnt exist either 'BTCBTC',
-                                                  'DOGEUSD': 'DOGEUSDT',
-                                                  'ETHUSD': 'ETHUSDT', 'ETHBTC': 'ETHBTC',
-                                                  'LINKUSD': 'LINKUSDT', 'LINKBTC': 'LINKBTC',
-                                                  'LTCUSD': 'LTCUSDT', 'LTCBTC': 'LTCBTC',
-                                                  'XLMUSD': 'XLMUSDT',
-                                                  'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
-                                                  }
+                   'universial_to_exchange_tick_dict': {'BTC-USDT': 'BTC-USDT', 'DAG-USDT': 'DAG-USDT',
+                                                        'ETH-USDT': 'ETH-USDT', 'FIL-USDT': 'FIL-USDT',
+                                                        'ICP-USDT': 'ICP-USDT', 'KAVA-USDT': 'KAVA-USDT',
+                                                        'KDA-USDT': 'KDA-USDT', 'LINK-USDT': 'LINK-USDT',
+                                                        'LTC-USDT': 'LTC-USDT', 'NOIA-USDT': 'NOIA-USDT',
+                                                        'QRDO-USDT': 'QRDO-USDT', 'REQ-USDT': 'REQ-USDT',
+                                                        'TEL-USDT': 'TEL-USDT', 'VRA-USDT': 'VRA-USDT',
+                                                        'XLM-USDT': 'XLM-USDT', 'XMR-USDT': 'XMR-USDT',
+                                                        'XPR-USDT': 'XPR-USDT', 'XRP-USDT': 'XRP-USDT',
+                                                        'XTZ-USDT': 'XTZ-USDT',
+                                                        },
+
                    }  # ###PAUL just a copy paster from binance foreign, needs editing
 # ###PAUL just a copy paster from binance foreign, needs editing
 
@@ -518,31 +574,33 @@ data_format_binance_us = {
                                 },
 }  ###PAUL just a copy paster from binance foreign, needs editing
 data_format_kucoin = {
-    'websocket_trade_columns': {'e': 'event_type',
-                                'E': 'msg_time',
-                                's': 'ticker',
-                                't': 'trade_id',
-                                'p': 'price',
-                                'q': 'quantity',
-                                'b': 'buy_order_id',
-                                'a': 'sell_order_id',
-                                'T': 'trade_time',
-                                'm': 'buyer_is_maker',
-                                'M': 'ignore'
+    # ###PAUL issue here... see the websocket example... this will need processing each trade to format
+    # ###PAUL into the binance format... i would as long as possible (which is forseeably forever) prefer to convert
+    # ###PAUL all trade level data to this format. it works and all functionality is built off the assumption it is
+    # ###PAUL like this
+    'websocket_trade_columns': {'type': 'event_type',
+                                'will do this manually via time.time()': 'msg_time',
+                                'symbol': 'ticker',
+                                'tradeId': 'trade_id',
+                                'price': 'price',
+                                'size': 'quantity',
+                                'derived from maker / taker / side in real time': 'buy_order_id',
+                                'derived from maker / taker / side in real time': 'sell_order_id',
+                                'time': 'trade_time',
+                                'derived from maker / taker / side in real time': 'buyer_is_maker',
+                                # 'M': 'ignore'
                                 },
 
-    'websocket_trade_example': {"e": "trade",  # message type
-                                "E": 1609300202081,  # message time
-                                "s": "BNBBTC",  # Symbol
-                                "t": 12345,  # Trade ID
-                                "p": "0.001",  # Price
-                                "q": "100",  # Quantity
-                                "b": 88,  # Buyer order ID
-                                "a": 50,  # Seller order ID
-                                "T": 123456785,  # Trade time
-                                "m": True,  # Is the buyer the market maker?
-                                "M": True,
-                                # Ignore...  some legacy thing on binance side
+    'websocket_trade_example': {'symbol': 'KDA-USDT',
+                                'side': 'sell',
+                                'type': 'match',
+                                'makerOrderId': '624f101441645900017c716e',
+                                'sequence': '1621541091162',
+                                'size': '12.6875',
+                                'price': '6.4292',
+                                'takerOrderId': '624f101832db560001eb370e',
+                                'time': '1649348632148020952',
+                                'tradeId': '624f1018785778509c13a3d6'
                                 },
 
     'book_response_structure': {'structure': '###PAUL do this later'},
@@ -555,11 +613,11 @@ data_format_kucoin = {
 
     'trade_name_and_type': {'msg_time': float,
                             'ticker': str,
-                            'trade_id': int,
+                            'trade_id': str,
                             'price': float,
                             'quantity': float,
-                            'buy_order_id': int,
-                            'sell_order_id': int,
+                            'buy_order_id': str,
+                            'sell_order_id': str,
                             'trade_time': float,
                             'buyer_is_maker': bool,
                             },

@@ -42,7 +42,17 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
     # get trades
     # try:
+    print(ticker)
+
+    # import pdb; pdb.set_trace()
+
+    # if exchange == 'kucoin':
+        # import pdb;
+        # pdb.set_trace()
+
     trades = get_live_trades_data(ticker, exchange)
+
+
 
     # if there are no trades for ticker's live file skip for this round (else it errors)
     if trades.shape[0] == 0:
@@ -60,6 +70,8 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
     if os.path.isfile(price_fp):
         last_line = get_last_line_of_file(price_fp)
+
+
 
         latest_time_price_written = last_line[:19]  # date will always be 19 characters...
 
@@ -114,10 +126,18 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
 
 def add_prices_to_all_tickers(exchange):
+    print(exchange)
     ST = time.perf_counter()
 
     # investment universe from params
     tickers_tracked = params['universe'][exchange]['tickers_tracked']
+
+
+
+    # import pdb; pdb.set_trace()
+
+
+
 
     for ticker in tickers_tracked:
         add_prices_from_live_trade_data(ticker, exchange)
@@ -132,7 +152,9 @@ def add_prices_for_all_exchanges():
     ST = time.perf_counter()
 
     global params
-    exchanges = params['exchanges']
+    exchanges = params['systemd_control']['active_data_exchanges']
+
+    # import pdb; pdb.set_trace()
 
     for exchange in exchanges:
         add_prices_to_all_tickers(exchange)
