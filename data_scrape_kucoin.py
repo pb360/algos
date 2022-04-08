@@ -1,4 +1,4 @@
-#!/home/paul/miniconda3/envs/binance/bin/python3
+#!/home/paul/miniconda3/envs/crypto_data_scrape/bin/python3
 # -*- coding: utf-8 -*-
 # imports
 #
@@ -19,6 +19,7 @@ the data for 'tickers_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCU
 #
 import os
 import time
+
 # ### time zone change... this must happen first and utils must be imported first
 os.environ['TZ'] = 'UTC'
 time.tzset()
@@ -28,8 +29,8 @@ import nest_asyncio
 import pandas as pd
 import sys  # ###PAUL_del_later_if_not_needed
 import threading
-import traceback
-from twisted.internet import task, reactor
+# import traceback
+# from twisted.internet import task, reactor
 
 # ### local imports
 #
@@ -43,7 +44,7 @@ from kucoin.client import Market
 from kucoin.client import WsToken
 from kucoin.ws_client import KucoinWsClient
 
-
+print('---- STARTING KUCOIN DATA SCRAPE ---- \n'*15, flush=True)
 # ### variable definitions
 #
 #
@@ -56,6 +57,7 @@ client = Market(url='https://api.kucoin.com')
 params = config.params
 
 exchange = 'kucoin'  # exchange we are collecting data for
+script = 'data_scrape_kucoin.py'
 params['exchange'] = exchange
 
 lock = threading.Lock()  # locks other threads from writing to daily trade file
@@ -65,7 +67,6 @@ this_scripts_process_ID = os.getpid()
 last_msg_time = time.time() + 1.5
 consecutive_error_messages = 0
 message_counter = 0  # for debug only
-
 
 # parameters about investment universe
 coins_tracked = params['universe'][exchange]['coins_tracked']
@@ -164,7 +165,6 @@ async def process_message(msg):
     global this_scripts_process_ID
     global consecutive_error_messages
 
-
     # reset last message time for heartbeat check... if too long script assumes problem and restarts
     last_msg_time = time.time()
     print(msg, flush=True)
@@ -180,9 +180,11 @@ async def process_message(msg):
         if consecutive_error_messages > 10:
             consecutive_error_messages += 1
         else:
-            subject = "BINANCE DATA SCRAPE: Consecutive Error Messages from Websocket"
             message = "just a notification, no action needed"
-            send_email(subject, message)
+
+            send_email(subject='ALGOS UPDATE: ' + exchange + ' trades scrape ---- Consecutive Error from Websocket',
+                       message=message,
+                       script=script)
 
     # if normal trade message received process it
     else:
@@ -251,14 +253,19 @@ async def trim_live_files(params=params):
 
         # happens auto for new tickers
         except FileNotFoundError:
-            print('debug 1: FileNotFoundError: ' + str(live_fp) , flush=True)
+            print('debug 1: FileNotFoundError: ' + str(live_fp), flush=True)
             pass
         except TypeError as e:
             print('we have a problem \n' * 10, flush=True)
             print('msg_time type:  ', type(recent_trades['msg_time']), flush=True)
 
-            send_email(subject='BINANCE DATA SCRAPE: error in trim live files',
-                       message='ctrl+shft+f "trim_live_files in data_scrape_v3 \n error below \n ' + str(e) )
+            send_email(subject='ALGOS UPDATE: ' + exchange + 'collection error',
+                       message=(('we have a problem \n' * 10) + '\n'
+                                + 'msg_time type:  ', str(type(recent_trades['msg_time']))
+                                + 'NEEDS DEBUGGING \n \n \n error in trim_live_files \n \n error below \n \n' \
+                                + str(e)),
+                       script=script
+                       )
 
         lock.release()
 
@@ -269,19 +276,30 @@ def notify_of_process_start():
     global this_scripts_process_ID
     now_time_string = str(time.gmtime(time.time()))
 
-    subject = 'DATA SCRAPER STARTED: BINANCE'
     message = 'Process ID: ' + str(this_scripts_process_ID) + '\n' + \
               'Start Time: ' + now_time_string
 
-    send_email(subject, message)
+    send_email(subject='ALGOS UPDATE: ' + exchange + ' ---- collection started',
+               message=message,
+               script=script)
+
+
 
 
 # websocket connection
 async def main():
-    notify_of_process_start()
+
 
     # is public
-    client = WsToken()
+    # client = WsToken()  # ###PAUL_dev old connection line
+
+    # replacement connection for testing
+    key = params['keys']['kucoin_stream']['key']
+    secret = params['keys']['kucoin_stream']['secret']
+    passphrase = params['keys']['kucoin_stream']['passphrase']
+    client = WsToken(key=key, secret=secret, passphrase=passphrase,
+                     # is_sandbox=False, url='',
+                     )
 
     ws_client = await KucoinWsClient.create(None, client, process_message, private=False)
 
@@ -296,7 +314,19 @@ async def main():
         await trim_live_files(params=params)
         await asyncio.sleep(60, loop=loop)
 
+try:
+    if ran_once is True:
+        pass
+except NameError:
+    print('---- NOTIFYING OF PROCESS START ----  KUCOIN DATA SCRAPE ---- \n' * 50, flush=True)
+    notify_of_process_start()
+    ran_once = True
+
+
+print('---- FINISHED KUCOIN DATA SCRAPE ---- \n'*15, flush=True)
+
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
+

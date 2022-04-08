@@ -96,9 +96,9 @@ ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
                           'kucoin': 'BTC-USDT',
                           }
 
-no_trade_time = {'binance_foreign': 45,
+no_trade_time = {'binance_foreign': 60,
                  'binance_us': 90,  # binance_us kept restarting so give it a longer time...
-                 'kucoin': 60,
+                 'kucoin': 90,
                  }
 
 systemd_control['active_data_exchanges'] = active_data_exchanges

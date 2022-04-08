@@ -1,4 +1,4 @@
-#!/home/paul/miniconda3/envs/binance/bin/python3 -u
+#!/home/paul/miniconda3/envs/crypto_data_scrape/bin/python3 -u
 # -*- coding: utf-8 -*-
 # ### imports
 #
@@ -42,7 +42,7 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
     # get trades
     # try:
-    print(ticker)
+    # print(ticker)
 
     # import pdb; pdb.set_trace()
 
@@ -126,7 +126,7 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
 
 def add_prices_to_all_tickers(exchange):
-    print(exchange)
+    # print(exchange)
     ST = time.perf_counter()
 
     # investment universe from params

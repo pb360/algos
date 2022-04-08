@@ -1,4 +1,4 @@
-#!/home/paul/miniconda3/envs/binance/bin/python3
+#!/home/paul/miniconda3/envs/crypto_data_scrape/bin/python3
 # -*- coding: utf-8 -*-
 # imports
 #
@@ -48,6 +48,7 @@ START_TIME = time.time()
 params = config.params
 
 exchange = 'binance_us'  # exchange we are collecting data for
+script = 'data_scrape_binance_us.py'
 params['exchange'] = exchange
 
 lock = threading.Lock()  # locks other threads from writing to daily trade file
@@ -185,9 +186,10 @@ def process_message(msg):
         if consecutive_error_messages > 10:
             consecutive_error_messages += 1
         else:
-            subject = "BINANCE DATA SCRAPE: Consecutive Error Messages from Websocket"
             message = "just a notification, no action needed"
-            send_email(subject, message)
+            send_email(subject='ALGOS UPDATE: ' + exchange + ' trades scrape ---- Consecutive Error from Websocket',
+                       message=message,
+                       script=script)
 
     # if normal trade message received process it
     else:
@@ -261,8 +263,13 @@ def trim_live_files(params=params):
             print('we have a problem \n' * 10, flush=True)
             print('msg_time type:  ', type(recent_trades['msg_time']), flush=True)
 
-            send_email(subject='BINANCE DATA SCRAPE: unk error, needs debug',
-                       message='ctrl+shft+f "trim_live_files in data_scrape_v3')
+            send_email(subject='ALGOS UPDATE: ' + exchange + 'collection error',
+                       message=(('we have a problem \n' * 10) + '\n'
+                                + 'msg_time type:  ', str(type(recent_trades['msg_time']))
+                                + 'NEEDS DEBUGGING \n \n \n error in trim_live_files \n \n error below \n \n' \
+                                + str(e)),
+                       script=script
+                       )
 
         lock.release()
 
@@ -276,13 +283,13 @@ def kill_scraper_for_sysd_autostart(conn_key, reason=""):
 
     # send email notification
     now = str(time.gmtime(time.time()))
-    subject = 'DATA SCRAPING ERROR: ended by sysd autorestart'
+    subject = 'ALGOS UPDATE:' + exchange + ' collection ---- ended by sysd autorestart'
     message = 'The data scraper for binance failed at ' + now + '\n' \
               + ' there will be a follow up email when a new instance is successfully started' + '\n' \
               + 'process ID of the script that failed: ' + str(this_scripts_process_ID) + '\n' + '\n' \
               + 'Reason: ' + reason
 
-    send_email(subject, message)
+    send_email(subject, message, script=script)
 
     # stop the socket. close the client
     bm.stop_socket(conn_key)
@@ -324,11 +331,12 @@ def notify_of_process_start():
     global this_scripts_process_ID
     now_time_string = str(time.gmtime(time.time()))
 
-    subject = 'DATA SCRAPER STARTED: BINANCE'
     message = 'Process ID: ' + str(this_scripts_process_ID) + '\n' + \
               'Start Time: ' + now_time_string
 
-    send_email(subject, message)
+    send_email(subject='ALGOS UPDATE: ' + exchange + ' ---- collection started',
+               message=message,
+               script=script)
 
 
 # run everything

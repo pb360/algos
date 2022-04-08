@@ -119,7 +119,7 @@ def price_crypto_making_watchdog():
             epoch_msg_time = (most_recent_trade_timestamp - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
             seconds_since_last_msg = time.time() - epoch_msg_time
 
-            if seconds_since_last_msg > 35:
+            if seconds_since_last_msg > params['systemd_control']['no_trade_time'][exchange]:
                 service = params['systemd_control']['active_services']['prices']['crypto']
                 print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)

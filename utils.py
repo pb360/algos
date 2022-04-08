@@ -143,7 +143,7 @@ def check_if_file_in_directory(file, directory):
 
 
 # ###PAUL_aws migration concern... may need different mail function
-def send_email(subject, message, to='paulboehringer0989@gmail.com', params=params):
+def send_email(subject, message, script=None, to='paulboehringer0989@gmail.com', params=params):
     """sends an email from my protonmail to the
     input:
         subject (str): subject for email
@@ -164,8 +164,10 @@ def send_email(subject, message, to='paulboehringer0989@gmail.com', params=param
         msg['To'] = to
 
         msg['Subject'] = subject
+        begin_message_str = 'email from script ---- ' + script \
+                            + ' \n \n running on  ----  '+ params['device_info']['device_name'] + '\n \n'
 
-        message = message
+        message = begin_message_str + message
         msg.attach(MIMEText(message))
 
         mailserver = smtplib.SMTP('127.0.0.1', port_number)
