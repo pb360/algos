@@ -164,7 +164,7 @@ def send_email(subject, message, script=None, to='paulboehringer0989@gmail.com',
         msg['To'] = to
 
         msg['Subject'] = subject
-        begin_message_str = 'email from script ---- ' + script \
+        begin_message_str = 'email from script ---- ' + str(script) \
                             + ' \n \n running on  ----  '+ params['device_info']['device_name'] + '\n \n'
 
         message = begin_message_str + message

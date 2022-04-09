@@ -1,4 +1,4 @@
-#!/home/paul/miniconda3/envs/binance/bin/python3 -u
+#!/home/paul/miniconda3/envs/crypto_data_scrape/bin/python3 -u
 # -*- coding: utf-8 -*-
 
 # ### imports
@@ -37,13 +37,21 @@ for ex in params['exchanges']:
 
 
 # used a few times to restart services, good because it allows for mode switching easily for manual updates
-def restart_service(service, pword=word, mode='restart'):
+def restart_service(service, script, pword=word, mode='hard_restart'):
+
+    send_email(subject='WATCHDOG UPDATE: ' + service + ' ---- restart',
+               message=('restarting: \n'
+                        + '---- service: ' + service
+                        + '---- script: ' + script),
+               script=script)
+
     if mode == 'restart':
-        command = 'sudo systemctl restart ' + service + '.service '
+        command = 'sudo systemctl restart ' + service + '.service'
         p = os.system('echo %s|sudo -S %s' % (pword, command))
 
     if mode == 'hard_restart':
-        command = 'sudo systemctl stop ' + service + '.service ' \
+        command = 'sudo chmod u+x ' + script \
+                  + '&& sudo systemctl stop ' + service + '.service ' \
                   + '&& sudo systemctl daemon-reload' \
                   + '&& sudo systemctl enable ' + service + '.service' \
                   + '&& sudo systemctl restart ' + service + '.service'
@@ -63,8 +71,9 @@ def trade_watchdog():
         # if exchange == 'kucoin':
         #     import pdb; pdb.set_trace()
 
-
-        service = params['systemd_control']['active_services']['trades'][exchange]
+        # keep this here, bottom line needed for top
+        service = params['systemd_control']['active_services']['trades'][exchange]['service']
+        script = params['systemd_control']['active_services']['trades'][exchange]['script']
         restart_notification_string = 3 * ('NOT GETTING TRADES - exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n')
 
         try:
@@ -80,7 +89,7 @@ def trade_watchdog():
 
                 # restart it
                 print(restart_notification_string, flush=True)
-                restart_service(service)
+                restart_service(service, script)
 
             else:
                 error_count_dict['trade'][exchange] = 0
@@ -94,7 +103,7 @@ def trade_watchdog():
                 # restart it
                 print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: max ERROR count for exchange: ' + exchange, flush=True)
                 print(restart_notification_string, flush=True)
-                restart_service(service)
+                restart_service(service, script)
 
 
     return None
@@ -120,12 +129,13 @@ def price_crypto_making_watchdog():
             seconds_since_last_msg = time.time() - epoch_msg_time
 
             if seconds_since_last_msg > params['systemd_control']['no_trade_time'][exchange]:
-                service = params['systemd_control']['active_services']['prices']['crypto']
+                service = params['systemd_control']['active_services']['prices']['crypto']['service']
+                script = params['systemd_control']['active_services']['prices']['crypto']['script']
                 print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)
 
                 # restart it
-                restart_service(service)
+                restart_service(service, script)
 
             else:
                 print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG prices being made for    ' + exchange + '    -=-=-=-=-=-=-=-=\n',
@@ -139,12 +149,13 @@ def price_crypto_making_watchdog():
                 # ###PAUL_debug i dont think this is the right way to handle this but its late
                 print('-=-=-=-=-=- ALGOS WATCHDOG: price making ERROR  -=-=-=-=-=-', flush=True)
                 # raise RuntimeError
-                service = params['systemd_control']['active_services']['prices']['crypto']
+                service = params['systemd_control']['active_services']['prices']['crypto']['service']
+                script = params['systemd_control']['active_services']['prices']['crypto']['script']
                 print(2 * '-=-=-=-=- ALGOS - RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)
 
                 # restart service
-                restart_service(service)
+                restart_service(service, script)
 
     return None
 
@@ -163,7 +174,8 @@ def check_if_orders_being_updated():
         print('-=-=-=-=-=-=-=-= no bots running on ---- ' + device_name)
     for port_name in active_ports:
         exchange = params['systemd_control']['active_services']['ports'][port_name]['exchange']
-        service = params['systemd_control']['active_services']['ports'][port_name]['service_name']
+        service = params['systemd_control']['active_services']['ports'][port_name]['service']
+        script = params['systemd_control']['active_services']['ports'][port_name]['script']
 
         try:
             fp = get_data_file_path(data_type='last_order_check',
@@ -188,7 +200,7 @@ def check_if_orders_being_updated():
                   flush=True)
 
             # restart it
-            restart_service(service)
+            restart_service(service, script)
 
         else:  # orders being checked / placed for this portfolio
             print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG:   port   ' + port_name + '  ---- is active on   ' + exchange

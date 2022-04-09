@@ -57,7 +57,7 @@ client = Market(url='https://api.kucoin.com')
 params = config.params
 
 exchange = 'kucoin'  # exchange we are collecting data for
-script = 'data_scrape_kucoin.py'
+script = 'data_scrape_kucoin_test_with_edit.py'
 params['exchange'] = exchange
 
 lock = threading.Lock()  # locks other threads from writing to daily trade file
