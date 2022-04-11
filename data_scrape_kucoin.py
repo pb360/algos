@@ -244,7 +244,7 @@ async def trim_live_files(params=params):
             recent_trades = pd.read_csv(live_fp, names=trade_col_names, index_col=False)
 
             # only keep recent trades within cutoff time threshold
-            subtract_time = params['systemd_control']['active_services']['trades'][exchange]['secs_of_live_trades']
+            subtract_time = params['active_services']['trades'][exchange]['secs_of_live_trades']
             live_trade_cutoff_time = time.time() - subtract_time
             recent_trades = recent_trades[recent_trades['msg_time'] > live_trade_cutoff_time]
 
@@ -301,6 +301,9 @@ async def main():
                      # is_sandbox=False, url='',
                      )
 
+    secs_between_trims = params['active_services']['trades'][exchange]['secs_between_trims']
+
+
     ws_client = await KucoinWsClient.create(None, client, process_message, private=False)
 
     # documentation showing how to format request ---- https://docs.kucoin.com/#match-execution-data
@@ -312,7 +315,7 @@ async def main():
     await ws_client.subscribe(subscribe_string)
     while True:
         await trim_live_files(params=params)
-        await asyncio.sleep(60, loop=loop)
+        await asyncio.sleep(secs_between_trims, loop=loop)
 
 try:
     if ran_once is True:

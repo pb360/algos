@@ -19,8 +19,6 @@ from utils import *
 
 params = config.params
 
-
-
 add_constant = params['keys']['add_constant']
 add_position = params['keys']['add_position']
 word = params['keys']['comp_p_word']
@@ -28,23 +26,20 @@ word = word + str(int(word[add_position]) + add_constant)
 
 device_name = params['device_info']['device_name']
 
-cooldown_trade_dict = {}
-cooldown_price_dict = {}
-cooldown_bots_dict = {}
-
 # set the error count for each exchange to 0
 # ###PAUL this is currently implemented wrong. would be better to do params['systemd_control']['active_services].keys()
-error_count_dict = {}
-
-for data_type in params['systemd_control'].keys():
-    for params['systemd_control']
+error_count_dict = {'trade': {}, 'price': {}, }
+# for data_type in params['systemd_control']['active_services''.keys():
+#     for params['systemd_control']\
+for ex in params['active_services']['trades'].keys():
     error_count_dict['trade'][ex] = 0
     error_count_dict['price'][ex] = 0
 
 
+
+
 # used a few times to restart services, good because it allows for mode switching easily for manual updates
 def restart_service(service, script, pword=word, mode='hard_restart'):
-
     send_email(subject='WATCHDOG UPDATE: ' + service + ' ---- restart',
                message=('restarting: \n'
                         + '---- service: ' + service
@@ -70,34 +65,23 @@ def restart_service(service, script, pword=word, mode='hard_restart'):
 def trade_watchdog():
     """checks if we are getting trades and will hard reset the trade datascrape service
     """
-    global cooldown_trade_dict
-    keys = cooldown_trade_dict.keys()
 
     print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
 
-    for exchange in params['systemd_control']['active_services']['trades'].keys():
-
-        if exchange not in keys:
-            cooldown_trade_dict[exchange] = []
-        # if exchange == 'kucoin':
-        #     import pdb; pdb.set_trace()
-
+    for exchange in params['active_services']['trades'].keys():
         # keep this here, bottom line needed for top
-        service = params['systemd_control']['active_services']['trades'][exchange]['service']
-        script = params['systemd_control']['active_services']['trades'][exchange]['script']
-        restart_notification_string = 3 * ('NOT GETTING TRADES - exchange: ' + exchange + ' - RESTARTING  -  ' + service + '\n')
+        service = params['active_services']['trades'][exchange]['service']
+        script = params['active_services']['trades'][exchange]['script']
+        restart_notification_string = 3 * ('NOT GETTING TRADES - exchange: ' + exchange +
+                                           ' - RESTARTING  -  ' + service + '\n')
 
         try:
-            check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
-            no_trade_time = params['systemd_control']['active_services']['no_trade_time'][exchange]
+            check_ticker = params['active_services']['trades'][exchange]['ticker_to_check']
+            no_trade_time = params['active_services']['trades'][exchange]['no_trade_time']
             trades = get_live_trades_data(check_ticker, exchange=exchange)
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
 
-            # if exchange == 'kucoin':
-            #     import pdb; pdb.set_trace()
-
             if time_since_last_btc_trade > no_trade_time:  # restart systemd service
-
                 # restart it
                 print(restart_notification_string, flush=True)
                 restart_service(service, script)
@@ -116,7 +100,6 @@ def trade_watchdog():
                 print(restart_notification_string, flush=True)
                 restart_service(service, script)
 
-
     return None
 
 
@@ -127,21 +110,19 @@ def price_crypto_making_watchdog():
     global error_count_dict
 
     print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING PRICES -=-=-=-=-=-=-=-=\n', flush=True)
-    for exchange in params['systemd_control']['active_services']['prices'].keys():
+    for exchange in params['active_services']['prices'].keys():
         try:
-            check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
+            check_ticker = params['active_services']['trades'][exchange]['ticker_to_check']
             prices = get_data(data_type='prices', ticker=check_ticker, exchange=exchange)
 
             # get most recent BTC trade (or whatever is the highest frequency)
-            most_recent_trade_timestamp = pd.to_datetime(prices.index[-1])
+            most_recent_price_timestamp = pd.to_datetime(prices.index[-1])
+            epoch_price_time = (most_recent_price_timestamp - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
+            seconds_since_last_price = time.time() - epoch_price_time
 
-            # calculate unix datetime
-            epoch_msg_time = (most_recent_trade_timestamp - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
-            seconds_since_last_msg = time.time() - epoch_msg_time
-
-            if seconds_since_last_msg > params['systemd_control']['active_services']['no_trade_time'][exchange]:
-                service = params['systemd_control']['active_services']['prices']['crypto']['service']
-                script = params['systemd_control']['active_services']['prices']['crypto']['script']
+            if seconds_since_last_price > params['active_services']['prices'][exchange]['no_price_time']:
+                service = params['active_services']['prices']['crypto']['service']
+                script = params['active_services']['prices']['crypto']['script']
                 print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)
 
@@ -160,8 +141,8 @@ def price_crypto_making_watchdog():
                 # ###PAUL_debug i dont think this is the right way to handle this but its late
                 print('-=-=-=-=-=- ALGOS WATCHDOG: price making ERROR  -=-=-=-=-=-', flush=True)
                 # raise RuntimeError
-                service = params['systemd_control']['active_services']['prices']['crypto']['service']
-                script = params['systemd_control']['active_services']['prices']['crypto']['script']
+                service = params['active_services']['prices']['crypto']['service']
+                script = params['active_services']['prices']['crypto']['script']
                 print(2 * '-=-=-=-=- ALGOS - RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
                       flush=True)
 
@@ -177,17 +158,17 @@ def check_if_orders_being_updated():
     if True, then orders are being updated then we are good.
     """
 
-    print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING LIVE BOTS -=-=-=-=-=-=-=-=\n', flush=True)
+    print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING LIVE BOTS -=-=-=-=-=-=-=-= on ---- ' \
+          + device_name + '\n', flush=True)
 
-    active_ports = params['systemd_control']['active_services']['ports'].keys()
-
+    active_ports = params['active_services']['ports'].keys()
 
     if len(active_ports) == 0:
-        print('-=-=-=-=-=-=-=-= no bots running on ---- ' + device_name)
+        print('-=-=-=-=-=-=-=-= no bots running on ---- ' + device_name, flush=True)
     for port_name in active_ports:
-        exchange = params['systemd_control']['active_services']['ports'][port_name]['exchange']
-        service = params['systemd_control']['active_services']['ports'][port_name]['service']
-        script = params['systemd_control']['active_services']['ports'][port_name]['script']
+        exchange = params['active_services']['ports'][port_name]['exchange']
+        service = params['active_services']['ports'][port_name]['service']
+        script = params['active_services']['ports'][port_name]['script']
 
         try:
             fp = get_data_file_path(data_type='last_order_check',
@@ -220,20 +201,22 @@ def check_if_orders_being_updated():
                   flush=True)
 
 
+print('---- WATCHDOG: started ---- \n' * 10, flush=True)
+
 # trade reception watchdog
-trade_watch_dog_interval = params['constants']['trade_watch_dog_interval']  # interval between cleaning
+check_trades_interval = params['active_services']['watchdog']['check_trades_interval']
 trade_watchdog_task = task.LoopingCall(f=trade_watchdog)
-trade_watchdog_task.start(trade_watch_dog_interval)  # call every sixty seconds
+trade_watchdog_task.start(check_trades_interval)
 
 # price making watch dog looping task
-price_watch_dog_interval = params['constants']['price_watch_dog_interval']
+check_prices_interval = params['active_services']['watchdog']['check_prices_interval']
 price_crypto_watchdog_task = task.LoopingCall(f=price_crypto_making_watchdog)
-price_crypto_watchdog_task.start(price_watch_dog_interval)
+price_crypto_watchdog_task.start(check_prices_interval)
 
 # portfolio order watchdog
-order_watch_dog_interval = params['constants']['order_watch_dog_interval']
+check_order_out_interval = params['active_services']['watchdog']['check_order_out_interval']
 livebot_check_task = task.LoopingCall(f=check_if_orders_being_updated)
-livebot_check_task.start(order_watch_dog_interval)
+livebot_check_task.start(check_order_out_interval)
 
 # run it all
 reactor.run()

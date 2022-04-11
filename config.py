@@ -13,117 +13,32 @@ import time
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
-# ###PAUL critical directory here... this must be correct for wherever the
-# ###PAUL algos folder is on the  machine running it, then everything else will fall into line
+# add algos
 algos_dir = '/mnt/'
 sys.path.append(algos_dir)
 
 from algos.machine_specfic.config_machine_specific import params_machine_specific
 from algos.local.configs_local import params_local
 
-# ### stuff from outside sources
+
+# ### machine specific and local params
 #
 #
 device_info = {'device_name': params_machine_specific['device_name'],
                'os': str(platform.system()),
                }
-
+active_services = params_machine_specific['active_services']
+addresses = params_local['addresses']
 keys = params_local['keys']
 
-# ### important constants ###PAUL_todo TODO when you have time try to break this out...
+
+# ### important constants ###PAUL_todo
 #
 #
-constants = {
-    'live_trade_trim_interval': 30,  # how mnay seconds betweeen trimming live files
-    'no_trade_message_timeout': 30,  # secs required for no msg until new scraping process starts
-    'data_scrape_heartbeat': 8,  # check no_trade_message_timeout in heartbeat_check()
-    'make_prices_from_trades_interval': 10,  # currently located in orders.py
-    'update_signal_interval': 10,  # how many seconds between MACD signal update
-    'order_sma_v1_interval': 15,  # order on signal interval   ###PAUL_migration should move to algos
-    'secondary_order_interval': 2,  # update market status and adjust orders ###PAUL_migration needs to mention binance
-    'trade_watch_dog_interval': 30,
-    # how long if no trade to restart trade collection w/ system-d ###PAUL_migration needs to mention binance
-    'price_watch_dog_interval': 60,
-    # how long if no price update to re-run orders.py w/ system-d ###PAUL_migration needs to mention binance
-    'order_watch_dog_interval': 60,
-    # how long if order check not updated to restart any live_bot
-    'os': str(platform.system()),
-    'signal_based_order_interval': 10,
-    'email_port': 1025,
-}
-# ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
+constants = {'os': str(platform.system()),  # ###PAUL alot relies on this, this is kindof the thing that should be here
+             'email_port': 1025,
+             }
 
-
-systemd_control = dict()
-
-
-# same service used for all price creation
-price_service_dict = {'service': 'algos_pipe_trades_to_prices',
-                      'script': '/mnt/algos/data_pipe_prices_from_trades.py',
-                      'cool_down': 120,
-                      'last_restart': None,
-                      }
-
-active_services = {'trades': {'binance_foreign': {'service': 'algos_scrape_trades_binance_foreign',
-                                                  'script': '/mnt/algos/data_scrape_binance_foreign.py',
-                                                  'secs_of_live_trades': 120,
-                                                  'no_trade_time': 60,
-                                                  'cool_down': 60, # how long to wait after restarting
-                                                  'last_restart': None, # activley managed by watchdog
-                                                  },
-                              'binance_us': {'service': 'algos_scrape_trades_binance_us',
-                                             'script': '/mnt/algos/data_scrape_binance_us.py',
-                                             'secs_of_live_trades': 120,
-                                             'no_trade_time': 60,
-                                             'cool_down': 60, # how long to wait after restarting
-                                             'last_restart': None, # activley managed by watchdog
-                                             },
-                              'kucoin': {'service': 'algos_scrape_trades_kucoin',
-                                         'script': '/mnt/algos/data_scrape_kucoin.py',
-                                         'secs_of_live_trades': 120,
-                                         'no_trade_time': 60,
-                                         'cool_down': 60, # how long to wait after restarting
-                                         'last_restart': None, # activley managed by watchdog
-                                         },
-                              # 'silver': {'service': 'algos_scrape_trades_silver_comex',
-                              #            'script': '/mnt/algos/data_scrape_silver_comex.py',
-                              #            'cool_down': 60, # how long to wait after restarting
-                              #            'last_restart': None, # activley managed by watchdog
-                              #            },
-                              },
-                   'prices': {'binance_foreign': price_service_dict,
-                              'binance_us': price_service_dict,
-                              'kucoin': price_service_dict,
-                              # 'silver': price_service_dict,
-                              },
-                   'ports': {'sma_v1_equal_dist': {'service': 'algos_live_bot_sma_v1_equal_dist',
-                                                   'script': '/mnt/algos/live_bot_sma_v1_equal_dist.py',
-                                                   'exchange': 'binance_us',
-                                                   },
-                             # 'markowitz_v1': {'service': 'algos_live_bot_markowitz_v1',
-                             # 'script': '/mnt/algos/live_bot_sma_v1_equal_dist get er done .py',
-                             #                  'exchange': 'binance_us',
-                             #                  },
-                             # 'ml_v1': {'service': 'algos_live_bot_ml_v1',
-                             #           'exchange': 'binance_us',
-                             #           },
-                             },
-                   }
-
-# used for watchdog... ticker of interest...
-ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
-                          'binance_us': 'BTCUSD',
-                          'kucoin': 'BTC-USDT',
-                          }
-
-systemd_control['active_data_exchanges'] = active_data_exchanges
-systemd_control['active_ports'] = active_ports
-systemd_control['active_services'] = active_services
-systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
-systemd_control['ticker_to_check_trades'] = ticker_to_check_trades
-systemd_control['no_trade_time'] = no_trade_time
-
-exchanges_we_want_to_add_end_to_end_support_for = ['kucoin', ]
 
 # ###PAUL_migration .... this should probably just go away, or be migrated to ./utils.py thats the only thing that'll
 # ###PAUL_migration .... us it with get_data_fp()
@@ -147,19 +62,9 @@ dirs = {'algos_dir': algos_dir,  # this is where the the algos directory is loca
 #
 #
 universe = dict()
-"""doc string for this dictionary because it is a bitch 
-###PAUL_todo make a universial entry such that 
-universe['universe']
-is a reference to all or as many of the individual tickers for each exchange. this will make comparitive work easier 
-can then make a 
-for exchange in exchanges: 
-    get_data(prices / trades, ticker, exchange) and do what you want to do (combine, compare...)  
-"""
 
 # ###PAUL_refractor for the live bot some temporary variables that will be in the universial dict will be below
-# ###PAUL_refracto eventually these will need to move to params['universe']['universal']
-
-
+# ###PAUL_refractor eventually these will need to move to params['universe']['universal']
 universal = {}
 
 universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
@@ -240,9 +145,8 @@ universe_binance_foreign = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth'
                                                                  'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
                                                                  'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
                                                                  },
-                            }  # ###PAUL just a copy paster from binance foreign, needs editing
+                            }
 
-# ###PAUL just a copy paster from binance foreign, needs editing
 universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
 
                        'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
@@ -327,7 +231,7 @@ universe_binance_us = {'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'li
                                                             'XRPUSD': 'XRPUSDT', 'XRPBTC': 'XRPBTC',
                                                             'XTZUSD': 'XTZUSDT', 'XTZBTC': 'XTZBTC',
                                                             },
-                       }  # ###PAUL just a copy paster from binance foreign, needs editing
+                       }
 
 universe_kucoin = {'coins_tracked': ['btc', 'dag', 'eth', 'fil', 'icp', 'kava', 'kda', 'link', 'ltc', 'noia', 'qrdo',
                                      'req', 'tel', 'vra', 'xlm', 'xmr', 'xpr', 'xrp', 'xtz'
@@ -378,13 +282,13 @@ universe_kucoin = {'coins_tracked': ['btc', 'dag', 'eth', 'fil', 'icp', 'kava', 
                                                         'XTZ-USDT': 'XTZ-USDT',
                                                         },
 
-                   }  # ###PAUL just a copy paster from binance foreign, needs editing
-# ###PAUL just a copy paster from binance foreign, needs editing
+                   }
 
 universe['universal'] = universal
 universe['binance_foreign'] = universe_binance_foreign
 universe['binance_us'] = universe_binance_us
 universe['kucoin'] = universe_kucoin
+
 
 # ### data format ---- for pretty much everything in the repo
 #
@@ -693,10 +597,6 @@ data_format['binance_foreign'] = data_format_binance_foreign
 data_format['binance_us'] = data_format_binance_us
 data_format['kucoin'] = data_format_kucoin
 
-# ### addresses
-#
-#
-adresses = {'nano1_eth': '0x1f05cb5b0d8aab9299dBC6a0254432907B928843'}
 
 # ### initialize ---- parameters and create the dictionary
 #
@@ -705,9 +605,10 @@ params = dict()
 
 params['device_info'] = device_info
 params['constants'] = constants
-params['systemd_control'] = systemd_control
-params['universe'] = universe
-params['keys'] = keys  ###PAUL consider not including in params
+params['active_services'] = active_services
+params['addresses'] = addresses
+params['keys'] = keys
 params['dirs'] = dirs
+params['universe'] = universe
 params['data_format'] = data_format
-params['addresses'] = adresses
+

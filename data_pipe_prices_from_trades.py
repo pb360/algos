@@ -42,7 +42,7 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
     # get trades
     # try:
-    # print(ticker)
+    # print(ticker, flush=True)
 
     # import pdb; pdb.set_trace()
 
@@ -126,7 +126,7 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
 
 def add_prices_to_all_tickers(exchange):
-    # print(exchange)
+    # print(exchange, flush=True)
     ST = time.perf_counter()
 
     # investment universe from params
@@ -152,7 +152,7 @@ def add_prices_for_all_exchanges():
     ST = time.perf_counter()
 
     global params
-    exchanges = params['systemd_control']['active_services']['prices'].keys()
+    exchanges = params['active_services']['prices'].keys()
 
     # import pdb; pdb.set_trace()
 
@@ -168,9 +168,13 @@ def add_prices_for_all_exchanges():
 
 
 def main(params=params):
-    price_add_interval = params['constants']['make_prices_from_trades_interval']
+
+    print('---- PRICES: pipe trades to prices ----\n'*10, flush=True)
+
+    exchange = 'binance_foreign'  # shit fix because i like having a different entry for each exchange in this
+    interval = params['active_services']['prices'][exchange]['trades_to_prices_interval']
     add_prices_task = task.LoopingCall(f=add_prices_for_all_exchanges)
-    add_prices_task.start(price_add_interval)
+    add_prices_task.start(interval)
     reactor.run()
 
 

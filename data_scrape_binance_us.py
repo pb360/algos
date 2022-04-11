@@ -19,6 +19,7 @@ the data for 'tickers_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCU
 #
 import os
 import time
+
 # ### time zone change... this must happen first and utils must be imported first
 os.environ['TZ'] = 'UTC'
 time.tzset()
@@ -38,7 +39,8 @@ from utils import send_email, get_data_file_path, convert_date_format
 # needed to let the package to see itself for interior self imports
 sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
 from ext_packages.sams_binance_api.binance.client import Client
-from ext_packages.sams_binance_api.binance.websockets_us import  BinanceSocketManager
+from ext_packages.sams_binance_api.binance.websockets_us import BinanceSocketManager
+
 # from binance.websockets_us import BinanceSocketManager
 
 # ### variable definitions
@@ -68,7 +70,6 @@ secret_key = params['keys']['binance_foreign_data_key_secret_1']
 coins_tracked = params['universe'][exchange]['coins_tracked']
 tickers_tracked = params['universe'][exchange]['tickers_tracked']
 tick_collection_list = params['universe'][exchange]['tick_collection_list']
-
 
 if exchange == 'binance_us':
     tld = 'us'
@@ -248,7 +249,7 @@ def trim_live_files(params=params):
             recent_trades = pd.read_csv(live_fp, names=trade_col_names, index_col=False)
 
             # only keep recent trades within cutoff time threshold
-            subtract_time = params['systemd_control']['active_services']['trades'][exchange]['secs_of_live_trades']
+            subtract_time = params['active_services']['trades'][exchange]['secs_of_live_trades']
             live_trade_cutoff_time = time.time() - subtract_time
             recent_trades = recent_trades[recent_trades['msg_time'] > live_trade_cutoff_time]
 
@@ -257,7 +258,7 @@ def trim_live_files(params=params):
 
         # happens auto for new tickers
         except FileNotFoundError:
-            print('debug 1: FileNotFoundError: ' + str(live_fp) , flush=True)
+            print('debug 1: FileNotFoundError: ' + str(live_fp), flush=True)
             pass
         except TypeError:
             print('we have a problem \n' * 10, flush=True)
@@ -320,9 +321,8 @@ def heartbeat_check(params=params):
     # wait 2 seconds... ###PAUL
     # time.sleep(2)
     # if no msg in last 30 seconds
-    no_trade_message_timeout = params['constants']['no_trade_message_timeout']
-
-    if now > last_msg_time + no_trade_message_timeout:  # ###PAUL consider using global var heartbeat_check_interval
+    no_message_timeout = params['active_services']['trades'][exchange]['no_message_timeout']
+    if now > last_msg_time + no_message_timeout:  # ###PAUL consider using global var heartbeat_check_interval
         print('NO MESSAGE FOR TOO LONG: killing process for auto-restart by systemd', flush=True)
         kill_scraper_for_sysd_autostart(conn_key, reason='   heartbeat_check() time out v4')
 
@@ -351,14 +351,14 @@ def main(params=params):
     conn_key = bm.start_multiplex_socket(tick_collection_list, process_message)
 
     # live file trim task
-    live_trade_trim_interval = params['constants']['live_trade_trim_interval']  # interval between cleaning
+    secs_between_trims = params['active_services']['trades'][exchange]['secs_between_trims']
     file_trim_task = task.LoopingCall(f=trim_live_files)
-    file_trim_task.start(live_trade_trim_interval)  # call every sixty seconds
+    file_trim_task.start(secs_between_trims)  # call every sixty seconds
 
     # heartbeat check task... make sure still recieving messages
-    data_scrape_heartbeat = params['constants']['data_scrape_heartbeat']
+    heartbeat_interval = params['active_services']['trades'][exchange]['message_heartbeat_check']
     heartbeat_check_task = task.LoopingCall(f=heartbeat_check)
-    heartbeat_check_task.start(data_scrape_heartbeat)
+    heartbeat_check_task.start(heartbeat_interval)
 
     # then start the socket manager
     bm.start()
@@ -366,7 +366,7 @@ def main(params=params):
 
 try:
     main()
-    print('------------   data_scrape ---- trades ---- binance_us ----- ran fully  ------------', flush=True)
+    print('------------   data_scrape ---- trades ---- binance_us ----- ran fully  ------------\n' * 10, flush=True)
 except Exception as e:
     print('debug spot 3', flush=True)
     exc_type, exc_value, exc_traceback = sys.exc_info()

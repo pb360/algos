@@ -254,94 +254,9 @@ def make_date_suffix(date, file_type='.csv'):
     return suffix
 
 
-price_data_dir = params['dirs']['price_data_dir']
-trade_data_dir = params['dirs']['trade_data_dir']
-live_trade_data_dir = params['dirs']['live_trade_data_dir']
-order_data_dir = params['dirs']['order_data_dir']
-live_data_dir = params['dirs']['live_data_dir']
-port_data_dir = params['dirs']['port_data_dir']
-
-
-# order_closed_data_dir = params['dirs']['order_closed_data_dir']
-# order_open_data_dir = params['dirs']['order_open_data_dir']
-
-
-def get_data_file_path_OLD_VERSION(data_type, ticker, date='live', port=None, params=params):
-    """returns string of filepath to requested datafile
-
-    :param port: (str) naming the portfolio strategy for orders and preformance data
-    inputs
-        data_type (str): options ----  ['price', 'trade', 'order', 'book']  ----
-            TODO add live order which means all open orders
-            TODO daily data files  add support for book eventually
-        ticker (str):    ticker  ---- 'BTCUSDT'
-        date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
-    """
-    # first handle if date is live... if not we attempt to convert it if not a tuple
-    if date == 'live' or date == 'open':
-        if data_type == 'trade':
-            fp = live_trade_data_dir + ticker + '/' + ticker + '_live_trades.csv'
-        ###PAUL_DEV_SPOT
-        if data_type == 'price':
-            fp = live_trade_data_dir + ticker + '/' + ticker + '_live_trades.csv'
-        if data_type == 'orders' or data_type == 'order' or data_type == 'order_open' or data_type == 'open_orders':
-            if port is None:
-                return IOError
-            else:
-                fp = order_data_dir + port + '/open_orders.csv'
-
-        ###this
-        if data_type == 'whose_turn':
-            if port is None:
-                return IOError
-            else:
-                fp = order_data_dir + port + '/whose_turn.csv'
-        if data_type == 'last_order_check':
-            if port is None:
-                return IOError
-            else:
-                fp = order_data_dir + port + '/last_check.txt'
-        if data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path':
-            if port is None:
-                return IOError
-            else:
-                fp = order_data_dir + port + '/'
-
-
-    # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
-    # if ~isinstance(date, tuple):
-    #     date = convert_date_format(date=date, output_type='tuple_to_day')
-
-    elif date == 'ticker_folder':  # just gets the ticker's folder.. will direct to folder of dates for data type
-        if data_type == 'price' or data_type == 'prices':
-            fp = price_data_dir + ticker + '/'
-        elif data_type == 'trade' or data_type == 'trades':
-            fp = trade_data_dir + ticker + '/'
-        elif data_type == 'book':
-            fp = price_data_dir + ticker + '/'
-        elif data_type == 'order_closed':
-            fp = order_data_dir + port + '/closed/' + ticker + '/'
-
-
-    elif date != 'live':  # date is actually supplied
-        suffix = make_date_suffix(date)
-
-        if data_type == 'price' or data_type == 'prices':
-            fp = price_data_dir + ticker + '/prices----' + ticker + suffix
-        elif data_type == 'trade' or data_type == 'trades':
-            fp = trade_data_dir + ticker + '/trades----' + ticker + suffix
-        elif data_type == 'order' or data_type == 'order_closed' or data_type == 'orders' or data_type == 'closed_orders':
-            fp = order_data_dir + port + '/closed/' + ticker + '/orders---' + ticker + suffix
-        elif data_type == 'book':
-            fp = price_data_dir + ticker + '/book----`' + ticker + suffix
-
-    # needs to be commented.. data scrape critical error if live
-    # else:
-    #     print("error creating data filepath", flush=True)
-    #     raise TypeError
-
-    return fp
-
+# useful in the below function
+live_data_dir = params['dirs']['live_data_dir']  # still used
+port_data_dir = params['dirs']['port_data_dir']  # still used
 
 def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None, params=params):
     """returns string of filepath to requested datafile
@@ -466,22 +381,6 @@ def get_live_trades_data(ticker, exchange, params=params):
                        index_col='msg_time'
                        )
 
-
-# ###PAUL_algos_refractor... doesnt appear to be used anywhere
-# def get_price_data(ticker, date='live', params=params):
-#     """
-#     :param ticker:
-#     :param date:
-#     :param params:
-#     :return:
-#     """
-#
-#     fp = get_data_file_path(data_type='price')
-#
-#     prices = pd.read_csv(fp)
-
-
-# from datetime import date, timedelta
 
 def get_date_range(start_date, end_date, output_type='datetime.datetime'):
     """makes list from start_date to end date
@@ -905,22 +804,20 @@ def make_alternating_buy_sell_signal(buy_idxs, sell_idxs, signal_shape):
     return signal
 
 
-# ###PAUL_refractor
+# ###PAUL_refractor  redo convert tickers
 # ###PAUL_refractor
 # ###PAUL_refractor for initial algos refractor may want to remove these conversion
 # ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
 def convert_ticker_us_to_foreign(us_ticker, exchange):
     return params['universe'][exchange]['tickers_us_to_foreign_dict'][us_ticker]
 
-
 def convert_ticker_foreign_to_us(foreign_ticker, exchange):
     return params['universe'][exchange]['tickers_foreign_to_us_dict'][foreign_ticker]
-
-
 # ###PAUL_refractor for initial algos refractor may want to remove these conversion
 # ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
 # ###PAUL_refractor
-# ###PAUL_refractor
+# ###PAUL_refractor redo convert tickers
+
 
 def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
     """Rounds a given quantity to a specific step size

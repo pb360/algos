@@ -224,10 +224,10 @@ def trim_live_files(params=params):
     # # #######   ---------------------------------------------------------------- START: debug
     # global iter_count_live_file_trim
     # iter_count_live_file_trim += 1
-    # print('iter #: ',  str(iter_count_live_file_trim), ' of live data purge')
+    # print('iter #: ',  str(iter_count_live_file_trim), ' of live data purge', flush=True)
     #
     # if iter_count_live_file_trim > 10:
-    #     print('hur-dee-dur... i stopped \n'*10)
+    #     print('hur-dee-dur... i stopped \n'*10, flush=True)
     #     raise ValueError
     # # #######   ---------------------------------------------------------------- END: debug
     # # #######   ---------------------------------------------------------------- END: debug
@@ -246,7 +246,7 @@ def trim_live_files(params=params):
             recent_trades = pd.read_csv(live_fp, names=trade_col_names, index_col=False)
 
             # only keep recent trades within cutoff time threshold
-            subtract_time = params['systemd_control']['active_services']['trades'][exchange]['secs_of_live_trades']
+            subtract_time = params['active_services']['trades'][exchange]['secs_of_live_trades']
             live_trade_cutoff_time = time.time() - subtract_time
             recent_trades = recent_trades[recent_trades['msg_time'] > live_trade_cutoff_time]
 
@@ -303,7 +303,7 @@ def kill_scraper_for_sysd_autostart(conn_key, reason=""):
 def heartbeat_check(params=params):
     # # DEBUG conditional... stop the script after 1 min 20 seconds
     # if now > START_TIME + 40:
-    #     print('DEBUG: Starting new script')
+    #     print('DEBUG: Starting new script', flush=True)
     #     start_backup_scraper(conn_key)
 
     global conn_key
@@ -313,9 +313,8 @@ def heartbeat_check(params=params):
     # wait 2 seconds... ###PAUL
     # time.sleep(2)
     # if no msg in last 30 seconds
-    no_trade_message_timeout = params['constants']['no_trade_message_timeout']
-
-    if now > last_msg_time + no_trade_message_timeout:  # ###PAUL consider using global var heartbeat_check_interval
+    no_message_timeout = params['active_services']['trades'][exchange]['no_message_timeout']
+    if now > last_msg_time + no_message_timeout:  # ###PAUL consider using global var heartbeat_check_interval
         print('NO MESSAGE FOR TOO LONG: killing process for auto-restart by systemd', flush=True)
         kill_scraper_for_sysd_autostart(conn_key, reason='   heartbeat_check() time out v4')
 
@@ -344,14 +343,14 @@ def main(params=params):
     conn_key = bm.start_multiplex_socket(tick_collection_list, process_message)
 
     # live file trim task
-    live_trade_trim_interval = params['constants']['live_trade_trim_interval']  # interval between cleaning
+    secs_between_trims = params['active_services']['trades'][exchange]['secs_between_trims']
     file_trim_task = task.LoopingCall(f=trim_live_files)
-    file_trim_task.start(live_trade_trim_interval)  # call every sixty seconds
+    file_trim_task.start(secs_between_trims)  # call every sixty seconds
 
     # heartbeat check task... make sure still recieving messages
-    data_scrape_heartbeat = params['constants']['data_scrape_heartbeat']
+    heartbeat_interval = params['active_services']['trades'][exchange]['message_heartbeat_check']
     heartbeat_check_task = task.LoopingCall(f=heartbeat_check)
-    heartbeat_check_task.start(data_scrape_heartbeat)
+    heartbeat_check_task.start(heartbeat_interval)
 
     # then start the socket manager
     bm.start()
@@ -359,7 +358,7 @@ def main(params=params):
 
 try:
     main()
-    print('----------------------   data_scrape.py ran fully  ------------------', flush=True)
+    print('----------------------   data_scrape.py ran fully  ------------------\n'*10, flush=True)
 except Exception as e:
     exc_type, exc_value, exc_traceback = sys.exc_info()
     issues = traceback.format_exception(exc_type, exc_value, exc_traceback)

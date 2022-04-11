@@ -87,7 +87,7 @@ op_sys = params['constants']['os']
 # ##
 # ### for deployment only
 # assert(exchange in params['systemd_control']['active_data_exchanges']) << see below for correct line
-# assert(port_name in params['systemd_control']['active_services']['ports'].keys())
+# assert(port_name in params['active_services']['ports'].keys())
 # ###
 # ##
 # #
@@ -1178,7 +1178,7 @@ def place_signal_on_orders_exception_catch():
 
 
 def main():
-    signal_based_order_interval = params['constants']['signal_based_order_interval']
+    signal_based_order_interval = params['active_services']['ports']['sma_v1_equal_dist']['signal_based_order_interval']
     place_orders_on_signal_task = task.LoopingCall(f=place_signal_on_orders_exception_catch)
     place_orders_on_signal_task.start(signal_based_order_interval)
 
@@ -1186,8 +1186,8 @@ def main():
     return None
 
 
-try:
-    main()
-    print('ALGOS ---- LIVE BOT ---- ran fully ------------------------ \n', flush=True)
-except Exception as e:
-    print('\n \n ALGOS - LIVE BOT - MAIN LEVEL ERROR! \n \n', flush=True)
+# try:
+main()
+print('ALGOS ---- LIVE BOT ---- ran fully ------------------------ \n', flush=True)
+# except Exception as e:
+#     print('\n \n ALGOS - LIVE BOT - MAIN LEVEL ERROR! \n ' + str(e) + '\n \n', flush=True)
