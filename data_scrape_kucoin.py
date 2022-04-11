@@ -214,7 +214,7 @@ async def process_message(msg):
 
 # iter_count_live_file_trim = 0   # ###DEBUG used to be sure function spits an error at some point
 async def trim_live_files(params=params):
-    """removes data older than params['constants']['secs_of_trades_to_keep_live'] from live data files
+    """removes data older than param from active_services from live data files
 
     ###PAUL TODO make so one thread locks and handles ONE file... low priority
     """
@@ -244,7 +244,7 @@ async def trim_live_files(params=params):
             recent_trades = pd.read_csv(live_fp, names=trade_col_names, index_col=False)
 
             # only keep recent trades within cutoff time threshold
-            subtract_time = params['constants']['secs_of_trades_to_keep_live']
+            subtract_time = params['systemd_control']['active_services']['trades'][exchange]['secs_of_live_trades']
             live_trade_cutoff_time = time.time() - subtract_time
             recent_trades = recent_trades[recent_trades['msg_time'] > live_trade_cutoff_time]
 

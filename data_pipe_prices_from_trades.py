@@ -152,7 +152,7 @@ def add_prices_for_all_exchanges():
     ST = time.perf_counter()
 
     global params
-    exchanges = params['systemd_control']['active_data_exchanges']
+    exchanges = params['systemd_control']['active_services']['prices'].keys()
 
     # import pdb; pdb.set_trace()
 

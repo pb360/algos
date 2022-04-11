@@ -30,11 +30,10 @@ device_info = {'device_name': params_machine_specific['device_name'],
 
 keys = params_local['keys']
 
-# ### important constants
+# ### important constants ###PAUL_todo TODO when you have time try to break this out...
 #
 #
 constants = {
-    'secs_of_trades_to_keep_live': 120,  # number of minutes to keep trades in live file
     'live_trade_trim_interval': 30,  # how mnay seconds betweeen trimming live files
     'no_trade_message_timeout': 30,  # secs required for no msg until new scraping process starts
     'data_scrape_heartbeat': 8,  # check no_trade_message_timeout in heartbeat_check()
@@ -55,65 +54,59 @@ constants = {
 # ###PAUL_migration  ^^^^^^    this can stay however will need some updates   ^^^^^^
 
 
-exchanges = ['binance_foreign', 'binance_us', ]
-
 systemd_control = dict()
 
-active_data_exchanges = ['binance_foreign', 'binance_us',
-                         'kucoin',
-                         ]  # where trades are able to be collected live
-active_ports = params_machine_specific['active_ports']
 
-# ###PAUL_todo
-# ### this dictionary is not currently used. but this is the format i would like to move to
-# ### maybe rename it the watchdog dictionary. also consider moving this to its own file or something which would
-# ### be checked every so often to know whether to pull services or something.
-#
-#
-# names of systemd services used to collect trades for each exchange
-active_services_OLD_VERSION = {'trades': {'binance_foreign': 'algos_scrape_trades_binance_foreign',
-                                          'binance_us': 'algos_scrape_trades_binance_us',
-                                          'kucoin': 'algos_scrape_trades_kucoin',
-                                          'silver': 'get to it',
-                                          },
-                               'prices': {'crypto': 'algos_pipe_trades_to_prices',
-                                          },
-                               'ports': {'sma_v1_equal_dist': {'service_name': 'algos_live_bot_sma_v1_equal_dist',
-                                                               'exchange': 'binance_us',
-                                                               },
-                                         'markowitz_v1': {'service_name': 'algos_live_bot_markowitz_v1',
-                                                          'exchange': 'binance_us',
-                                                          },
-                                         'ml_v1': {'service_name': 'algos_live_bot_ml_v1',
-                                                   'exchange': 'binance_us',
-                                                   },
-                                         },
-                               }
+# same service used for all price creation
+price_service_dict = {'service': 'algos_pipe_trades_to_prices',
+                      'script': '/mnt/algos/data_pipe_prices_from_trades.py',
+                      'cool_down': 120,
+                      'last_restart': None,
+                      }
 
 active_services = {'trades': {'binance_foreign': {'service': 'algos_scrape_trades_binance_foreign',
-                                                  'script': '/mnt/algos/data_scrape_binance_foreign.py', },
+                                                  'script': '/mnt/algos/data_scrape_binance_foreign.py',
+                                                  'secs_of_live_trades': 120,
+                                                  'no_trade_time': 60,
+                                                  'cool_down': 60, # how long to wait after restarting
+                                                  'last_restart': None, # activley managed by watchdog
+                                                  },
                               'binance_us': {'service': 'algos_scrape_trades_binance_us',
-                                             'script': '/mnt/algos/data_scrape_binance_us.py', },
+                                             'script': '/mnt/algos/data_scrape_binance_us.py',
+                                             'secs_of_live_trades': 120,
+                                             'no_trade_time': 60,
+                                             'cool_down': 60, # how long to wait after restarting
+                                             'last_restart': None, # activley managed by watchdog
+                                             },
                               'kucoin': {'service': 'algos_scrape_trades_kucoin',
-                                         'script': '/mnt/algos/data_scrape_kucoin.py', },
-                              'silver': {'service': 'algos_scrape_trades_silver_comex',
-                                         'script': '/mnt/algos/data_scrape_silver_comex.py', },
+                                         'script': '/mnt/algos/data_scrape_kucoin.py',
+                                         'secs_of_live_trades': 120,
+                                         'no_trade_time': 60,
+                                         'cool_down': 60, # how long to wait after restarting
+                                         'last_restart': None, # activley managed by watchdog
+                                         },
+                              # 'silver': {'service': 'algos_scrape_trades_silver_comex',
+                              #            'script': '/mnt/algos/data_scrape_silver_comex.py',
+                              #            'cool_down': 60, # how long to wait after restarting
+                              #            'last_restart': None, # activley managed by watchdog
+                              #            },
                               },
-                   'prices': {
-                              'crypto': {'service': 'algos_pipe_trades_to_prices',
-                                         'script': '/mnt/algos/data_pipe_prices_from_trades.py', },
+                   'prices': {'binance_foreign': price_service_dict,
+                              'binance_us': price_service_dict,
+                              'kucoin': price_service_dict,
+                              # 'silver': price_service_dict,
                               },
                    'ports': {'sma_v1_equal_dist': {'service': 'algos_live_bot_sma_v1_equal_dist',
                                                    'script': '/mnt/algos/live_bot_sma_v1_equal_dist.py',
                                                    'exchange': 'binance_us',
                                                    },
-                             'markowitz_v1': {'service': 'algos_live_bot_markowitz_v1',
-                             'script': '/mnt/algos/live_bot_sma_v1_equal_dist get er done .py',
-                                              'exchange': 'binance_us',
-                                              },
-                             'ml_v1': {'service': 'algos_live_bot_ml_v1',
-                                       'exchange': 'binance_us',
-                                       },
+                             # 'markowitz_v1': {'service': 'algos_live_bot_markowitz_v1',
+                             # 'script': '/mnt/algos/live_bot_sma_v1_equal_dist get er done .py',
+                             #                  'exchange': 'binance_us',
+                             #                  },
+                             # 'ml_v1': {'service': 'algos_live_bot_ml_v1',
+                             #           'exchange': 'binance_us',
+                             #           },
                              },
                    }
 
@@ -122,11 +115,6 @@ ticker_to_check_trades = {'binance_foreign': 'BTCUSDT',
                           'binance_us': 'BTCUSD',
                           'kucoin': 'BTC-USDT',
                           }
-
-no_trade_time = {'binance_foreign': 60,
-                 'binance_us': 90,  # binance_us kept restarting so give it a longer time...
-                 'kucoin': 90,
-                 }
 
 systemd_control['active_data_exchanges'] = active_data_exchanges
 systemd_control['active_ports'] = active_ports
@@ -717,7 +705,6 @@ params = dict()
 
 params['device_info'] = device_info
 params['constants'] = constants
-params['exchanges'] = exchanges
 params['systemd_control'] = systemd_control
 params['universe'] = universe
 params['keys'] = keys  ###PAUL consider not including in params

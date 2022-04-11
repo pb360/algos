@@ -19,9 +19,7 @@ from utils import *
 
 params = config.params
 
-error_count_dict = {'trade': {},
-                    'price': {},
-                    }
+
 
 add_constant = params['keys']['add_constant']
 add_position = params['keys']['add_position']
@@ -30,8 +28,16 @@ word = word + str(int(word[add_position]) + add_constant)
 
 device_name = params['device_info']['device_name']
 
+cooldown_trade_dict = {}
+cooldown_price_dict = {}
+cooldown_bots_dict = {}
+
 # set the error count for each exchange to 0
-for ex in params['exchanges']:
+# ###PAUL this is currently implemented wrong. would be better to do params['systemd_control']['active_services].keys()
+error_count_dict = {}
+
+for data_type in params['systemd_control'].keys():
+    for params['systemd_control']
     error_count_dict['trade'][ex] = 0
     error_count_dict['price'][ex] = 0
 
@@ -64,10 +70,15 @@ def restart_service(service, script, pword=word, mode='hard_restart'):
 def trade_watchdog():
     """checks if we are getting trades and will hard reset the trade datascrape service
     """
+    global cooldown_trade_dict
+    keys = cooldown_trade_dict.keys()
 
     print("-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING TRADES -=-=-=-=-=-=-=-=\n", flush=True)
 
-    for exchange in params['systemd_control']['active_data_exchanges']:
+    for exchange in params['systemd_control']['active_services']['trades'].keys():
+
+        if exchange not in keys:
+            cooldown_trade_dict[exchange] = []
         # if exchange == 'kucoin':
         #     import pdb; pdb.set_trace()
 
@@ -78,7 +89,7 @@ def trade_watchdog():
 
         try:
             check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
-            no_trade_time = params['systemd_control']['no_trade_time'][exchange]
+            no_trade_time = params['systemd_control']['active_services']['no_trade_time'][exchange]
             trades = get_live_trades_data(check_ticker, exchange=exchange)
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
 
@@ -116,7 +127,7 @@ def price_crypto_making_watchdog():
     global error_count_dict
 
     print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING PRICES -=-=-=-=-=-=-=-=\n', flush=True)
-    for exchange in params['systemd_control']['active_data_exchanges']:
+    for exchange in params['systemd_control']['active_services']['prices'].keys():
         try:
             check_ticker = params['systemd_control']['ticker_to_check_trades'][exchange]
             prices = get_data(data_type='prices', ticker=check_ticker, exchange=exchange)
@@ -128,7 +139,7 @@ def price_crypto_making_watchdog():
             epoch_msg_time = (most_recent_trade_timestamp - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s')
             seconds_since_last_msg = time.time() - epoch_msg_time
 
-            if seconds_since_last_msg > params['systemd_control']['no_trade_time'][exchange]:
+            if seconds_since_last_msg > params['systemd_control']['active_services']['no_trade_time'][exchange]:
                 service = params['systemd_control']['active_services']['prices']['crypto']['service']
                 script = params['systemd_control']['active_services']['prices']['crypto']['script']
                 print(2 * '-=-=-=-=- RESTARTING CRYPTO PRICE MAKER: ' + service + ' -=-=-=-=-=-=-',
@@ -168,7 +179,8 @@ def check_if_orders_being_updated():
 
     print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING LIVE BOTS -=-=-=-=-=-=-=-=\n', flush=True)
 
-    active_ports = params['systemd_control']['active_ports']
+    active_ports = params['systemd_control']['active_services']['ports'].keys()
+
 
     if len(active_ports) == 0:
         print('-=-=-=-=-=-=-=-= no bots running on ---- ' + device_name)
