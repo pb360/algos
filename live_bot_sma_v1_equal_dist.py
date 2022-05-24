@@ -12,7 +12,6 @@ tickers_tracked --> tickers_traded_universial
 ----> convert_ticker_foreign_to_us(foreign_ticker) --> convert_ticker_universial_to_exchange(universial_t)
 ----> convert_ticker_us_to_foreign(us_ticker)      --> convert_ticker_exchange_to_universial(exchange_t)
 """
-
 # ###PAUL_refractor
 # ###PAUL_refractor
 
@@ -40,26 +39,26 @@ time.tzset()
 # ### time zone change... this must happen first and utils must be imported first
 
 
-import ast
-import concurrent.futures
-
-import datetime
-from decimal import Decimal
-import json
-import math
-import numpy as np
-import os
+# import ast
+# import concurrent.futures
+#
+# import datetime
+# from decimal import Decimal
+# import json
+# import math
+# import numpy as np
+# import os
 import pandas as pd
-import platform
-import plotly
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-import re
-import signal
-import sys
-import time
+# import platform
+# import plotly
+# from plotly.subplots import make_subplots
+# import plotly.graph_objects as go
+# import re
+# import signal
+# import sys
+# import time
 from twisted.internet import task, reactor
-from typing import Union
+# from typing import Union
 
 # local imports
 #

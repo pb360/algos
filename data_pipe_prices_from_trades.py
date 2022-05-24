@@ -40,16 +40,6 @@ def add_prices_from_live_trade_data(ticker, exchange):
     """checkes the live trade file and will append trades to days file
     """
 
-    # get trades
-    # try:
-    # print(ticker, flush=True)
-
-    # import pdb; pdb.set_trace()
-
-    # if exchange == 'kucoin':
-        # import pdb;
-        # pdb.set_trace()
-
     trades = get_live_trades_data(ticker, exchange)
 
 
@@ -134,12 +124,15 @@ def add_prices_to_all_tickers(exchange):
 
 
 
+
+
     # import pdb; pdb.set_trace()
 
 
 
 
     for ticker in tickers_tracked:
+        ticker = convert_ticker(ticker, in_exchange=exchange, out_exchange='universal')
         add_prices_from_live_trade_data(ticker, exchange)
 
     ET = time.perf_counter()

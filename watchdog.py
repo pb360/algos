@@ -27,6 +27,7 @@ word = word + str(int(word[add_position]) + add_constant)
 device_name = params['device_info']['device_name']
 
 
+# ###PAUL this function should be in utils... dont want to move it now cause both servers running
 # used a few times to restart services, good because it allows for mode switching easily for manual updates
 def restart_service(service_type, params_t, exchange=None, port=None, pword=word, mode='hard_restart'):
     """takes given parameters and will restart (if cooldown doesn't override the restart)
@@ -51,7 +52,7 @@ def restart_service(service_type, params_t, exchange=None, port=None, pword=word
     cool_down = service_dict['cool_down']
 
     # hasn't been long enough... return the same params_t dict and wait till next iteration
-    if last_restart + cool_down < time.time():
+    if last_restart is not None and last_restart + cool_down > time.time():
         cooldown_str = ('---- WATCHDOG: COOLDOWN prevented restart ---- service_type ' + service_type + ' ---- ' + _
                         + ' --- aka script ---- ' + script + ' \n') * 5
         print(cooldown_str)

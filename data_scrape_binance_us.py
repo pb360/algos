@@ -34,7 +34,7 @@ from twisted.internet import task, reactor
 #
 #
 import config
-from utils import send_email, get_data_file_path, convert_date_format
+from utils import send_email, get_data_file_path, convert_date_format, convert_ticker
 
 # needed to let the package to see itself for interior self imports
 sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
@@ -118,9 +118,9 @@ def rename_temp_to_live_file(temp_file_path, live_file_path):
     lock.release()
 
 
-def make_new_trade_observation_for_trade_file(trade_info):
+def make_new_trade_observation_for_trade_file(trade_info, ticker):
     new_line = str(trade_info['E'] / 1000) + ',' \
-               + str(trade_info['s']) + ',' \
+               + ticker + ',' \
                + str(trade_info['t']) + ',' \
                + str(trade_info['p']) + ',' \
                + str(trade_info['q']) + ',' \
@@ -198,7 +198,9 @@ def process_message(msg):
 
         # get trade info from message
         ticker = trade_info['s']
-        new_line = make_new_trade_observation_for_trade_file(trade_info)
+        ticker = convert_ticker(ticker, in_exchange=exchange, out_exchange='universal')
+
+        new_line = make_new_trade_observation_for_trade_file(trade_info, ticker)
 
         # ### write to live data file
         live_data_file_path = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
@@ -242,6 +244,8 @@ def trim_live_files(params=params):
     trade_col_names = params['data_format'][exchange]['trade_col_name_list']
 
     for ticker in tickers_tracked:
+        ticker = convert_ticker(ticker, in_exchange=exchange, out_exchange='universal')
+
         lock.acquire()
         live_fp = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
 

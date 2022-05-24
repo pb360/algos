@@ -142,7 +142,6 @@ def check_if_file_in_directory(file, directory):
         return False
 
 
-# ###PAUL_aws migration concern... may need different mail function
 def send_email(subject, message, script=None, to='paulboehringer0989@gmail.com', params=params):
     """sends an email from my protonmail to the
     input:
@@ -165,7 +164,7 @@ def send_email(subject, message, script=None, to='paulboehringer0989@gmail.com',
 
         msg['Subject'] = subject
         begin_message_str = 'email from script ---- ' + str(script) \
-                            + ' \n \n running on  ----  '+ params['device_info']['device_name'] + '\n \n'
+                            + ' \n \n running on  ----  ' + params['device_info']['device_name'] + '\n \n'
 
         message = begin_message_str + message
         msg.attach(MIMEText(message))
@@ -208,7 +207,7 @@ def get_last_line_of_file(filepath, filesize='large'):
                 last_line = f.readline().decode()
         # turns out the file was one line
         except OSError:
-            print(2*('file too short for the long method ---- ' +  filepath + '\n'), flush=True)
+            print(2 * ('file too short for the long method ---- ' + filepath + '\n'), flush=True)
             # if the file is empty then this try except will hit
             try:
                 with open(filepath) as f:
@@ -254,11 +253,36 @@ def make_date_suffix(date, file_type='.csv'):
     return suffix
 
 
-# useful in the below function
-live_data_dir = params['dirs']['live_data_dir']  # still used
-port_data_dir = params['dirs']['port_data_dir']  # still used
+def convert_ticker(ticker, in_exchange, out_exchange, params=params):
+    # try:
 
-def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None, params=params):
+
+    if out_exchange == 'universal':
+        if in_exchange == 'universal':
+            print('asking to convert ticker from universal to universal')
+            raise SyntaxWarning
+        else:
+            return params['universe']['universal']['to_universal'][in_exchange][ticker]
+
+    if out_exchange != 'universal':
+        if in_exchange == 'universal':
+            universal_ticker = ticker
+        else:
+            universal_ticker = params['universe']['universal']['to_universal'][in_exchange][ticker]
+
+        try:
+            return params['universe']['universal']['from_universal'][out_exchange][universal_ticker]
+
+        except KeyError:
+            # handle the case of tether pairs from exchanges that also have a separate USD (non tether quote)
+            if 'ether' in universal_ticker:
+                universal_ticker = universal_ticker.replace('ether', '')  # for tether, not ETH
+                return params['universe']['universal']['from_universal'][out_exchange][universal_ticker]
+            else:  # there is a problem
+                raise KeyError
+
+# ###PAUL_universal_ticker_refactor
+def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None, ticker_mode='asis', params=params):
     """returns string of filepath to requested datafile
 
     :param port: (str) naming the portfolio strategy for orders and preformance data
@@ -269,6 +293,16 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
         ticker (str):    ticker  ---- 'BTCUSDT'
         date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
     """
+
+    live_data_dir = params['dirs']['live_data_dir']  # still used
+    port_data_dir = params['dirs']['port_data_dir']  # still used
+
+    # ###PAUL_todo: once data is saved under universal names the conditional is needed, should be done every time
+    if ticker_mode == 'asis':  # ticker given in exchange's format
+        pass
+    elif ticker_mode == 'universal':
+        ticker = convert_ticker(ticker, in_exchange='universal', out_exchange=exchange, params=params)
+
     fp = None
 
     if date != 'ticker_folder':
@@ -276,6 +310,122 @@ def get_data_file_path(data_type, ticker, date='live', port=None, exchange=None,
 
     # first handle if date is live... if not we attempt to convert it if not a tuple
     if date == 'live' or date == 'open':
+
+        # ### live kept data
+        #
+        #
+        if data_type == 'trade' or data_type == 'trades' or data_type == 'price' or data_type == 'prices':
+            if exchange is None:
+                return IOError
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_live/' + exchange + '/' + ticker + '/' \
+                     + exchange + '_' + ticker + '_live_trades.csv'
+
+            # ###PAUL this should be handled one day... maybe return just the price file for time.time()
+            elif data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + ticker + '/' + ticker + '_live_trades.csv'
+
+        # ### portfolio data
+        #
+        #
+        if data_type == 'orders' or data_type == 'order' or data_type == 'open_orders' \
+                or data_type == 'whose_turn' or data_type == 'last_order_check' \
+                or data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path' \
+                or data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
+            # if port not provided can't get any of these
+            if port is None:
+                return IOError
+            elif data_type == 'orders' or data_type == 'order' or data_type == 'open_orders':
+                fp = port_data_dir + exchange + '/' + port + '/open_orders.csv'
+            elif data_type == 'whose_turn':
+                fp = port_data_dir + exchange + '/' + port + '/whose_turn.csv'
+            elif data_type == 'last_order_check':
+                fp = port_data_dir + exchange + '/' + port + '/last_check.txt'
+            elif data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path':
+                fp = port_data_dir + exchange + '/' + port + '/'
+            elif data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
+                fp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
+                     + 'orders----' + ticker + '----' + suffix
+
+    # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
+    # if ~isinstance(date, tuple):
+    #     date = convert_date_format(date=date, output_type='tuple_to_day')
+
+    elif date == 'ticker_folder':  # just gets the ticker's folder.. will direct to folder of dates for data type
+        if exchange is not None:
+            if data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + 'price/' + exchange + '/' + ticker + '/'
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + ticker + '/'
+            elif data_type == 'book':
+                fp = live_data_dir + 'book_daily/' + exchange + '/' + ticker + '/'
+        elif port is not None:
+            if data_type == 'order_closed':
+                fp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
+                     + 'orders----' + ticker + '----' + suffix
+        else:
+            return IOError
+
+    elif date != 'live':  # date is actually supplied
+
+        # live maintained data (historical, but still folder is managed in real time)
+        if exchange is not None and port is None:
+            if data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + 'price/' + exchange + '/' + ticker \
+                     + '/prices----' + exchange + '_' + ticker + suffix
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + ticker \
+                     + '/trades----' + exchange + '_' + ticker + suffix
+            elif data_type == 'book':
+                fp = live_data_dir + 'book/' + exchange + '/' + ticker \
+                     + '/book----' + exchange + '_' + ticker + suffix
+
+        # port related data
+        elif port is not None:
+            if data_type == 'order' or data_type == 'orders' or data_type == 'closed_orders':
+                ffp = port_data_dir + exchange + '/' + port + '/closed/' + ticker + '/' \
+                      + 'orders----' + ticker + '----' + suffix
+        else:
+            return IOError
+
+    if fp is not None:
+        return fp
+    else:
+        print('Nothing in data file path function matched the request', flush=True)
+        print('the request was:', flush=True)
+        print('    data_type=' + str(data_type) + ', ticker=' + str(ticker) + ', date=' + str(date) \
+              + ', port=' + str(port) + ', exchange=' + str(exchange), flush=True)
+        return IOError
+
+
+def get_data_file_path_v2(data_type,
+                          ticker,
+                          date='live',
+                          port=None,
+                          exchange=None,
+                          params=params):
+    """returns string of filepath to requested datafile
+
+    :param port: (str) naming the portfolio strategy for orders and preformance data
+    inputs
+        data_type (str): options ----  ['price', 'trade', 'order', 'book']  ----
+            TODO add live order which means all open orders
+            TODO daily data files  add support for book eventually
+        ticker (str):    ticker  ---- 'BTCUSDT'
+        date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
+    """
+
+    live_data_dir = params['dirs']['live_data_dir']  # still used
+    port_data_dir = params['dirs']['port_data_dir']  # still used
+
+    fp = None
+
+    if date != 'ticker_folder':
+        suffix = make_date_suffix(date)
+
+    # first handle if date is live... if not we attempt to convert it if not a tuple
+    if date == 'live' or date == 'open':
+
         # ### live kept data
         #
         #
@@ -392,7 +542,6 @@ def get_date_range(start_date, end_date, output_type='datetime.datetime'):
 
     outputs:
         date_list (list): containing datetime.datetime objects.... unless output_type specified otherwise
-
     """
 
     date_list = []
@@ -519,7 +668,7 @@ def get_data(data_type,
             print('---- file missing: ' + fp, flush=True)
             continue
 
-        idx += 1 # cant enumerate... only increase count if the file is found, otherwise breaks if first file not there
+        idx += 1  # cant enumerate... only increase count if the file is found, otherwise breaks if first file not there
 
     # convert index_col "YYYY-MM-DD HH:MM:SS" to pd.datetime AFTER price read... trade data is epoch time int, so OK
     if data_type == 'price':
@@ -552,8 +701,7 @@ def get_data(data_type,
     return data
 
 
-###PAUL eventually may need to take into account the data source (hopefully can put that off as long as possible)
-def convert_trades_df_to_prices(trades, exchange='binance_foreign'):
+def convert_trades_df_to_prices(trades, exchange='standard_trade_format'):
     """reads CSV of trades. converts to prices in some interval
 
     input :
@@ -561,7 +709,7 @@ def convert_trades_df_to_prices(trades, exchange='binance_foreign'):
         exchange (str): helps tell the format
     """
 
-    if exchange == 'binance_us' or exchange == 'binance_foreign':
+    if exchange == 'standard_trade_format' or exchange in ['binance_foreign', 'binance_us', 'kucoin']:
         trades.index = pd.to_datetime(trades.index, unit='s')
         trades['buyer_is_maker'] = trades['buyer_is_maker'].astype('int')
         trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
@@ -589,8 +737,6 @@ def convert_trades_df_to_prices(trades, exchange='binance_foreign'):
 
         return prices
 
-
-# pdb.set_trace()
 
 def trim_data_frame_by_time(df,
                             method='most_recent',
@@ -644,12 +790,11 @@ def make_day_of_prices_from_day_of_trades(ticker, date, exchange, params=params)
         date = convert_date_format(date, 'tuple_to_day')
 
     trades = get_data(data_type='trade', ticker=ticker, date=date, exchange=exchange)
-
     prices = convert_trades_df_to_prices(trades)
-
     prices_fp = get_data_file_path(data_type='prices', ticker=ticker, date=date, exchange=exchange)
-
     prices.to_csv(prices_fp)
+
+    return None
 
 
 def remake_price_files(start_date=None, end_date=None, exchange=None, params=params, ):
@@ -804,21 +949,6 @@ def make_alternating_buy_sell_signal(buy_idxs, sell_idxs, signal_shape):
     return signal
 
 
-# ###PAUL_refractor  redo convert tickers
-# ###PAUL_refractor
-# ###PAUL_refractor for initial algos refractor may want to remove these conversion
-# ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
-def convert_ticker_us_to_foreign(us_ticker, exchange):
-    return params['universe'][exchange]['tickers_us_to_foreign_dict'][us_ticker]
-
-def convert_ticker_foreign_to_us(foreign_ticker, exchange):
-    return params['universe'][exchange]['tickers_foreign_to_us_dict'][foreign_ticker]
-# ###PAUL_refractor for initial algos refractor may want to remove these conversion
-# ###PAUL_refractor functions as they may cause confusion.. keep for now as used.
-# ###PAUL_refractor
-# ###PAUL_refractor redo convert tickers
-
-
 def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
     """Rounds a given quantity to a specific step size
     :param quantity: required
@@ -865,3 +995,40 @@ def check_if_dir_exists_and_make(dir):
         os.makedirs(dir)
 
     return None
+
+
+def reverse_dictionary(d):
+    """takes a dictionary and flips the keys and values
+    """
+    new_dict = {}
+
+    for key in d.keys():
+        value = d[key]
+        new_dict[value] = key
+
+    return new_dict
+
+
+def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=None, thread_lock=False):
+    # check that the file exists for the correct time period
+    if os.path.isfile(file_path):
+        if thread_lock == True:
+            lock_thread_append_to_file(file_path, new_line)
+        if thread_lock == False:
+            # write trade to historical file... no lock as this script only appends to these files
+            with open(file_path, "a") as f:
+                f.write(new_line)
+            os.chmod(file_path, 0o777)
+
+    else:  # file does not exist
+        # check if directory heading to file exists, if not make all required on the way
+        fp_dirname = os.path.dirname(file_path)
+        if os.path.isdir(fp_dirname) == False:
+            os.makedirs(fp_dirname)
+
+        # write the new line, and header if requestd
+        with open(file_path, "a") as f:
+            if header is not None:
+                f.write(header)
+            f.write(new_line)
+        os.chmod(file_path, 0o777)
