@@ -1,6 +1,8 @@
 #!/home/paul/miniconda3/envs/binance/bin/python3
 # -*- coding: utf-8 -*-
 
+# ###PAUL TODO anywhere data is written with a column "ticker", but it is actually a pair, consider fixing this
+# TODO         its alot of work but also would make things nice for me... probably something to ignore for now
 # ### imports
 #
 #
@@ -74,11 +76,11 @@ universe = dict()
 
 universe_binance_foreign = {'exchange': 'binance_foreign',
 
-                            # all coins tracked as a base asset in at least one ticker on this exchange
-                            'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
+                            # all tickers tracked as a base asset in at least one pair on this exchange
+                            'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
 
                             # websocket communication for exchange... this is how requests are sent
-                            'tick_collection_list': ['adausdt@trade', 'adabtc@trade',
+                            'pair_collection_list': ['adausdt@trade', 'adabtc@trade',
                                                      'bnbusdt@trade', 'bnbbtc@trade',
                                                      'btcusdt@trade',
                                                      'dogeusdt@trade', 'dogebtc@trade',
@@ -91,7 +93,7 @@ universe_binance_foreign = {'exchange': 'binance_foreign',
                                                      ],
 
                             # trade communication for exchange... this string is what is sent for trade requests
-                            'tickers_tracked': ['ADAUSDT', 'ADABTC',
+                            'pairs_tracked': ['ADAUSDT', 'ADABTC',
                                                 'BNBUSDT', 'BNBBTC',
                                                 'BTCUSDT',
                                                 'DOGEUSDT', 'DOGEBTC',
@@ -104,7 +106,7 @@ universe_binance_foreign = {'exchange': 'binance_foreign',
                                                 ],
 
 
-                            # how to convert the ticker in exchange format to universal
+                            # how to convert the pair in exchange format to universal
                             'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDT', 'ADABTC': 'ADA-BTC',
                                                            'BNBUSDT': 'BNB-USDT', 'BNBBTC': 'BNB-BTC',
                                                            'BTCUSDT': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
@@ -125,11 +127,11 @@ universe_binance_foreign = {'exchange': 'binance_foreign',
 
 universe_binance_us = {'exchange': 'binance_us',
 
-                       # all coins tracked as a base asset in at least one ticker on this exchange
-                       'coins_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
+                       # all tickers tracked as a base asset in at least one pair on this exchange
+                       'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
 
                        # how they are fed into the websocket function (as is)
-                       'tick_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
+                       'pair_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
                                                 'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
                                                 'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
                                                 'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
@@ -141,7 +143,7 @@ universe_binance_us = {'exchange': 'binance_us',
                                                 ],
 
                        # trade communication for exchange... this string is what is sent for trade requests
-                       'tickers_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
+                       'pairs_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
                                            'BNBUSDT', 'BNBBTC', 'BNBUSD',
                                            'BTCUSDT', 'BTCUSD',
                                            'DOGEUSDT', 'DOGEUSD',
@@ -153,7 +155,7 @@ universe_binance_us = {'exchange': 'binance_us',
                                            ],
 
 
-                       # how to convert the ticker in exchange format to universal
+                       # how to convert the pair in exchange format to universal
                        'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDTether', 'ADABTC': 'ADA-BTC',
                                                       'ADAUSD': 'ADA-USDT',
                                                       'BNBUSDT': 'BNB-USDTether', 'BNBBTC': 'BNB-BTC',
@@ -174,28 +176,28 @@ universe_binance_us = {'exchange': 'binance_us',
 
 universe_kucoin = {'exchange': 'kucoin',
 
-                   # all coins tracked as a base asset in at least one ticker on this exchange
-                   'coins_tracked': ['btc', 'dag', 'eth', 'fil', 'icp', 'kava', 'kda', 'link', 'ltc', 'noia', 'qrdo',
-                                     'req', 'tel', 'vra', 'xlm', 'xmr', 'xpr', 'xrp', 'xtz'
-                                     ],
+                   # tickers tracked as a base asset in at least one pair on this exchange
+                   'tickers_tracked': ['btc', 'dag', 'eth', 'fil', 'icp', 'kava', 'kda', 'link', 'ltc', 'noia', 'qrdo',
+                                       'req', 'tel', 'vra', 'xlm', 'xmr', 'xpr', 'xrp', 'xtz'
+                                       ],
 
                    # how they are fed into the websocket function (as is)
-                   'tick_collection_list': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
+                   'pair_collection_list': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
                                             'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
                                             'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
                                             'XTZ-USDT',
                                             ],
 
                    # trade communication for exchange... this string is what is sent for trade requests
-                   # identical list as  tick_collection_list  above (for kucoin unlike binance)
-                   'tickers_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
+                   # identical list as  pair_collection_list  above (for kucoin unlike binance)
+                   'pairs_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
                                        'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
                                        'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
                                        'XTZ-USDT',
                                        ],
 
 
-                   # how to convert the ticker in exchange format to universal
+                   # how to convert the pair in exchange format to universal
                    'convert_dict': {'universal': {'BTC-USDT': 'BTC-USDT', 'DAG-USDT': 'DAG-USDT',
                                                   'ETH-USDT': 'ETH-USDT', 'FIL-USDT': 'FIL-USDT',
                                                   'ICP-USDT': 'ICP-USDT', 'KAVA-USDT': 'KAVA-USDT',
@@ -317,7 +319,7 @@ data_format_binance_foreign = {
                                     'stepSize', 'minNotional', 'marketMinQty', 'marketMaxQty', 'marketStepSize',
                                     ],
 
-    'order_filters_name_type': {'exchange_ticker': str,  # us  corresponding to ticker_tracked
+    'order_filters_name_type': {'exchange_ticker': str,  # us  corresponding to pairs_tracked
                                 'baseAsset': str,  # 'BTC' in 'BTCUSDT'
                                 'baseAssetPrecision': int,  # num of decimals for base
                                 'quoteAsset': str,  # 'USD' in 'BTCUSD'
@@ -432,7 +434,9 @@ data_format_binance_us = {
                                 'marketMaxQty': float,  # max BASE asset for market order
                                 'marketStepSize': float  # min increment of BASE market order
                                 },
-}  ###PAUL just a copy paster from binance foreign, needs editing
+}
+
+
 data_format_kucoin = {
     'websocket_trade_columns': {'type': 'event_type',
                                 'will do this manually via time.time()': 'msg_time',

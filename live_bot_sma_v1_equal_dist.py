@@ -5,12 +5,12 @@
 # ###PAUL_refractor
 """
 after getting the bot running on /algos/ services
-tickers_tracked --> tickers_traded_universial
+pairs_tracked --> tickers_traded_universial
 - This logic implies that the FOREIGN ticker = UNIVERSIAL ticker
 -                         and      US ticker = EXCHANGE   ticker
 - this will be the new nomenclature: ^^^^^^^^^^^^^^^^^^^^^^^^^^
-----> convert_ticker_foreign_to_us(foreign_ticker) --> convert_ticker_universial_to_exchange(universial_t)
-----> convert_ticker_us_to_foreign(us_ticker)      --> convert_ticker_exchange_to_universial(exchange_t)
+----> convert_pair_foreign_to_us(foreign_ticker) --> convert_pair_universial_to_exchange(universial_t)
+----> convert_pair_us_to_foreign(us_ticker)      --> convert_pair_exchange_to_universial(exchange_t)
 """
 # ###PAUL_refractor
 # ###PAUL_refractor
@@ -116,8 +116,8 @@ tickers_foreign_to_us_dict = params['universe'][exchange]['tickers_foreign_to_us
 tickers_us_to_foreign_dict = params['universe'][exchange]['tickers_us_to_foreign_dict']
 
 # ###PAUL_refractor...
-tickers_tracked = params['universe'][exchange]['tickers_tracked']
-tickers_tracked = params['universe'][exchange]['tickers_traded']  # ###PAUL_refractor... temp soln
+pairs_tracked = params['universe'][exchange]['pairs_tracked']
+pairs_tracked = params['universe'][exchange]['tickers_traded']  # ###PAUL_refractor... temp soln
 # ###PAUL_refractor the above line just gives the tickers I want for now. this is the biggest refractor
 # ###PAUL_refractor adjustment... it will need attention later
 
@@ -125,19 +125,19 @@ tickers_tracked = params['universe'][exchange]['tickers_traded']  # ###PAUL_refr
 # ###PAUL_refractor. delete this later... or reconsider how its handled
 if exchange == 'binance_us':
     try:
-        # editing tickers_tracked
-        tickers_tracked.remove('XRPUSDT')
-        tickers_tracked.remove('XRPBTC')
+        # editing pairs_tracked
+        pairs_tracked.remove('XRPUSDT')
+        pairs_tracked.remove('XRPBTC')
     except ValueError as e:
         print('---- XRP not in list of tickers so no removal', flush=True)
         print(e, flush=True)
 
-for ticker_t in tickers_tracked:
+for ticker_t in pairs_tracked:
     btc_quote_bool = re.search('BTC$', ticker_t)  # checks that BTC is the ending of the ticker
 
     # remove all bitcoin denominated tickers from trading
     if btc_quote_bool != None:
-        tickers_tracked.remove(ticker_t)  # remove if match
+        pairs_tracked.remove(ticker_t)  # remove if match
 
 # ### Global Variables
 #
@@ -179,14 +179,14 @@ def directory_check_for_portfolio_data(params):
 
     # create portfolio orders dir:         ./data/<exchange>/<port_name>   ...if its not there yet
     port_path = get_data_file_path(data_type='port_folder',
-                                   ticker=None,
+                                   pair=None,
                                    date='live',
                                    port=port_name,
                                    exchange=exchange,
                                    )
 
     dirs_needed_for_order_data = [port_path, port_path + 'closed/', ]
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         dirs_needed_for_order_data.append(port_path + 'closed/' + ticker + '/')
 
     for dir_path in dirs_needed_for_order_data:
@@ -207,7 +207,7 @@ def directory_check_for_portfolio_data(params):
 def initialize_actions_dicts():
     global actions_dict
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         actions_dict[ticker] = 'neutural'
 
     return None
@@ -229,7 +229,7 @@ def initialize_port_allocation_dict(method='default'):
         port_allocation_dict['XLMUSDT'] = 0.0
 
     if method == 'all BTC':
-        for ticker in tickers_tracked:
+        for ticker in pairs_tracked:
             if ticker == 'BTCUSDT':
                 port_allocation_dict[ticker] = 1
             else:
@@ -251,12 +251,12 @@ def get_initial_prices_batch():
     ###PAUL crucial error
     """
     global prices_dfs_dict
-    global tickers_tracked
+    global pairs_tracked
     global short_term_prices_dict
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         # get_data will retrieve the last 24 hours of prices from written price files
-        prices = get_data(data_type='price', ticker=ticker, date='live', exchange=data_exchange)  # gets 24 hours
+        prices = get_data(data_type='price', pair=ticker, date='live', exchange=data_exchange)  # gets 24 hours
 
         # fill in annoying missing data
         prices.fillna(method='ffill', inplace=True)
@@ -288,7 +288,7 @@ def get_initial_signal_batch(params=params):
     global prices_dfs_dict
     global signal_dfs_dict
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         prices = prices_dfs_dict[ticker]
 
         sma_short = prices['buy_vwap'].rolling(window=3400 * 3).mean().fillna(method='bfill')[-1]
@@ -374,7 +374,7 @@ def make_ticker_info_df():
     ticker_entry_list = []
 
     # note that the ticker index for the DF is the standard binance ticker (USDT)... ticker_us is another col
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         ticker_us = tickers_foreign_to_us_dict[ticker]  # ###PAUL_refractor... ticker_us --> ticker_exchange
         filters_dict = get_ticker_filters_dict_binance_us(
             ticker_us)  # ###PAUL_refractor... ticker_us --> ticker_exchange
@@ -421,9 +421,9 @@ def update_prices(ticker, params=params):
 
 
 def update_all_prices(params=params):
-    global tickers_tracked
+    global pairs_tracked
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         update_prices(ticker)
 
     return None
@@ -476,9 +476,9 @@ def update_short_term_prices(ticker, params=params):
 
 
 def update_all_short_term_prices(params=params):
-    global tickers_tracked
+    global pairs_tracked
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         update_short_term_prices(ticker)
 
     return None
@@ -493,7 +493,7 @@ def update_signals(params=params):
     global prices_dfs_dict
     global signal_dfs_dict
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         prices = prices_dfs_dict[ticker]
 
         sma_short = prices['buy_vwap'].rolling(window=3400 * 3).mean().fillna(method='bfill')[-1]
@@ -515,7 +515,7 @@ def initialize_bag_dicts():
     global bag_actual_dict
     global bag_desired_dict
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         bag_max_dict[ticker] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
         bag_actual_dict[ticker] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
         bag_desired_dict[ticker] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
@@ -567,7 +567,7 @@ def update_port_holdings_and_value():
 
     # update port value   ---- note: only considers the ticker's traded in the portfolio value
     port_value_t = 0
-    for ticker in tickers_tracked:  # ###PAUL_refractor tickers_tracked --> tickers_traded_universal
+    for ticker in pairs_tracked:  # ###PAUL_refractor pairs_tracked --> tickers_traded_universal
         # get the base asset of each ticker
         base_asset = ticker_info_df.loc[ticker]['baseAsset']  # ###PAUL_refractor. df indexed by universal tickers
 
@@ -587,7 +587,7 @@ def update_port_holdings_and_value():
     port_value = port_value_t
 
     # must do these after the new total value is assessed
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         last_price = last_prices_dict[ticker]
 
         # get dollars for actual bags dict by subtracting value held from proportion of portfolio for ticker
@@ -633,7 +633,7 @@ def initialize_whose_turn_dict():
     global whose_turn_dict
     global ticker_info_df
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         baseAsset = ticker_info_df.loc[ticker]['baseAsset']
         value_of_hold = last_prices_dict[ticker] * port_holdings_dict[baseAsset]['total']
 
@@ -690,13 +690,13 @@ def determine_buy_or_sell():
         actions_dict (dict): {'BTCUSDT':'buy',  'XRPUSDT':'sell'}
     """
     global actions_dict
-    global tickers_tracked
+    global pairs_tracked
     global signals_dfs_dict
     global whose_turn_dict
 
     actions_dict = dict()
 
-    for ticker in tickers_tracked:
+    for ticker in pairs_tracked:
         whose_turn = whose_turn_dict[ticker]
         signal_int = signal_dfs_dict[ticker]  # -1 = sell    1 = buy
 
@@ -781,7 +781,7 @@ def process_placed_order(placed_order_res):
     # ### write the order to the live files
     #
     open_order_fp = get_data_file_path(data_type='order',
-                                       ticker='None',
+                                       pair='None',
                                        date='live',
                                        port=port_name,
                                        exchange=exchange)
@@ -811,7 +811,7 @@ def place_order(B_or_S, ticker, o_type, base_qty, price=None, order_id=None):
         order ID to track the order status, maybe more
     """
 
-    if ticker not in tickers_tracked:  # ###PAUL_refractor
+    if ticker not in pairs_tracked:  # ###PAUL_refractor
         raise KeyError
 
     info = ticker_info_df.loc[ticker]
@@ -904,7 +904,7 @@ def remove_order_from_open_tracking(tuple_key):
 
     # ### remove order from open order tracking file
     #
-    open_order_fp = get_data_file_path(data_type='order', ticker=None, date='live', port=port_name, exchange=exchange)
+    open_order_fp = get_data_file_path(data_type='order', pair=None, date='live', port=port_name, exchange=exchange)
 
     with open(open_order_fp, 'r') as f:
         lines = f.readlines()
@@ -929,7 +929,7 @@ def close_order(order_id_tuple):
     global tickers_foreign_to_us_dict
 
     orderId, foreign_ticker = order_id_tuple
-    ticker_us = convert_ticker_foreign_to_us(foreign_ticker, exchange)
+    ticker_us = convert_pair_foreign_to_us(foreign_ticker, exchange)
 
     tuple_key = (orderId, foreign_ticker)
 
@@ -949,7 +949,7 @@ def close_order(order_id_tuple):
 
 def update_most_recent_order_check_file(params):
     fp = get_data_file_path(data_type='last_order_check',
-                            ticker=None, date='live',
+                            pair=None, date='live',
                             port=port_name,
                             exchange=exchange)
 
@@ -975,7 +975,7 @@ def check_for_closed_orders():
     # put list of keys: tuples (orderId, Ticker) from exchange collected
     open_orders_on_exchange = []
     for res in open_orders_res_list:
-        ticker = convert_ticker_us_to_foreign(res['symbol'], exchange)  # ###PAUL_refractor
+        ticker = convert_pair_us_to_foreign(res['symbol'], exchange)  # ###PAUL_refractor
         orderId = res['orderId']
         tup = (orderId, ticker)
 
@@ -1018,7 +1018,7 @@ def place_orders_on_signal(params):
     # want update holdings and value as near as placing new orders as possible... this cancels open orders
     update_port_holdings_and_value()
 
-    for ticker in tickers_tracked:  # ###PAUL_refractor... tickers_traded_universal
+    for ticker in pairs_tracked:  # ###PAUL_refractor... tickers_traded_universal
 
         us_ticker = tickers_foreign_to_us_dict[ticker]
         # place buy/sell order

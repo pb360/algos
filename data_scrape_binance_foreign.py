@@ -5,13 +5,13 @@
 #
 
 """
-This script creates a websocket connection to binance and listens and records all trades for relevant tickers
+This script creates a websocket connection to binance and listens and records all trades for relevant pairs
 on or around 2/20/2022 the repo was migrated from algo2 --> algos allowing for easier data collection
-the data for 'tickers_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
+the data for 'pairs_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
  'ETHBTC', 'LINKUSDT', 'LINKBTC', 'LTCUSDT', 'LTCBTC', 'XLMUSDT', 'XRPUSDT', 'XRPBTC', ] goes back much earlier
 
 
- other tickers' data collection starts after
+ other pairs' data collection starts after
 """
 
 # ### imports
@@ -33,7 +33,7 @@ from twisted.internet import task, reactor
 #
 #
 import config
-from utils import send_email, get_data_file_path, convert_date_format, convert_ticker
+from utils import send_email, get_data_file_path, convert_date_format, convert_pair
 
 # needed to let the package to see itself for interior self imports
 sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
@@ -64,9 +64,8 @@ api_key = params['keys']['binance_foreign_data_key_1']
 secret_key = params['keys']['binance_foreign_data_key_secret_1']
 
 # parameters about investment universe
-coins_tracked = params['universe'][exchange]['coins_tracked']
-tickers_tracked = params['universe'][exchange]['tickers_tracked']
-tick_collection_list = params['universe'][exchange]['tick_collection_list']
+pairs_tracked = params['universe'][exchange]['pairs_tracked']
+pair_collection_list = params['universe'][exchange]['pair_collection_list']
 
 
 if exchange == 'binance_us':
@@ -116,9 +115,9 @@ def rename_temp_to_live_file(temp_file_path, live_file_path):
     lock.release()
 
 
-def make_new_trade_observation_for_trade_file(trade_info, ticker):
+def make_new_trade_observation_for_trade_file(trade_info, pair):
     new_line = str(trade_info['E'] / 1000) + ',' \
-               + ticker + ',' \
+               + pair + ',' \
                + str(trade_info['t']) + ',' \
                + str(trade_info['p']) + ',' \
                + str(trade_info['q']) + ',' \
@@ -195,20 +194,20 @@ def process_message(msg):
         consecutive_error_messages = 0  # since its a good message, reset the error counter
 
         # get trade info from message
-        ticker = trade_info['s']
-        ticker = convert_ticker(ticker, in_exchange=exchange, out_exchange='universal')
+        pair = trade_info['s']
+        pair = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
 
-        new_line = make_new_trade_observation_for_trade_file(trade_info, ticker)
+        new_line = make_new_trade_observation_for_trade_file(trade_info, pair)
 
         # ### write to live data file
-        live_data_file_path = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
+        live_data_file_path = get_data_file_path(data_type='trade', pair=pair, date='live', exchange=exchange)
         check_if_file_make_dirs_then_write(file_path=live_data_file_path, new_line=new_line, thread_lock=True)
 
         # ### WRITE TO HISTORICAL DATA FILES
         trade_info_epoch_time = trade_info['E'] / 1000
         date_tuple = convert_date_format(trade_info_epoch_time, 'tuple_to_day')
 
-        daily_trade_fp = get_data_file_path('trade', ticker, date=date_tuple, exchange=exchange)
+        daily_trade_fp = get_data_file_path('trade', pair, date=date_tuple, exchange=exchange)
         header = 'msg_time,ticker,trade_id,price,quantity,buy_order_id,sell_order_id,trade_time,buyer_is_maker\n'
 
         check_if_file_make_dirs_then_write(file_path=daily_trade_fp, new_line=new_line, header=header)
@@ -236,15 +235,15 @@ def trim_live_files(params=params):
 
     # variable definitions
     global exchange
-    global tickers_tracked
+    global pairs_tracked
 
     trade_col_names = params['data_format'][exchange]['trade_col_name_list']
 
-    for ticker in tickers_tracked:
-        ticker = convert_ticker(ticker, in_exchange=exchange, out_exchange='universal')
+    for pair in pairs_tracked:
+        pair = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
 
         lock.acquire()
-        live_fp = get_data_file_path(data_type='trade', ticker=ticker, date='live', exchange=exchange)
+        live_fp = get_data_file_path(data_type='trade', pair=pair, date='live', exchange=exchange)
 
         try:
             recent_trades = pd.read_csv(live_fp, names=trade_col_names, index_col=False)
@@ -257,7 +256,7 @@ def trim_live_files(params=params):
             # re-write live trade file
             recent_trades.to_csv(live_fp, header=False, index=False)
 
-        # happens auto for new tickers
+        # happens auto for new pairs
         except FileNotFoundError:
             print('debug 1: FileNotFoundError: ' + str(live_fp), flush=True)
             pass
@@ -344,7 +343,7 @@ def main(params=params):
     notify_of_process_start()
 
     # start websocket
-    conn_key = bm.start_multiplex_socket(tick_collection_list, process_message)
+    conn_key = bm.start_multiplex_socket(pair_collection_list, process_message)
 
     # live file trim task
     secs_between_trims = params['active_services']['trades'][exchange]['secs_between_trims']

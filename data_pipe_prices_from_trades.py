@@ -36,15 +36,15 @@ def check_if_head_dir_if_no_make_path(fp):
     return None
 
 
-def add_prices_from_live_trade_data(ticker, exchange):
+def add_prices_from_live_trade_data(pair, exchange):
     """checkes the live trade file and will append trades to days file
     """
 
-    trades = get_live_trades_data(ticker, exchange)
+    trades = get_live_trades_data(pair, exchange)
 
 
 
-    # if there are no trades for ticker's live file skip for this round (else it errors)
+    # if there are no trades for pair's live file skip for this round (else it errors)
     if trades.shape[0] == 0:
         return None
     # except:
@@ -56,7 +56,7 @@ def add_prices_from_live_trade_data(ticker, exchange):
     prices = prices.iloc[:-1]  # remove last second as this second could still be happening
 
     now = time.time()  # must use timestamp as requesting date="live"
-    price_fp = get_data_file_path(data_type='price', ticker=ticker, date=now, exchange=exchange)
+    price_fp = get_data_file_path(data_type='price', pair=pair, date=now, exchange=exchange)
 
     if os.path.isfile(price_fp):
         last_line = get_last_line_of_file(price_fp)
@@ -86,7 +86,7 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
 
         yesterday_price_fp = get_data_file_path(data_type='price',
-                                                ticker=ticker,
+                                                pair=pair,
                                                 date=now - 24 * 60 * 60,
                                                 exchange=exchange)
 
@@ -110,17 +110,17 @@ def add_prices_from_live_trade_data(ticker, exchange):
 
         # cutoff prices so they start at midnight and
         prices = prices[prices.index > dt]
-        check_if_head_dir_if_no_make_path(price_fp)  # make any dirs if needed (new tickers, etc...)
+        check_if_head_dir_if_no_make_path(price_fp)  # make any dirs if needed (new pairs, etc...)
         prices.to_csv(price_fp)
     return None
 
 
-def add_prices_to_all_tickers(exchange):
+def add_prices_to_all_pairs(exchange):
     # print(exchange, flush=True)
     ST = time.perf_counter()
 
     # investment universe from params
-    tickers_tracked = params['universe'][exchange]['tickers_tracked']
+    pairs_tracked = params['universe'][exchange]['pairs_tracked']
 
 
 
@@ -131,9 +131,9 @@ def add_prices_to_all_tickers(exchange):
 
 
 
-    for ticker in tickers_tracked:
-        ticker = convert_ticker(ticker, in_exchange=exchange, out_exchange='universal')
-        add_prices_from_live_trade_data(ticker, exchange)
+    for pair in pairs_tracked:
+        pair = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
+        add_prices_from_live_trade_data(pair, exchange)
 
     ET = time.perf_counter()
     TT = ET - ST
@@ -150,7 +150,7 @@ def add_prices_for_all_exchanges():
     # import pdb; pdb.set_trace()
 
     for exchange in exchanges:
-        add_prices_to_all_tickers(exchange)
+        add_prices_to_all_pairs(exchange)
 
     ET = time.perf_counter()
     TT = ET - ST

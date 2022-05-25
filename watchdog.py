@@ -144,7 +144,7 @@ def price_crypto_making_watchdog():
 
         try:
             check_ticker = params['active_services']['trades'][exchange]['ticker_to_check']
-            prices = get_data(data_type='prices', ticker=check_ticker, exchange=exchange)
+            prices = get_data(data_type='prices', pair=check_ticker, exchange=exchange)
 
             # get most recent BTC trade (or whatever is the highest frequency)
             most_recent_price_timestamp = pd.to_datetime(prices.index[-1])
@@ -200,7 +200,7 @@ def check_if_orders_being_updated():
             restart_str = (2 * '-=-=-=-=- ALGOS - RESTARTING LIVE BOT: ' + service + ' -=-=-=-=-=-=-')*5
 
             fp = get_data_file_path(data_type='last_order_check',
-                                    ticker=None,
+                                    pair=None,
                                     date='live',
                                     port=port_name,
                                     exchange=exchange)
