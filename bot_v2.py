@@ -1,34 +1,7 @@
-#!/home/paul/miniconda3/envs/binance/bin/python3
-# -*- coding: utf-8 -*-
-
-# ###PAUL_refractor
-# ###PAUL_refractor
-"""
-after getting the bot running on /algos/ services
-pairs_tracked --> tickers_traded_universial
-- This logic implies that the FOREIGN ticker = UNIVERSIAL ticker
--                         and      US ticker = EXCHANGE   ticker
-- this will be the new nomenclature: ^^^^^^^^^^^^^^^^^^^^^^^^^^
-----> convert_pair_foreign_to_us(foreign_ticker) --> convert_pair_universial_to_exchange(universial_t)
-----> convert_pair_us_to_foreign(us_ticker)      --> convert_pair_exchange_to_universial(exchange_t)
-"""
-# ###PAUL_refractor
-# ###PAUL_refractor
-
-# ### portfolio name
-#
-#
-port_name = 'sma_v1_equal_dist'
-exchange = 'binanceus'  # ###PAUL should this be inherited from params?
-data_exchange = 'binance'
-
-iter_count = 0  # counter for place_order_on_signals
-
 # ### imports
 #
 #
 
-# ### time zone change... this must happen first and utils must be imported first
 # ### time zone change... this must happen first and utils must be imported first
 import os
 import time
@@ -36,140 +9,135 @@ import time
 os.environ['TZ'] = 'UTC'
 time.tzset()
 # ### time zone change... this must happen first and utils must be imported first
-# ### time zone change... this must happen first and utils must be imported first
 
-
-# import ast
-# import concurrent.futures
-#
-# import datetime
-# from decimal import Decimal
-# import json
-# import math
-# import numpy as np
-# import os
 import pandas as pd
-# import platform
-# import plotly
-# from plotly.subplots import make_subplots
-# import plotly.graph_objects as go
-# import re
-# import signal
-# import sys
-# import time
 from twisted.internet import task, reactor
-# from typing import Union
+
 
 # local imports
 #
 #
 import config
+params = config.params
+
 from utils import *
 
-sys.path.append('/mnt/algos/ext_packages/sams_binance_api')  # # path containing sams binance api
+# ###PAUL_del
+# ###PAUL this will likely be replaced by ccxt so pass on consideration for this for now.
+# sys.path.append('/mnt/algos/ext_packages/sams_binance_api')  # # path containing sams binance api
 
-from binance.client import Client
-from binance.websockets import BinanceSocketManager
+# from binance.client import Client
+# from binance.websockets import BinanceSocketManager
+
+
+import ccxt
+
 
 # time the script from start to first trade
 START_TIME = time.time()
 this_scripts_process_ID = os.getpid()
 
-# ### definitions
+# cell_split
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split
+
+# ### portfolio specific information
 #
 #
-params = config.params
-# params['port_name'] = port_name  # ###PAUL_refractor i dont think this works under the remodel
-op_sys = params['constants']['os']
+port_name = 'sma_v2_8020_KDA_NOIA'
+exchange = 'kucoin'  # ###PAUL should this be inherited from params?
+data_exchange = 'kucoin'
+
+# all pairs to be considered in portfolio... in universal symbol format
+pairs_traded = ['KDA-USDT', 'NOIA-USDT']
+
+# ### API things
+#
+#
+api_key = params['keys']['kucoin']['algostrading0123456789']['trade_1']['key']
+secret_key = params['keys']['kucoin']['algostrading0123456789']['trade_1']['secret']
+kucoin_passphrase = params['keys']['kucoin']['algostrading0123456789']['trade_1']['passphrase']
+
+
+# ###PAUL probably want this to be based off exchange
+kucoin = ccxt.kucoin({'apiKey': api_key,
+                      'secret': secret_key,
+                      'password': kucoin_passphrase})
 
 # #
 # ##
-# ### for deployment only
-# assert(exchange in params['systemd_control']['active_data_exchanges']) << see below for correct line
-# assert(port_name in params['active_services']['ports'].keys())
+# ### for systemd deployment only
+# assert(exchange in params['systemd_control']['active_exchanges'])
+# assert(port_name in params['systemd_control']['active_ports'])
 # ###
 # ##
 # #
 
 
-# ### API things
+# cell_split
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split
+
+
+# ### definitions
 #
 #
-api_key = params['keys']['protonmail_sub_acct_key']
-secret_key = params['keys']['protonmail_sub_acct_secret']
+iter_count = 0  # counter for decision cycles  i.e.   place_order_on_signals()
 
-### create client to pair with binance
-client = Client(
-    api_key=api_key,
-    api_secret=secret_key,
-    requests_params=None,
-    tld='us'  ### paul this is for the country... need to set that for sure.... careful on other exchanges
-)
+# params['port_name'] = port_name  # ###PAUL no need to put this here... for now leave out and remove if can
+op_sys = params['constants']['os']
 
-# ### utility constants
+
+# ### utility constants... these should be constant on a exchange basis (for crypto)
 #
 #
 prices_dtype_dict = params['data_format'][exchange]['price_name_and_type']
 order_filters_names_type_dict = params['data_format'][exchange]['order_filters_name_type']
 
-tickers_foreign_to_us_dict = params['universe'][exchange]['tickers_foreign_to_us_dict']
-tickers_us_to_foreign_dict = params['universe'][exchange]['tickers_us_to_foreign_dict']
-
-# ###PAUL_refractor...
-pairs_tracked = params['universe'][exchange]['pairs_tracked']
-pairs_tracked = params['universe'][exchange]['tickers_traded']  # ###PAUL_refractor... temp soln
-# ###PAUL_refractor the above line just gives the tickers I want for now. this is the biggest refractor
-# ###PAUL_refractor adjustment... it will need attention later
-
-
-# ###PAUL_refractor. delete this later... or reconsider how its handled
-if exchange == 'binanceus':
-    try:
-        # editing pairs_tracked
-        pairs_tracked.remove('XRPUSDT')
-        pairs_tracked.remove('XRPBTC')
-    except ValueError as e:
-        print('---- XRP not in list of tickers so no removal', flush=True)
-        print(e, flush=True)
-
-for ticker_t in pairs_tracked:
-    btc_quote_bool = re.search('BTC$', ticker_t)  # checks that BTC is the ending of the ticker
-
-    # remove all bitcoin denominated tickers from trading
-    if btc_quote_bool != None:
-        pairs_tracked.remove(ticker_t)  # remove if match
-
 # ### Global Variables
 #
 #
-actions_dict = dict()  # {ticker: one_of --> ['buy_again', 'buy', 'neutural', 'sell', 'sell_again']}
-whose_turn_dict = dict()  # whose_turn is it is {ticker: ['buy' or 'sell']}
-prices_dfs_dict = dict()  # {ticker: price_df}
-short_term_prices_dict = dict()  # {ticker: price_df}
-last_prices_dict = dict()  # {ticker: most_recent_price}
-signal_dfs_dict = dict()  # {ticker: signal}  # ###PAUL all vari's standard except this one
-# ###PAUL_refractor: should also update how prices are made. only care about prices on the exchange that
-# ###PAUL_refractor: is being traded.. the signal may come from elsewhere but where orders placed matters
+prices_dfs_dict = dict()  # {pair: price_df}
+short_term_prices_dict = dict()  # {pair: price_df}
+last_prices_dict = dict()  # {pair: most_recent_price}
 
+# in order of how derived from prices each is
+signal_dfs_dict = dict()  # {pair: signal}  # ###PAUL all vari's standard except this one
+actions_dict = dict()  # {pair: one_of --> ['buy_again', 'buy', 'neutural', 'sell', 'sell_again']}
+whose_turn_dict = dict()  # whose_turn is it is {pair: ['buy' or 'sell']}
+
+
+# ### state of holdings / portfolio
+#
+#
 port_value = 0  # total port value (in USD denomination)
 port_usd = 0  # USD currently in the portfolio (available for purchasing stuff)
-port_allocation_dict = dict()  # prortion value each ticker gets - ex: {'BTCUSDT':0.75, 'ETHUSDT':0.25}
+port_allocation_dict = dict()  # prortion value each pair gets - ex: {'BTCUSDT':0.75, 'ETHUSDT':0.25}
 
 # value held (in base asset) ----  formatted:  {'free':free, 'locked':locked, 'total':total}
-# NOTE: doesnt consider quote/pair/multi tickers with same base, just all merged in one
+# NOTE: doesnt consider pairs with same base, just all merged in one
 port_holdings_dict = dict()
 
-# each is structured bag_dict[ticker][base, base_in_quote, AND quote]
-bag_max_dict = dict()  # max value of port for ticker if all in the quote or itself - uses allocation_dict
+# each is structured bag_dict[pair][base, base_in_quote, AND quote]
+bag_max_dict = dict()  # max value of port for pair if all in the quote or itself - uses allocation_dict
 bag_actual_dict = dict()  # what we really got
 bag_desired_dict = dict()  # what we want
 
 order_open_dict = {}  # contains all open orders, backed up live in  ./data/<port_name>/open_orders.csv
 
 
+# cell_split
 # cell_split  ----------------------------------------------------------------------------------------
 # cell_split  ----------------------------------------------------------------------------------------
 # cell_split  ----------------------------------------------------------------------------------------
+# cell_split
+
+
+# %%time
 
 
 def directory_check_for_portfolio_data(params):
@@ -186,8 +154,8 @@ def directory_check_for_portfolio_data(params):
                                    )
 
     dirs_needed_for_order_data = [port_path, port_path + 'closed/', ]
-    for ticker in pairs_tracked:
-        dirs_needed_for_order_data.append(port_path + 'closed/' + ticker + '/')
+    for pair in pairs_traded:
+        dirs_needed_for_order_data.append(port_path + 'closed/' + pair + '/')
 
     for dir_path in dirs_needed_for_order_data:
         check_if_dir_exists_and_make(dir_path)
@@ -203,37 +171,47 @@ def directory_check_for_portfolio_data(params):
     return None
 
 
-# initialize actions dict --> {'ticker': 'neutural'}
+# initialize actions dict --> {'pair': 'neutural'}
 def initialize_actions_dicts():
     global actions_dict
 
-    for ticker in pairs_tracked:
-        actions_dict[ticker] = 'neutural'
+    for pair in pairs_traded:
+        actions_dict[pair] = 'neutural'
 
     return None
 
 
 # initialize allocation dict
 def initialize_port_allocation_dict(method='default'):
-    """ initialized the proportion of assets in the trading account that go to each ticker """
+    """ initialized the proportion of assets in the trading account that go to each pair """
     global port_allocation_dict
+    global pairs_traded
 
     if method == 'default':
-        port_allocation_dict['ADAUSDT'] = 0.0
-        port_allocation_dict['BNBUSDT'] = 0.0
-        port_allocation_dict['BTCUSDT'] = 0.25
-        port_allocation_dict['DOGEUSDT'] = 0.25
-        port_allocation_dict['ETHUSDT'] = 0.25
-        port_allocation_dict['LINKUSDT'] = 0.25
-        port_allocation_dict['LTCUSDT'] = 0.0
-        port_allocation_dict['XLMUSDT'] = 0.0
+        port_allocation_dict['ADA-USDT'] = 0.0
+        port_allocation_dict['BNB-USDT'] = 0.0
+        port_allocation_dict['BTC-USDT'] = 0.25
+        port_allocation_dict['DOGE-USDT'] = 0.25
+        port_allocation_dict['ETH-USDT'] = 0.25
+        port_allocation_dict['LINK-USDT'] = 0.25
+        port_allocation_dict['LTC-USDT'] = 0.0
+        port_allocation_dict['XLM-USDT'] = 0.0
 
     if method == 'all BTC':
-        for ticker in pairs_tracked:
-            if ticker == 'BTCUSDT':
-                port_allocation_dict[ticker] = 1
+        for pair in pairs_traded:
+            if pair == 'BTC-USDT':
+                port_allocation_dict[pair] = 1
             else:
-                port_allocation_dict[ticker] = 0
+                port_allocation_dict[pair] = 0
+
+    if method == 'uniform':
+        num_pairs = len(pairs_traded)
+
+        for pair in pairs_traded:
+            port_allocation_dict[pair] = 1 / num_pairs
+
+    if method == 'markowitz':
+        raise RuntimeError
 
     return None
 
@@ -245,67 +223,41 @@ def get_initial_prices_batch():
     output
         None: edits prices_dfs_dict as a global variable
 
-
     ###PAUL there is a huge problem with this function... its prices are not coming in up to date.
     ###PAUL its super weird and i have no clue what is going on with it... looking into now because kindof
     ###PAUL crucial error
     """
+
+    global pairs_traded
     global prices_dfs_dict
-    global pairs_tracked
     global short_term_prices_dict
 
-    for ticker in pairs_tracked:
+    for pair in pairs_traded:
         # get_data will retrieve the last 24 hours of prices from written price files
-        prices = get_data(data_type='price', pair=ticker, date='live', exchange=data_exchange)  # gets 24 hours
+        prices = get_data(data_type='price', pair=pair, date='live', exchange=data_exchange)  # gets 24 hours
 
         # fill in annoying missing data
         prices.fillna(method='ffill', inplace=True)
         prices.fillna(method='bfill', inplace=True)
         prices.fillna(method='ffill', inplace=True)
-        prices_dfs_dict[ticker] = prices
+        prices_dfs_dict[pair] = prices
 
         # fill the short term prices dict (used for secondary orders)
         # clean prices_older than 10 mins... (for now)
         cutoff_time = datetime.datetime.now() + datetime.timedelta(minutes=-10)
         keep_mask = prices.index > cutoff_time
-        short_term_prices_dict[ticker] = prices_dfs_dict[ticker][keep_mask].copy(deep=True)
+        short_term_prices_dict[pair] = prices_dfs_dict[pair][keep_mask].copy(deep=True)
 
         # get vwap and mid_ewm prices... used to place orders for scam wicks
-        short_term_prices_dict[ticker]['mid_vwap'] = (short_term_prices_dict[ticker]['buy_vwap'] +
-                                                      short_term_prices_dict[ticker]['sell_vwap']) / 2
-        short_term_prices_dict[ticker]['mid_ewm'] = short_term_prices_dict[ticker]['mid_vwap'].ewm(alpha=0.6).mean()
+        short_term_prices_dict[pair]['mid_vwap'] = (short_term_prices_dict[pair]['buy_vwap'] +
+                                                    short_term_prices_dict[pair]['sell_vwap']) / 2
+        short_term_prices_dict[pair]['mid_ewm'] = short_term_prices_dict[pair]['mid_vwap'].ewm(alpha=0.6).mean()
 
     return None
 
 
-# ###PAUL_refractor_round_2... will want to make a get_signal(ticker) function and loop over that
-def get_initial_signal_batch(params=params):
-    """create signals from initial price batch
-
-    output
-        None: edits signal_dfs_dict inplace
-    """
-    global prices_dfs_dict
-    global signal_dfs_dict
-
-    for ticker in pairs_tracked:
-        prices = prices_dfs_dict[ticker]
-
-        sma_short = prices['buy_vwap'].rolling(window=3400 * 3).mean().fillna(method='bfill')[-1]
-        sma_long = prices['buy_vwap'].rolling(window=3400 * 10).mean().fillna(method='bfill')[-1]
-
-        # buy if shorter SMA is bigger than longer SMA
-        if sma_short > sma_long:
-            signal_dfs_dict[ticker] = 1
-
-        # sell if shorter SMA smaller than longer SMA
-        if sma_short < sma_long:
-            signal_dfs_dict[ticker] = -1
-
-    return None
-
-
-def get_ticker_filters_dict_binanceus(ticker_exchange):
+# ###PAUL universal exchange interaction refactor needed
+def get_pair_filters_dict_binance_us(universal_symbol):
     """get order filters such as PRICE_FILTER, LOT_SIZE, etc... so orders will go through cleanly
 
     returns: order_parameters_dict cointaining the following keys
@@ -317,10 +269,15 @@ def get_ticker_filters_dict_binanceus(ticker_exchange):
         stepSize            ---- change in step size of asset orders
         minNotional         ---- smallest order allowed by cost in quote asset
     """
-    order_params_dict = dict()
-    order_params_dict['ticker_us'] = ticker_exchange  # ###PAUL_refractor... 'ticker_us' --> 'ticker_exchange'
 
-    info = client.get_symbol_info(ticker_exchange)
+    global exchange
+
+    exchange_symbol = convert_pair(universal_symbol, in_exchange='universal', out_exchange=exchange)
+
+    order_params_dict = dict()
+    order_params_dict['exchange_symbol'] = exchange_symbol
+
+    info = client.get_symbol_info(exchange_symbol)
 
     # base asset: (BTC in BTC_USDT)
     order_params_dict['baseAsset'] = info['baseAsset']
@@ -356,36 +313,34 @@ def get_ticker_filters_dict_binanceus(ticker_exchange):
             order_params_dict['marketStepSize'] = f['stepSize']
 
     if 'SPOT' not in info['permissions']:
-        print('looks like trading not allowed on this asset \n ... investigate further', flush=True)
+        print('looks like trading not allowed on this asset \n ... investigate further')
         raise TypeError
 
     return order_params_dict
 
 
-def make_ticker_info_df():
-    """makes DataFrame, indexed by standard binance ticker with columns:
-        'ticker_us', 'baseAsset', 'baseAssetPrecision', 'quoteAsset', 'quoteAssetPrecision',
+# ###PAUL universal exchange interaction refactor needed
+def make_pair_info_df():
+    """makes DataFrame, indexed by column "universal_symbol" with columns:
+        'exchange_symbol', 'baseAsset', 'baseAssetPrecision', 'quoteAsset', 'quoteAssetPrecision',
         'minPrice', 'maxPrice', 'tickSize', 'minQty', 'maxQty', 'stepSize', 'minNotional',
         'marketMinQty', 'marketMaxQty', 'marketStepSize'
     """
 
-    global ticker_info_df
+    global pair_info_df
 
-    ticker_entry_list = []
+    pair_entry_list = []
 
-    # note that the ticker index for the DF is the standard binance ticker (USDT)... ticker_us is another col
-    for ticker in pairs_tracked:
-        ticker_us = tickers_foreign_to_us_dict[ticker]  # ###PAUL_refractor... ticker_us --> ticker_exchange
-        filters_dict = get_ticker_filters_dict_binanceus(
-            ticker_us)  # ###PAUL_refractor... ticker_us --> ticker_exchange
-        filters_dict['ticker'] = ticker  # ###PAUL_refractor... ticker --> ticker_universal
-        ticker_entry_list.append(filters_dict)
+    for pair in pairs_traded:
+        filters_dict = get_pair_filters_dict_binance_us(pair)
+        filters_dict['universal_symbol'] = pair  # add on the universal
+        pair_entry_list.append(filters_dict)
 
-    ticker_info_df = pd.DataFrame.from_records(ticker_entry_list, index='ticker')
-    ticker_info_df = ticker_info_df.astype(dtype=order_filters_names_type_dict)
+    pair_info_df = pd.DataFrame.from_records(pair_entry_list, index='universal_symbol')
+    pair_info_df = pair_info_df.astype(dtype=order_filters_names_type_dict)
 
 
-def update_prices(ticker, params=params):
+def update_prices(pair, params=params):
     """TODO: eventually update from short term price DFs ###PAUL
     """
 
@@ -399,138 +354,137 @@ def update_prices(ticker, params=params):
     global data_exchange
     global prices_dfs_dict
 
-    latest_price_written = max(prices_dfs_dict[ticker].index)
+    latest_price_written = max(prices_dfs_dict[pair].index)
 
     # get all the new trades
     # ###PAUL_refractor... wrong exchange cause dealing with binance prices.. dont know how to handle rn
-    live_trades = get_live_trades_data(ticker, exchange=data_exchange)  # ###PAUL_refractor
+    live_trades = get_live_trades_data(pair, exchange=data_exchange)  # ###PAUL_refractor
     live_prices = convert_trades_df_to_prices(live_trades, exchange=data_exchange)  # ###PAUL_refractor
     live_prices = live_prices[live_prices.index > latest_price_written]
 
     # merge the new prices with the old prices.
-    prices_dfs_dict[ticker] = pd.concat([prices_dfs_dict[ticker], live_prices])
+    prices_dfs_dict[pair] = pd.concat([prices_dfs_dict[pair], live_prices])
 
     # clean prices_older than 24 hr... probably wont need more for informed decision making (for now)
     cutoff_time = datetime.datetime.now() + datetime.timedelta(hours=-24)
-    keep_mask = prices_dfs_dict[ticker].index > cutoff_time
-    prices_dfs_dict[ticker] = prices_dfs_dict[ticker][keep_mask]
+    keep_mask = prices_dfs_dict[pair].index > cutoff_time
+    prices_dfs_dict[pair] = prices_dfs_dict[pair][keep_mask]
 
     # fill NaNs (only happens when is missing information so this is needed at this step each update)
-    prices_dfs_dict[ticker].fillna(method='ffill', inplace=True)
-    prices_dfs_dict[ticker].fillna(method='bfill', inplace=True)
+    prices_dfs_dict[pair].fillna(method='ffill', inplace=True)
+    prices_dfs_dict[pair].fillna(method='bfill', inplace=True)
 
 
 def update_all_prices(params=params):
-    global pairs_tracked
+    global pairs_traded
 
-    for ticker in pairs_tracked:
-        update_prices(ticker)
+    for pair in pairs_traded:
+        update_prices(pair)
 
     return None
 
 
-def update_short_term_prices(ticker, params=params):
+def update_short_term_prices(pair, params=params):
     """updates the short term prices... the file reading in this may take a bit extra timme, for stability
     for now this is seperate from update prices... eventually should be combined with update prices as to
     not need to generate prices from live trades twice
     """
 
-    global data_exchange
+    global exchange
     global short_term_prices_dict
 
-    ##############################################################################################
-    ##############################################################################################
-    ##############################################################################################
-    try:
-        latest_price_written = max(short_term_prices_dict[ticker].index)
-    except:
-        import pdb; pdb.set_trace()
-    ##############################################################################################
-    ##############################################################################################
-    ##############################################################################################
+    latest_price_written = max(short_term_prices_dict[pair].index)
 
     # get all the new trades
-    # ###PAUL_refractor... wrong exchange cause dealing with binance prices.. dont know how to handle rn
-    live_trades = get_live_trades_data(ticker, exchange=data_exchange)  # ###PAUL_refractor
-    live_prices = convert_trades_df_to_prices(live_trades, exchange=data_exchange)  # ###PAUL_refractor
+    # ###PAUL this is a dirty fix... after initializing the short term prices on the data exchange
+    # ###PAUL i switch them to "exchange" the trading exchange...
+    live_trades = get_live_trades_data(pair, exchange=exchange)  # ###PAUL_refractor
+    live_prices = convert_trades_df_to_prices(live_trades, exchange=exchange)  # ###PAUL_refractor
     live_prices = live_prices[live_prices.index > latest_price_written]
 
     # merge the new prices with the old prices.
-    short_term_prices_dict[ticker] = pd.concat([prices_dfs_dict[ticker], live_prices])
+    short_term_prices_dict[pair] = pd.concat([prices_dfs_dict[pair], live_prices])
 
-    # clean prices_older than 24 hr... probably wont need more for informed decision making (for now)
+    # clean prices_older than 10 minutes... no need for more on the short term
     cutoff_time = datetime.datetime.now() + datetime.timedelta(minutes=-10)
-    keep_mask = short_term_prices_dict[ticker].index > cutoff_time
-    short_term_prices_dict[ticker] = short_term_prices_dict[ticker][keep_mask]
+    keep_mask = short_term_prices_dict[pair].index > cutoff_time
+    short_term_prices_dict[pair] = short_term_prices_dict[pair][keep_mask]
 
     # fill NaNs (only happens when is missing information so this is needed at this step each update)
-    short_term_prices_dict[ticker].fillna(method='ffill', inplace=True)
-    short_term_prices_dict[ticker].fillna(method='bfill', inplace=True)
+    short_term_prices_dict[pair].fillna(method='ffill', inplace=True)
+    short_term_prices_dict[pair].fillna(method='bfill', inplace=True)
 
     # recently added
-    short_term_prices_dict[ticker]['mid_vwap'] = (short_term_prices_dict[ticker]['buy_vwap'] +
-                                                  short_term_prices_dict[ticker]['sell_vwap']) / 2
-    short_term_prices_dict[ticker]['mid_ewm'] = short_term_prices_dict[ticker]['mid_vwap'].ewm(alpha=0.6).mean()
+    short_term_prices_dict[pair]['mid_vwap'] = (short_term_prices_dict[pair]['buy_vwap'] +
+                                                short_term_prices_dict[pair]['sell_vwap']) / 2
+    short_term_prices_dict[pair]['mid_ewm'] = short_term_prices_dict[pair]['mid_vwap'].ewm(alpha=0.6).mean()
 
     return None
 
 
 def update_all_short_term_prices(params=params):
-    global pairs_tracked
+    global pairs_traded
 
-    for ticker in pairs_tracked:
-        update_short_term_prices(ticker)
+    for pair in pairs_traded:
+        update_short_term_prices(pair)
 
     return None
 
 
 def update_signals(params=params):
+    """also handles initialization of the signals dictionary
+    """
+
     # first update the prices
     update_all_prices()
     update_all_short_term_prices()
 
     # declare globals for this scope
+    global pairs_traded
     global prices_dfs_dict
     global signal_dfs_dict
 
-    for ticker in pairs_tracked:
-        prices = prices_dfs_dict[ticker]
+    for pair in pairs_traded:
+        prices = prices_dfs_dict[pair]
 
-        sma_short = prices['buy_vwap'].rolling(window=3400 * 3).mean().fillna(method='bfill')[-1]
-        sma_long = prices['buy_vwap'].rolling(window=3400 * 10).mean().fillna(method='bfill')[-1]
+        sma_short = prices['buy_vwap'].rolling(window=3400 * 2).mean().fillna(method='bfill')[-1]
+        sma_long = prices['buy_vwap'].rolling(window=3400 * 8).mean().fillna(method='bfill')[-1]
 
         # buy if shorter SMA is bigger than longer SMA
         if sma_short > sma_long:
-            signal_dfs_dict[ticker] = 1
+            signal_dfs_dict[pair] = 1
 
         # sell if shorter SMA smaller than longer SMA
         if sma_short < sma_long:
-            signal_dfs_dict[ticker] = -1
+            signal_dfs_dict[pair] = -1
 
     return None
 
 
 def initialize_bag_dicts():
+    global pairs_traded
     global bag_max_dict
     global bag_actual_dict
     global bag_desired_dict
 
-    for ticker in pairs_tracked:
-        bag_max_dict[ticker] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
-        bag_actual_dict[ticker] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
-        bag_desired_dict[ticker] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
+    for pair in pairs_traded:
+        bag_max_dict[pair] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
+        bag_actual_dict[pair] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
+        bag_desired_dict[pair] = {'base': 0, 'base_in_quote': 0, 'quote': 0}
 
 
 def update_port_holdings_and_value():
     '''updates the global variables listed at the top of the function
     note the differientation between holdings and bags
         - holdings is EVERYTHING in the account
-        - bags are things that are tradable according to tickers tracked
+        - bags are things that are tradable according to pairs tracked
         - value is determined from bags, holdings are not included and must be manually traded
 
-    TODO: this function gets holdings of ALL tickers, not all tickers are tracked right now some
-     optimization needs to be done its not worth adding all tickers to track.. will take longer and more compute
+    TODO: this function gets holdings of ALL pairs, not all pairs are tracked right now some
+     optimization needs to be done its not worth adding all pairs to track.. will take longer and more compute
     '''
+
+    global pairs_traded
 
     global short_term_prices_dict
     global last_prices_dict
@@ -543,70 +497,72 @@ def update_port_holdings_and_value():
     global bag_max_dict
     global bag_actual_dict
 
-    ###PAUL errored out here
-
     # update port holdings    ---- note: it gets all holdable assets on binance us
-    try:
-        bag_list = client.get_account()[
-            'balances']  # returns list of dicts: {'asset': 'BTC', 'free': '0.18', 'locked': '0.0'}
-    except TimeoutError as e:
-        print('\n \n ###PAUL_ReadTimeout error here happened \n \n ', flush=True)  # ###PAUL eventually figure this out
-        print('Exception Trace 1', flush=True)
-        print(e, flush=True)
-        print('\n \n \n', flush=True)
-        pass
 
+    #     try:
+
+    bag_list = client.get_account()[
+        'balances']  # returns list of dicts: {'asset': 'BTC', 'free': '0.18', 'locked': '0.0'}
+
+    #     except TimeoutError as e:
+    #         print('\n \n ###PAUL_ReadTimeout error here happened \n \n ')  # ###PAUL eventually figure this out
+    #         print('Exception Trace 1')
+    #         print(e)
+    #         print('/n /n /n')
+    #         pass
+
+    # loop adds pairs outside of portfolio's control to bag list... these don't contribute value to the port value
     for bag in bag_list:
-        ticker = bag['asset']
+        ticker = bag['asset']  # actual one sided ticker  i.e. BTC
         free = float(bag['free'])
         locked = float(bag['locked'])
         total = free + locked
 
-        # will add tickers outside of portfolio's control to bag list... these don't contribute value to the port..
+        #         universal_symbol = convert_pair(exchange_symbol, in_exchange=exchange, out_exchange='universal')
         port_holdings_dict[ticker] = {'free': free, 'locked': locked, 'total': total}
 
-    # update port value   ---- note: only considers the ticker's traded in the portfolio value
+    # update port value   ---- note: only considers the pair's traded in the portfolio value
     port_value_t = 0
-    for ticker in pairs_tracked:  # ###PAUL_refractor pairs_tracked --> tickers_traded_universal
-        # get the base asset of each ticker
-        base_asset = ticker_info_df.loc[ticker]['baseAsset']  # ###PAUL_refractor. df indexed by universal tickers
 
-        # get qty and value of base asset held for each ticker
-        last_price = float(short_term_prices_dict[ticker].iloc[-1:]['mid_ewm'])
-        last_prices_dict[ticker] = last_price
+    for pair in pairs_traded:
+        # get the base asset of each pair
+        base_asset = pair_info_df.loc[pair]['baseAsset']
+
+        # get qty and value of base asset held for each pair
+        last_price = float(short_term_prices_dict[pair].iloc[-1:]['mid_ewm'])
+        last_prices_dict[pair] = last_price
         base_asset_qty = port_holdings_dict[base_asset]['total']
         asset_value = last_price * base_asset_qty
 
         # update actual bags dict
-        bag_actual_dict[ticker]['base'] = base_asset_qty
-        bag_actual_dict[ticker]['base_in_quote'] = asset_value
+        bag_actual_dict[pair]['base'] = base_asset_qty
+        bag_actual_dict[pair]['base_in_quote'] = asset_value
 
         port_value_t += asset_value
 
-    port_value_t += port_holdings_dict['USD']['total']  # tack on the USD value... not a ticker tracked
+    port_value_t += port_holdings_dict['USD']['total']  # tack on the USD value... not a pair tracked
     port_value = port_value_t
 
     # must do these after the new total value is assessed
-    for ticker in pairs_tracked:
-        last_price = last_prices_dict[ticker]
+    for pair in pairs_traded:
+        last_price = last_prices_dict[pair]
 
-        # get dollars for actual bags dict by subtracting value held from proportion of portfolio for ticker
-        total_value_for_ticker = port_allocation_dict[ticker] * port_value
+        # get dollars for actual bags dict by subtracting value held from proportion of portfolio for pair
+        total_value_for_pair = port_allocation_dict[pair] * port_value
 
-        # figure out how many dollars are left for ticker (can be negative this means were holding too much)
-        quote_value_of_ticker_bag = last_price * bag_actual_dict[ticker]['base']
-        bag_actual_dict[ticker]['quote'] = total_value_for_ticker - quote_value_of_ticker_bag
+        quote_value_of_pair_bag = last_price * bag_actual_dict[pair]['base']
+        bag_actual_dict[pair]['quote'] = total_value_for_pair - quote_value_of_pair_bag
 
         # update all of max bag dict
         #
         # ###PAUL_refractor... generalize the base_asset as a variable
         #
-        bag_max_dict[ticker]['base'] = total_value_for_ticker / last_price
-        bag_max_dict[ticker]['base_in_quote'] = total_value_for_ticker
-        bag_max_dict[ticker]['quote'] = total_value_for_ticker
+        bag_max_dict[pair]['base'] = total_value_for_pair / last_price
+        bag_max_dict[pair]['base_in_quote'] = total_value_for_pair
+        bag_max_dict[pair]['quote'] = total_value_for_pair
 
 
-def update_desired_bags(action, ticker):
+def update_desired_bags(action, pair):
     """called in place_orders_on_signal()
     ###PAUL_refractor... maybe needed for place_secondary orders?
     ###PAUL_tag1 ---- longer term consideration... desired_bags more complex than in or out
@@ -617,58 +573,59 @@ def update_desired_bags(action, ticker):
     global bag_desired_dict
 
     if action == 'buy' or action == 'buy_again':
-        bag_desired_dict[ticker]['base'] = bag_max_dict[ticker]['base']
-        bag_desired_dict[ticker]['base_in_quote'] = bag_max_dict[ticker]['base_in_quote']
-        bag_desired_dict[ticker]['quote'] = 0
+        bag_desired_dict[pair]['base'] = bag_max_dict[pair]['base']
+        bag_desired_dict[pair]['base_in_quote'] = bag_max_dict[pair]['base_in_quote']
+        bag_desired_dict[pair]['quote'] = 0
 
     if action == 'sell' or action == 'sell_again':
-        bag_desired_dict[ticker]['base'] = 0
-        bag_desired_dict[ticker]['base_in_quote'] = 0
-        bag_desired_dict[ticker]['quote'] = bag_max_dict[ticker]['quote']
+        bag_desired_dict[pair]['base'] = 0
+        bag_desired_dict[pair]['base_in_quote'] = 0
+        bag_desired_dict[pair]['quote'] = bag_max_dict[pair]['quote']
+
+    ###PAUL_todo TODO make whose turn correct in case of a reboot. no reason to trade on startup if not needed.
 
 
 def initialize_whose_turn_dict():
     global last_prices_dict
     global port_holdings_dict
     global whose_turn_dict
-    global ticker_info_df
+    global pair_info_df
 
-    for ticker in pairs_tracked:
-        baseAsset = ticker_info_df.loc[ticker]['baseAsset']
-        value_of_hold = last_prices_dict[ticker] * port_holdings_dict[baseAsset]['total']
+    for pair in pairs_traded:
+        baseAsset = pair_info_df.loc[pair]['baseAsset']
+        value_of_hold = last_prices_dict[pair] * port_holdings_dict[baseAsset]['total']
 
         if value_of_hold < 25:
-            whose_turn_dict[ticker] = 'buy'
+            whose_turn_dict[pair] = 'buy'
         else:
-            whose_turn_dict[ticker] = 'sell'
+            whose_turn_dict[pair] = 'sell'
 
     return None
 
 
 # make stuff thats gotta be made
 directory_check_for_portfolio_data(params)
-make_ticker_info_df()
+make_pair_info_df()
 initialize_bag_dicts()
 
-initialize_port_allocation_dict()
+initialize_port_allocation_dict(method='uniform')
 initialize_actions_dicts()
 get_initial_prices_batch()
-get_initial_signal_batch()
+# get_initial_signal_batch()
 update_all_prices()
 update_all_short_term_prices()
 update_signals()
 update_port_holdings_and_value()
 initialize_whose_turn_dict()
 
-print('---- initial variables created', flush=True)
-
+print('Done')
 
 #
 # ###PAUL_tag2
 # """
-# there was a problem with prices being too sparce and being filled in weird when using binanceus
+# there was a problem with prices being too sparce and being filled in weird when using binance_us
 # as the price maker... a few things
-# ---> check that binanceus prices are being made nice and properly
+# ---> check that binance_us prices are being made nice and properly
 # --->  figure out the issue becuase this will come up when it becomes time to trading lower liquidity assets
 #       in an automated manner
 # """
@@ -676,12 +633,14 @@ print('---- initial variables created', flush=True)
 #
 
 
+# cell_split
 # cell_split  ----------------------------------------------------------------------------------------
 # cell_split  ----------------------------------------------------------------------------------------
 # cell_split  ----------------------------------------------------------------------------------------
+# cell_split
 
 
-def determine_buy_or_sell():
+def update_actions_dict():
     """ the primary benefit of this function is to see whether we have a buy or sell that has been determined
     and then to up the priority of that order if it needs it.
 
@@ -690,35 +649,35 @@ def determine_buy_or_sell():
         actions_dict (dict): {'BTCUSDT':'buy',  'XRPUSDT':'sell'}
     """
     global actions_dict
-    global pairs_tracked
+    global pairs_traded
     global signals_dfs_dict
     global whose_turn_dict
 
     actions_dict = dict()
 
-    for ticker in pairs_tracked:
-        whose_turn = whose_turn_dict[ticker]
-        signal_int = signal_dfs_dict[ticker]  # -1 = sell    1 = buy
+    for pair in pairs_traded:
+        whose_turn = whose_turn_dict[pair]
+        signal_int = signal_dfs_dict[pair]  # -1 = sell    1 = buy
 
         # BUY condition met
         if signal_int == 1:
             if whose_turn == 'buy':
-                actions_dict[ticker] = 'buy'
-                whose_turn_dict[ticker] = 'sell'
+                actions_dict[pair] = 'buy'
+                whose_turn_dict[pair] = 'sell'
             else:  # the buy condition was met before but the order has not been filled
-                actions_dict[ticker] = 'buy_again'
+                actions_dict[pair] = 'buy_again'
 
         # SELL condition met
         elif signal_int == -1:
             if whose_turn == 'sell':
-                actions_dict[ticker] = 'sell'
-                whose_turn_dict[ticker] = 'buy'
+                actions_dict[pair] = 'sell'
+                whose_turn_dict[pair] = 'buy'
             else:  # the sell condition was met, but it is not sell's turn yet.
-                actions_dict[ticker] = 'sell_again'
+                actions_dict[pair] = 'sell_again'
 
                 # NEITHER buy or sell condition met
         else:
-            actions_dict[ticker] = 'neutural'
+            actions_dict[pair] = 'neutural'
 
     return actions_dict
 
@@ -751,18 +710,17 @@ def process_placed_order(placed_order_res):
     global exchange
     global port_name
     global order_open_dict
-    global tickers_us_to_foreign_dict
 
     # used as primary key among orders (not sure if this or clientOrderId best practice...)
-    ticker = placed_order_res['symbol']
-    foreign_ticker = tickers_us_to_foreign_dict[ticker]
+    pair = placed_order_res['symbol']
+    universal_symbol = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
 
     orderId = placed_order_res['orderId']
     order_time = placed_order_res['transactTime']
 
     order_info_dict = dict()
 
-    order_info_dict['symbol'] = foreign_ticker  # ###PAUL_refractor
+    order_info_dict['symbol'] = universal_symbol
     # order_info_dict['orderId']              = placed_order_res['orderId'] # put lower for dictionary return
     order_info_dict['clientOrderId'] = placed_order_res['clientOrderId']
     order_info_dict['placedTime'] = placed_order_res['transactTime']
@@ -776,7 +734,7 @@ def process_placed_order(placed_order_res):
     order_info_dict['updateTime'] = placed_order_res['transactTime']
 
     # add the new order to the dictionary tracking open orders
-    order_open_dict[(orderId, foreign_ticker)] = order_info_dict
+    order_open_dict[(orderId, universal_symbol)] = order_info_dict
 
     # ### write the order to the live files
     #
@@ -792,14 +750,14 @@ def process_placed_order(placed_order_res):
         f.write(new_live_order_line)
     os.chmod(open_order_fp, 0o777)  # needed for when running on systemd
 
-    return orderId, foreign_ticker, order_info_dict
+    return orderId, universal_symbol, order_info_dict
 
 
-def place_order(B_or_S, ticker, o_type, base_qty, price=None, order_id=None):
+def place_order(B_or_S, pair, o_type, base_qty, price=None, order_id=None):
     """places an orders.py
 
     input:
-        ticker (str): 'BTCUSDT'... use ticker tracked NOT the USA ticker, it will convert it
+        pair (str): 'BTCUSDT'... use universal_symbol tracked NOT the USA universal_symbol, it will convert it
         o_type (str): 'limit' only supported now, in future maybe, market and more...
         B_or_S (str): 'buy' or 'sell'
         base_qty (float): amount of base asset to buy (i.e. BTC in BTCUSDT )
@@ -811,50 +769,58 @@ def place_order(B_or_S, ticker, o_type, base_qty, price=None, order_id=None):
         order ID to track the order status, maybe more
     """
 
-    if ticker not in pairs_tracked:  # ###PAUL_refractor
+    if pair not in pairs_traded:  # ###PAUL  not sure what I wanted to be doing here
         raise KeyError
 
-    info = ticker_info_df.loc[ticker]
+    # ### verify constraints met for order... stepSize and tickSize should be only ones affected
+    #
+    #
+    info = pair_info_df.loc[pair]
 
-    # string used to place order on ticker
-    ticker_us = info['ticker_us']  # ###PAUL_refractor ticker_exchange
-
-    # requirements on the base asset
+    # most important / relevant checks
     base_qty = round_step_size(quantity=base_qty, step_size=info['stepSize'])
+    price = round_step_size(quantity=price, step_size=info['tickSize'])
 
+    # exchange rules
     if base_qty < info['minQty'] or base_qty > info['maxQty']:
         raise ValueError
-
-        # price requirements
-    price = round_step_size(quantity=price, step_size=info['tickSize'])
 
     if price < info['minPrice'] or price > info['maxPrice']:
         raise ValueError
 
+    # ###PAUL would like to get rid of the below and raise a ValueError also
     # notional requirements (makes sure that the order is large enough in terms of quote asset)
     if price * base_qty < info['minNotional']:
-        print('    Price: ' + str(price), flush=True)
-        print('    base_qty: ' + str(base_qty), flush=True)
-        print("    info['minNotional']: " + str(info['minNotional']), flush=True)
+        print('    Price: ' + str(price) + '\n')
+        print('    base_qty: ' + str(base_qty) + '\n')
+        print("    info['minNotional']: " + str(info['minNotional']) + '\n')
 
         return 'order not placed MIN_NOTIONAL issue '
 
+    # ### place order
+    #
+    #
+    # string used to place order on pair on the exchange
+    exchange_symbol = info['exchange_symbol']
+
     if o_type == 'limit':
-        print('Limit Order:  ' + B_or_S + ' ' + str(base_qty) + ' ' + ticker_us + ' for $' + str(price), flush=True)
+        print('placing order')
+        print('Limit Order:  ' + B_or_S + ' ' + str(base_qty) + ' ' + exchange_symbol + ' for $' + str(price))
+
         if B_or_S == 'buy':
-            order_res = client.order_limit_buy(symbol=ticker_us,
+            order_res = client.order_limit_buy(symbol=exchange_symbol,
                                                quantity=base_qty,
                                                price=price
                                                )
 
         if B_or_S == 'sell':
-            order_res = client.order_limit_sell(symbol=ticker_us,
+            order_res = client.order_limit_sell(symbol=exchange_symbol,
                                                 quantity=base_qty,
                                                 price=price
                                                 )
 
     else:
-        print('Error: order type not supported', flush=True)
+        print('Error: order type not supported')
         raise TypeError
 
     process_placed_order(order_res)
@@ -862,8 +828,8 @@ def place_order(B_or_S, ticker, o_type, base_qty, price=None, order_id=None):
     return order_res
 
 
-def write_closed_order(orderId, ticker, order_info_dict):
-    """writes order that has closed to a file of orders for that ticker
+def write_closed_order(orderId, pair, order_info_dict):
+    """writes order that has closed to a file of orders for that pair
     """
 
     global order_open_dict
@@ -872,9 +838,7 @@ def write_closed_order(orderId, ticker, order_info_dict):
     header = 'orderId,ticker,clientOrderId,placedTime,price,origQty,executedQty,cummulativeQuoteQty,side,status,ord_type,updateTime\n'
     new_line = make_order_observation_csv_line(orderId, order_info_dict)
 
-    #     print('###PAUL_debug_spot_1', flush=True)
-    daily_trade_fp = get_data_file_path('closed_order', ticker, date='live', port=port_name, exchange=exchange)
-    #     print('###PAUL_debug_spot_2', flush=True)
+    daily_trade_fp = get_data_file_path('closed_order', pair, date='live', port=port_name, exchange=exchange)
 
     # check that the file exists for the correct time period
     file_existed = os.path.isfile(daily_trade_fp)
@@ -884,23 +848,19 @@ def write_closed_order(orderId, ticker, order_info_dict):
         f.write(new_line)
     os.chmod(daily_trade_fp, 0o777)
 
-    #     print('###PAUL_debug_spot_3', flush=True)
-
     return None
 
 
 def remove_order_from_open_tracking(tuple_key):
     """serves 3 primary purposes:  1.) removes order from ./data/orders/open/open_orders.csv
-                                   2.) writes the order to the ticker's / day's closed order file
+                                   2.) writes the order to the pair's / day's closed order file
                                    3.) removes order from global tracking dictionary
     """
 
     global order_open_dict
 
-    orderId, foreign_ticker = tuple_key
-
-    order_info_dict = order_open_dict[(orderId, foreign_ticker)]
-    ticker_us = order_info_dict['symbol']
+    orderId, universal_symbol = tuple_key
+    order_info_dict = order_open_dict[(orderId, universal_symbol)]
 
     # ### remove order from open order tracking file
     #
@@ -916,33 +876,34 @@ def remove_order_from_open_tracking(tuple_key):
                 f.write(line)
 
     # ### write to closed order files
-    write_closed_order(orderId, ticker_us, order_info_dict)
+    write_closed_order(orderId, universal_symbol, order_info_dict)
 
     # ### remove order from dictionary... must do last, info here used to write to closed order file
     #
-    del order_open_dict[(orderId, foreign_ticker)]
+    del order_open_dict[(orderId, universal_symbol)]
 
     return None
 
 
 def close_order(order_id_tuple):
-    global tickers_foreign_to_us_dict
+    orderId, universal_symbol = order_id_tuple
+    exchange_symbol = convert_pair(universal_symbol, in_exchange='universal', out_exchange=exchange)
 
-    orderId, foreign_ticker = order_id_tuple
-    ticker_us = convert_pair_foreign_to_us(foreign_ticker, exchange)
-
-    tuple_key = (orderId, foreign_ticker)
+    tuple_key = (orderId, universal_symbol)
 
     # cancel the order
     try:
-        order_res = client.cancel_order(symbol=ticker_us, orderId=orderId)
+        order_res = client.cancel_order(symbol=exchange_symbol, orderId=orderId)
         remove_order_from_open_tracking(tuple_key)
 
+        print('closed order: ')
+        print(order_res)
+
     except Exception as e:
-        print('order cancel attempted, it seems order was filled: ', flush=True)
-        print('    symbol: ' + ticker_us + '  orderId: ' + str(orderId) + '\n \n \n', flush=True)
-        print(e, flush=True)
-        print('\n \n \n ', flush=True)
+        print('order cancel attempted, it seems order was filled: ')
+        print('    symbol: ' + exchange_symbol + '  orderId: ' + str(orderId) + '/n /n /n')
+        print(e)
+        print('/n /n /n ')
 
     return None
 
@@ -962,6 +923,44 @@ def update_most_recent_order_check_file(params):
     return None
 
 
+def check_opens_and_close_lower_priority_orders(B_or_S, price, pair):
+    """goes over all the open orders for the set of API keys and if the new order
+    """
+
+    global order_open_dict
+
+    order_higher_priority = False
+    order_open_for_pair = False
+    keys_to_close = []
+
+    # ###PAUL_refractor... this could (should?) be built more DRY
+    for key in order_open_dict.keys():
+        _, order_pair = key
+        if pair == order_pair:
+            print('pair match for order')
+            order_open_for_pair = True
+
+            old_price = float(order_open_dict[key]['price'])
+            if B_or_S == 'buy' and price > old_price or B_or_S == 'sell' and price < old_price:
+                print("order qualifying condition ---- " + B_or_S + '  ask was  ' + str(old_price)
+                      + '  updated to:   ' + str(price))
+                order_higher_priority = True
+                keys_to_close.append(key)
+
+    for key in keys_to_close:
+        close_order(key)
+
+    return order_higher_priority, order_open_for_pair
+
+
+# cell_split
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split
+
+
+###PAUL... should orders be checked for before every order attempt?
 def check_for_closed_orders():
     """checks if any of the open orders being tracked are now closed and removes them from tracking
     TODO: need to add order fills to tracking consider ./data/orders/filled/  (filled being a new dir)
@@ -972,12 +971,14 @@ def check_for_closed_orders():
     # get open orders from exchange
     open_orders_res_list = client.get_open_orders()
 
-    # put list of keys: tuples (orderId, Ticker) from exchange collected
+    # put list of keys: tuples (orderId, universal_symbol) from exchange collected
     open_orders_on_exchange = []
     for res in open_orders_res_list:
-        ticker = convert_pair_us_to_foreign(res['symbol'], exchange)  # ###PAUL_refractor
+        exchange_symbol = res['symbol']
+        universal_symbol = convert_pair(exchange_symbol, in_exchange=exchange, out_exchange='universal')
+
         orderId = res['orderId']
-        tup = (orderId, ticker)
+        tup = (orderId, universal_symbol)
 
         open_orders_on_exchange.append(tup)
 
@@ -1004,7 +1005,7 @@ def place_orders_on_signal(params):
     global port_holdings_dict
     global port_allocation_dict
 
-    global ticker_info_df
+    global pair_info_df
 
     global bag_max_dict
     global bag_actual_dict
@@ -1012,26 +1013,27 @@ def place_orders_on_signal(params):
 
     update_signals()  # also includes update to long and short term prices
 
-    # get desired action for ticker
-    actions_dict = determine_buy_or_sell()
+    # get desired action for pair
+    actions_dict = update_actions_dict()
 
     # want update holdings and value as near as placing new orders as possible... this cancels open orders
     update_port_holdings_and_value()
 
-    for ticker in pairs_tracked:  # ###PAUL_refractor... tickers_traded_universal
+    for pair in pairs_traded:
 
-        us_ticker = tickers_foreign_to_us_dict[ticker]
+        exchange_symbol = convert_pair(pair, in_exchange='universal', out_exchange=exchange)
+
         # place buy/sell order
-        action = actions_dict[ticker]
+        action = actions_dict[pair]
 
         # most actions should be neutral... save time by passing on other actions if neutral
         if action == 'neutural':
             continue
 
-        update_desired_bags(action, ticker)  # bag for ticker to  {0, max_bag_for_ticker} based on allocation
+        update_desired_bags(action, pair)  # bag for pair to  {0, max_bag_for_pair} based on allocation
 
-        actual_base_in_quote_value = bag_actual_dict[ticker]['base_in_quote']
-        desired_base_in_quote_value = bag_desired_dict[ticker]['base_in_quote']
+        actual_base_in_quote_value = bag_actual_dict[pair]['base_in_quote']
+        desired_base_in_quote_value = bag_desired_dict[pair]['base_in_quote']
 
         diff = desired_base_in_quote_value - actual_base_in_quote_value
 
@@ -1041,22 +1043,19 @@ def place_orders_on_signal(params):
         if -25 < diff and diff < 25:
             continue  # skips to next iteration of for loop
 
-        print('###PAUL_debug ---- diff > 25', flush=True)  ###PAUL_debug
-
         # info needed whether buying or selling
-        last_price_df_t = short_term_prices_dict[ticker].iloc[-1:]
+        last_price_df_t = short_term_prices_dict[pair].iloc[-1:]
         mid_vwap = float(last_price_df_t['mid_vwap'])
         mid_ewm = float(last_price_df_t['mid_ewm'])
 
         # need to update holdings before this selling... there is a delay,
-        # however, updating each ticker individually is too many API requests...
+        # however, updating each pair individually is too many API requests...
         # this means just catch the error on the order... yes this same problem can apply to the buys
         # need to find the specific type of error and see what happens.. lets go sell too much btc
 
         ###PAUL TODO: should add order book info on prices to this to take advantage of scan wicks
         # this means buying at the scam price if lower than the above, vise versa selling
         if diff >= 25:  # we are buying
-            print('###PAUL_debug ---- should be buying', flush=True)
             current_dollar_holdings = port_holdings_dict['USD']['free']
 
             buy_dollars = min(diff, current_dollar_holdings)  # cant buy more than i have
@@ -1072,8 +1071,7 @@ def place_orders_on_signal(params):
                 qty = buy_dollars / price * 0.98
 
         if diff <= -25:  # we are selling
-            print('###PAUL_debug ---- should be selling', flush=True)
-            baseAsset = ticker_info_df.loc[ticker]['baseAsset']
+            baseAsset = pair_info_df.loc[pair]['baseAsset']
             baseAsset_holdings = port_holdings_dict[baseAsset]['free']
             sell_dollars = min(-diff, min(mid_vwap, mid_ewm) * baseAsset_holdings)
 
@@ -1090,66 +1088,41 @@ def place_orders_on_signal(params):
         total_order_value = qty * price
 
         if total_order_value < 11:
-            print(' ----->>>>  total_order_value too small  value is: ' + str(total_order_value), flush=True)
             continue
 
-        try:
+        #         try:
 
-            order_higher_priority = False
-            order_open_for_ticker = False
-            keys_to_close = []
+        order_higher_priority, order_open_for_pair = check_opens_and_close_lower_priority_orders(B_or_S,
+                                                                                                 price,
+                                                                                                 pair)
 
-            # ###PAUL_refractor... this could (should?) be built more DRY
-            for key in order_open_dict.keys():
-                _, order_ticker = key
-                if ticker == order_ticker:
-                    print('ticker match for order', flush=True)
-                    order_open_for_ticker = True
+        ###PAUL expecting an error here. if order is filled between the time the order_open_dict is checked
+        ###PAUL this point then the attempt to close should fail... the try catch is to enable this
 
-                    old_price = float(order_open_dict[key]['price'])
-                    if B_or_S == 'buy' and price > old_price or B_or_S == 'sell' and price < old_price:
-                        print("order qualifying condition ---- " + B_or_S + '  ask was  ' + str(old_price)
-                              + '  updated to:   ' + str(price),
-                              flush=True)
-                        order_higher_priority = True
-                        keys_to_close.append(key)
+        #         except RuntimeError as e:
+        #             print('ERROR PLACING ORDER')
+        #             print('    ###PAUL it appears an order was filled between the time the closed orders were ')
+        #             print('    ###PAUL checked for and the time it was attempted to be closed')
+        #             print('    ###PAUL this is just a warning which seems to be the cleanest way to handle right now /n /n')
+        #             print(e)
+        #             print('/n /n /n')
+        #             continue  # want to continue so no order is placed as its been filled
 
-            for key in keys_to_close:
-                print('Closing order: ' + str(key), flush=True)
-                close_order(key)  # keep this here unless
-
-            print('###PAUL_debug: order_open_for_ticker:  ' + str(order_open_for_ticker) + '\n'
-                  + '  ----  order_higher_priority :' + str(order_higher_priority),
-                  flush=True)
-            ###PAUL expecting an error here. if order is filled between the time the order_open_dict is checked
-            ###PAUL this point then the attempt to close should fail... the try catch is to enable this
-
-
-        except RuntimeError as e:
-            print('ERROR PLACING ORDER', flush=True)
-            print('    ###PAUL it appears an order was filled between the time the closed orders were ', flush=True)
-            print('    ###PAUL checked for and the time it was attempted to be closed', flush=True)
-            print('    ###PAUL this is just a warning which seems to be the cleanest way to handle right now \n \n',
-                  flush=True)
-            print(e, flush=True)
-            print('\n \n \n', flush=True)
-            continue  # want to continue so no order is placed as its been filled
-
-        #         print('closing order to update to higher priority', flush=True)
+        #         print('closing order to update to higher priority')
         #         close_order(key)
 
-        # if  order_higher_priority  or no   order_open_for_ticker  then order
-        if order_higher_priority == True or order_open_for_ticker == False:
-            print('LIMIT ORDER ---- ' + B_or_S + ' - ' + str(qty) + ' - ' + ticker
-                  + ' for $' + str(price) + ' ---- port_name: ' + port_name, flush=True)
+        # if  order_higher_priority  or no   order_open_for_pair  then order
+        if order_higher_priority == True or order_open_for_pair == False:
+            print('LIMIT ORDER ---- ' + B_or_S + ' - ' + str(qty) + ' - ' + pair
+                  + ' for $' + str(price) + ' ---- port_name: ' + port_name)
             order_res = place_order(B_or_S=B_or_S,
-                                    ticker=ticker,
+                                    pair=pair,
                                     o_type='limit',
                                     base_qty=qty,
                                     price=price
                                     )
-
-            print(order_res, flush=True)
+            print('order_res:  ')
+            print(order_res)
             process_placed_order(order_res)
 
     check_for_closed_orders()  # stops tracking orders that were closed any way (filled, bot, or manual)
@@ -1158,35 +1131,35 @@ def place_orders_on_signal(params):
     update_most_recent_order_check_file(params)
 
     if iter_count % 10 == 0:
-        print('ALGOS - LIVE BOT - iter: ' + str(iter_count) + ' ---- port: ' + port_name
-              + ' ---- exchange: ' + exchange, flush=True)
+        print('ALGOS - LIVE BOT - iter: ' + str(iter_count) \
+              + ' ---- port: ' + port_name \
+              + ' ---- exchange: ' + exchange)
+
     iter_count += 1
 
     return None
 
+# def place_signal_on_orders_exception_catch():
+#     try:
+#         place_orders_on_signal(params)
+#     except Exception as e:
+#         print('/n /n ALGOS - LIVE BOT - TOP LEVEL ERROR! /n /n')
+#         print(e)
+#         print('/n /n /n')
+#         send_email(subject = 'live bot notebook failed',
+#                    message = 'the error was: ' + str(e)
+#                   )
 
-def place_signal_on_orders_exception_catch():
-    # try:
-    place_orders_on_signal(params)
-    # except Exception as e:
-    #     print('\n \n ALGOS - LIVE BOT - TOP LEVEL ERROR! \n \n', flush=True)
-    #     print(e, flush=True)
-    #     print('\n \n \n', flush=True)
-    #     send_email(subject='live bot notebook failed',
-    #                message='the error was: ' + str(e),)
-
-
-def main():
-    signal_based_order_interval = params['active_services']['ports']['sma_v1_equal_dist']['signal_based_order_interval']
-    place_orders_on_signal_task = task.LoopingCall(f=place_signal_on_orders_exception_catch)
-    place_orders_on_signal_task.start(signal_based_order_interval)
-
-    reactor.run()
-    return None
+# signal_based_order_interval = params['constants']['signal_based_order_interval']
+# place_orders_on_signal_task = task.LoopingCall(f=place_signal_on_orders_exception_catch)
+# place_orders_on_signal_task.start(signal_based_order_interval)
 
 
-# try:
-main()
-print('ALGOS ---- LIVE BOT ---- ran fully ------------------------ \n', flush=True)
-# except Exception as e:
-#     print('\n \n ALGOS - LIVE BOT - MAIN LEVEL ERROR! \n ' + str(e) + '\n \n', flush=True)
+
+
+
+# cell_split
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split  ----------------------------------------------------------------------------------------
+# cell_split

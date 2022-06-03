@@ -52,6 +52,8 @@ def convert_date_format(date, output_type):
         string_to_sec       ---- "2021-01-31 13:55:01"
         tuple_day_int       ---- (2021, 1, 31)   tuple entries may be int or str
         tuple_sec_int       ---- (2021, 1, 31, 13, 22, 59)   tuple entries may be int or str
+        timestamp           ---- ###PAUL this needs to be added
+
     """
     ### input type for first conditional, output type for second
     if isinstance(date, tuple):
@@ -594,7 +596,7 @@ def convert_trades_df_to_prices(trades, exchange='standard_trade_format'):
         exchange (str): helps tell the format
     """
 
-    if exchange == 'standard_trade_format' or exchange in ['binance_foreign', 'binance_us', 'kucoin']:
+    if exchange == 'standard_trade_format' or exchange in ['binance', 'binanceus', 'kucoin']:
         trades.index = pd.to_datetime(trades.index, unit='s')
         trades['buyer_is_maker'] = trades['buyer_is_maker'].astype('int')
         trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
@@ -682,7 +684,7 @@ def make_day_of_prices_from_day_of_trades(pair, date, exchange, params=params):
     return None
 
 
-def remake_price_files(start_date=None, end_date=None, exchange=None, params=params, ):
+def remake_price_files(start_date=None, end_date=None, exchange=None, symbol_mode='native_exchange', params=params):
     """scans the trade history directory for each pair and remakes the price file
 
     input:
@@ -703,6 +705,8 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, params=par
 
     for pair in pairs_tracked:
 
+        if symbol_mode == 'native_exchange':
+            symbol =
         # get dir of trade data for that pair
         pair_trade_dir = get_data_file_path(data_type='trade',
                                               pair=pair,

@@ -29,7 +29,7 @@
 
 ## the largest revamp is the fact that <i> config.py </i> and <i> utils.py </i> need reworking
 * I would really like to keep the utility and config file universial. 
-  * This requires putting things like binance_foreign in many function inputs 
+  * This requires putting things like binance in many function inputs 
   * but this works better, that way the functionality is in there. 
   * Say I add kucoin, the framework then exists to implement logic in existing functionality while minimizing duplicate functionality 
   * Also it lets us import configs and utils as a broad file and use them... 
@@ -42,7 +42,7 @@
 * <b> located: </b>  <i> /usr/lib/systemd/system/  </i>
 
 * general services 
-    * <i> algos_binance_foreign_trades.service </i>  ---- gets the trades
+    * <i> algos_binance_trades.service </i>  ---- gets the trades
 * # all systemd services below still need re-working  
     * <i> algo2_binance_prices.service </i> creates price feed 
     * <i> algo2_watchdog.service </i>

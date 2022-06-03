@@ -46,8 +46,8 @@ from binance.websockets import BinanceSocketManager
 START_TIME = time.time()
 params = config.params
 
-exchange = 'binance_foreign'  # exchange we are collecting data for
-script = 'data_scrape_binance_foreign.py'
+exchange = 'binance'  # exchange we are collecting data for
+script = 'data_scrape_binance.py'
 params['exchange'] = exchange
 
 lock = threading.Lock()  # locks other threads from writing to daily trade file
@@ -60,15 +60,15 @@ consecutive_error_messages = 0
 message_counter = 0  # for debug only
 
 # api keys
-api_key = params['keys']['binance_foreign_data_key_1']
-secret_key = params['keys']['binance_foreign_data_key_secret_1']
+api_key = params['keys']['binance_data_key_1']
+secret_key = params['keys']['binance_data_key_secret_1']
 
 # parameters about investment universe
 pairs_tracked = params['universe'][exchange]['pairs_tracked']
 pair_collection_list = params['universe'][exchange]['pair_collection_list']
 
 
-if exchange == 'binance_us':
+if exchange == 'binanceus':
     tld = 'us'
 else:
     tld = 'com'

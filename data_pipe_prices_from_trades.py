@@ -164,7 +164,7 @@ def main(params=params):
 
     print('---- PRICES: pipe trades to prices ----\n'*10, flush=True)
 
-    exchange = 'binance_foreign'  # shit fix because i like having a different entry for each exchange in this
+    exchange = 'binance'  # shit fix because i like having a different entry for each exchange in this
     interval = params['active_services']['prices'][exchange]['trades_to_prices_interval']
     add_prices_task = task.LoopingCall(f=add_prices_for_all_exchanges)
     add_prices_task.start(interval)

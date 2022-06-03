@@ -49,8 +49,8 @@ from ext_packages.sams_binance_api.binance.websockets_us import BinanceSocketMan
 START_TIME = time.time()
 params = config.params
 
-exchange = 'binance_us'  # exchange we are collecting data for
-script = 'data_scrape_binance_us.py'
+exchange = 'binanceus'  # exchange we are collecting data for
+script = 'data_scrape_binanceus.py'
 params['exchange'] = exchange
 
 lock = threading.Lock()  # locks other threads from writing to daily trade file
@@ -63,14 +63,14 @@ consecutive_error_messages = 0
 message_counter = 0  # for debug only
 
 # api keys
-api_key = params['keys']['binance_foreign_data_key_1']
-secret_key = params['keys']['binance_foreign_data_key_secret_1']
+api_key = params['keys']['binance_data_key_1']
+secret_key = params['keys']['binance_data_key_secret_1']
 
 # parameters about investment universe
 pairs_tracked = params['universe'][exchange]['pairs_tracked']
 pair_collection_list = params['universe'][exchange]['pair_collection_list']
 
-if exchange == 'binance_us':
+if exchange == 'binanceus':
     tld = 'us'
 else:
     tld = 'com'
@@ -369,7 +369,7 @@ def main(params=params):
 
 try:
     main()
-    print('------------   data_scrape ---- trades ---- binance_us ----- ran fully  ------------\n' * 10, flush=True)
+    print('------------   data_scrape ---- trades ---- binanceus ----- ran fully  ------------\n' * 10, flush=True)
 except Exception as e:
     print('debug spot 3', flush=True)
     exc_type, exc_value, exc_traceback = sys.exc_info()

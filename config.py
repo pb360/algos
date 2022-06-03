@@ -38,6 +38,7 @@ def reverse_dict(d):
 
     return new_dict
 
+
 # ### machine specific and local params
 #
 #
@@ -74,105 +75,103 @@ dirs = {'algos_dir': algos_dir,  # this is where the the algos directory is loca
 #
 universe = dict()
 
-universe_binance_foreign = {'exchange': 'binance_foreign',
+universe_binance = {'exchange': 'binance',
 
-                            # all tickers tracked as a base asset in at least one pair on this exchange
-                            'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
+                    # all tickers tracked as a base asset in at least one pair on this exchange
+                    'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
 
-                            # websocket communication for exchange... this is how requests are sent
-                            'pair_collection_list': ['adausdt@trade', 'adabtc@trade',
-                                                     'bnbusdt@trade', 'bnbbtc@trade',
-                                                     'btcusdt@trade',
-                                                     'dogeusdt@trade', 'dogebtc@trade',
-                                                     'ethusdt@trade', 'ethbtc@trade',
-                                                     'linkusdt@trade', 'linkbtc@trade',
-                                                     'ltcusdt@trade', 'ltcbtc@trade',
-                                                     'xlmusdt@trade', 'xlmbtc@trade',
-                                                     'xrpusdt@trade', 'xrpbtc@trade',
-                                                     'xtzusdt@trade', 'xtzbtc@trade', 'xtzeth@trade',
-                                                     ],
+                    # websocket communication for exchange... this is how requests are sent
+                    'pair_collection_list': ['adausdt@trade', 'adabtc@trade',
+                                             'bnbusdt@trade', 'bnbbtc@trade',
+                                             'btcusdt@trade',
+                                             'dogeusdt@trade', 'dogebtc@trade',
+                                             'ethusdt@trade', 'ethbtc@trade',
+                                             'linkusdt@trade', 'linkbtc@trade',
+                                             'ltcusdt@trade', 'ltcbtc@trade',
+                                             'xlmusdt@trade', 'xlmbtc@trade',
+                                             'xrpusdt@trade', 'xrpbtc@trade',
+                                             'xtzusdt@trade', 'xtzbtc@trade', 'xtzeth@trade',
+                                             ],
 
-                            # trade communication for exchange... this string is what is sent for trade requests
-                            'pairs_tracked': ['ADAUSDT', 'ADABTC',
-                                                'BNBUSDT', 'BNBBTC',
-                                                'BTCUSDT',
-                                                'DOGEUSDT', 'DOGEBTC',
-                                                'ETHUSDT', 'ETHBTC',
-                                                'LINKUSDT', 'LINKBTC',
-                                                'LTCUSDT', 'LTCBTC',
-                                                'XLMUSDT', 'XLMBTC',
-                                                'XRPUSDT', 'XRPBTC',
-                                                'XTZUSDT', 'XTZBTC', 'XTZETH',
-                                                ],
+                    # trade communication for exchange... this string is what is sent for trade requests
+                    'pairs_tracked': ['ADAUSDT', 'ADABTC',
+                                      'BNBUSDT', 'BNBBTC',
+                                      'BTCUSDT',
+                                      'DOGEUSDT', 'DOGEBTC',
+                                      'ETHUSDT', 'ETHBTC',
+                                      'LINKUSDT', 'LINKBTC',
+                                      'LTCUSDT', 'LTCBTC',
+                                      'XLMUSDT', 'XLMBTC',
+                                      'XRPUSDT', 'XRPBTC',
+                                      'XTZUSDT', 'XTZBTC', 'XTZETH',
+                                      ],
 
+                    # how to convert the pair in exchange format to universal
+                    'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDT', 'ADABTC': 'ADA-BTC',
+                                                   'BNBUSDT': 'BNB-USDT', 'BNBBTC': 'BNB-BTC',
+                                                   'BTCUSDT': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
+                                                   'DOGEUSDT': 'DOGE-USDT', 'DOGEBTC': 'DOGE-BTC',
+                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
+                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
+                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
+                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
+                                                   'LINKUSDT': 'LINK-USDT', 'LINKBTC': 'LINK-BTC',
+                                                   'LTCUSDT': 'LTC-USDT', 'LTCBTC': 'LTC-BTC',
+                                                   'XLMUSDT': 'XLM-USDT', 'XLMBTC': 'XLM-BTC',
+                                                   'XRPUSDT': 'XRP-USDT', 'XRPBTC': 'XRP-BTC',
+                                                   'XTZUSDT': 'XTZ-USDT', 'XTZBTC': 'XTZ-BTC',
+                                                   'XTZETH': 'XTZ-ETH',
+                                                   },
+                                     },
+                    }
 
-                            # how to convert the pair in exchange format to universal
-                            'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDT', 'ADABTC': 'ADA-BTC',
-                                                           'BNBUSDT': 'BNB-USDT', 'BNBBTC': 'BNB-BTC',
-                                                           'BTCUSDT': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
-                                                           'DOGEUSDT': 'DOGE-USDT', 'DOGEBTC': 'DOGE-BTC',
-                                                           'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                           'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                           'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                           'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                           'LINKUSDT': 'LINK-USDT', 'LINKBTC': 'LINK-BTC',
-                                                           'LTCUSDT': 'LTC-USDT', 'LTCBTC': 'LTC-BTC',
-                                                           'XLMUSDT': 'XLM-USDT', 'XLMBTC': 'XLM-BTC',
-                                                           'XRPUSDT': 'XRP-USDT', 'XRPBTC': 'XRP-BTC',
-                                                           'XTZUSDT': 'XTZ-USDT', 'XTZBTC': 'XTZ-BTC',
-                                                           'XTZETH': 'XTZ-ETH',
-                                                           },
-                                             },
-                            }
+universe_binanceus = {'exchange': 'binanceus',
 
-universe_binance_us = {'exchange': 'binance_us',
+                      # all tickers tracked as a base asset in at least one pair on this exchange
+                      'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
 
-                       # all tickers tracked as a base asset in at least one pair on this exchange
-                       'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
+                      # how they are fed into the websocket function (as is)
+                      'pair_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
+                                               'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
+                                               'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
+                                               'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
+                                               'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
+                                               'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
+                                               'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
+                                               'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
+                                               'xtzbtc@trade', 'xtzusd@trade',
+                                               ],
 
-                       # how they are fed into the websocket function (as is)
-                       'pair_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
-                                                'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
-                                                'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
-                                                'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
-                                                'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
-                                                'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
-                                                'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
-                                                'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                                'xtzbtc@trade', 'xtzusd@trade',
-                                                ],
+                      # trade communication for exchange... this string is what is sent for trade requests
+                      'pairs_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
+                                        'BNBUSDT', 'BNBBTC', 'BNBUSD',
+                                        'BTCUSDT', 'BTCUSD',
+                                        'DOGEUSDT', 'DOGEUSD',
+                                        'ETHUSDT', 'ETHBTC', 'ETHUSD',
+                                        'LINKUSDT', 'LINKBTC', 'LINKUSD',
+                                        'LTCUSDT', 'LTCBTC', 'LTCUSD',
+                                        'XLMUSDT', 'XLMUSD',
+                                        'XTZBTC', 'XTZUSD',
+                                        ],
 
-                       # trade communication for exchange... this string is what is sent for trade requests
-                       'pairs_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
-                                           'BNBUSDT', 'BNBBTC', 'BNBUSD',
-                                           'BTCUSDT', 'BTCUSD',
-                                           'DOGEUSDT', 'DOGEUSD',
-                                           'ETHUSDT', 'ETHBTC', 'ETHUSD',
-                                           'LINKUSDT', 'LINKBTC', 'LINKUSD',
-                                           'LTCUSDT', 'LTCBTC', 'LTCUSD',
-                                           'XLMUSDT', 'XLMUSD',
-                                           'XTZBTC', 'XTZUSD',
-                                           ],
-
-
-                       # how to convert the pair in exchange format to universal
-                       'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDTether', 'ADABTC': 'ADA-BTC',
-                                                      'ADAUSD': 'ADA-USDT',
-                                                      'BNBUSDT': 'BNB-USDTether', 'BNBBTC': 'BNB-BTC',
-                                                      'BNBUSD': 'BNB-USDT',
-                                                      'BTCUSDT': 'BTC-USDTether', 'BTCUSD': 'BTC-USDT',
-                                                      'DOGEUSDT': 'DOGE-USDTether', 'DOGEUSD': 'DOGE-USDT',
-                                                      'ETHUSDT': 'ETH-USDTether', 'ETHBTC': 'ETH-BTC',
-                                                      'ETHUSD': 'ETH-USDT',
-                                                      'LINKUSDT': 'LINK-USDTether', 'LINKBTC': 'LINK-BTC',
-                                                      'LINKUSD': 'LINK-USDT',
-                                                      'LTCUSDT': 'LTC-USDTether', 'LTCBTC': 'LTC-BTC',
-                                                      'LTCUSD': 'LTC-USDT',
-                                                      'XLMUSDT': 'XLM-USDTether', 'XLMUSD': 'XLM-USDT',
-                                                      'XTZBTC': 'XTZ-BTC', 'XTZUSD': 'XTZ-USDT',
-                                                      },
-                                        },
-                       }
+                      # how to convert the pair in exchange format to universal
+                      'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDTether', 'ADABTC': 'ADA-BTC',
+                                                     'ADAUSD': 'ADA-USDT',
+                                                     'BNBUSDT': 'BNB-USDTether', 'BNBBTC': 'BNB-BTC',
+                                                     'BNBUSD': 'BNB-USDT',
+                                                     'BTCUSDT': 'BTC-USDTether', 'BTCUSD': 'BTC-USDT',
+                                                     'DOGEUSDT': 'DOGE-USDTether', 'DOGEUSD': 'DOGE-USDT',
+                                                     'ETHUSDT': 'ETH-USDTether', 'ETHBTC': 'ETH-BTC',
+                                                     'ETHUSD': 'ETH-USDT',
+                                                     'LINKUSDT': 'LINK-USDTether', 'LINKBTC': 'LINK-BTC',
+                                                     'LINKUSD': 'LINK-USDT',
+                                                     'LTCUSDT': 'LTC-USDTether', 'LTCBTC': 'LTC-BTC',
+                                                     'LTCUSD': 'LTC-USDT',
+                                                     'XLMUSDT': 'XLM-USDTether', 'XLMUSD': 'XLM-USDT',
+                                                     'XTZBTC': 'XTZ-BTC', 'XTZUSD': 'XTZ-USDT',
+                                                     },
+                                       },
+                      }
 
 universe_kucoin = {'exchange': 'kucoin',
 
@@ -191,11 +190,10 @@ universe_kucoin = {'exchange': 'kucoin',
                    # trade communication for exchange... this string is what is sent for trade requests
                    # identical list as  pair_collection_list  above (for kucoin unlike binance)
                    'pairs_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
-                                       'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
-                                       'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
-                                       'XTZ-USDT',
-                                       ],
-
+                                     'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
+                                     'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
+                                     'XTZ-USDT',
+                                     ],
 
                    # how to convert the pair in exchange format to universal
                    'convert_dict': {'universal': {'BTC-USDT': 'BTC-USDT', 'DAG-USDT': 'DAG-USDT',
@@ -218,19 +216,19 @@ universe_kucoin = {'exchange': 'kucoin',
 # ### the reverse dictionary flipping keys and values... this minimizes errors as only 1 conversion dict per exchange
 #
 #
-universal = {'from_universal': {'binance_foreign':  reverse_dict(universe_binance_foreign['convert_dict']['universal']),
-                              'binance_us': reverse_dict(universe_binance_us['convert_dict']['universal']),
-                              'kucoin': reverse_dict(universe_kucoin['convert_dict']['universal']),
-                              },
-             'to_universal': {'binance_foreign': deepcopy(universe_binance_foreign['convert_dict']['universal']),
-                              'binance_us': deepcopy(universe_binance_us['convert_dict']['universal']),
+universal = {'from_universal': {'binance': reverse_dict(universe_binance['convert_dict']['universal']),
+                                'binanceus': reverse_dict(universe_binanceus['convert_dict']['universal']),
+                                'kucoin': reverse_dict(universe_kucoin['convert_dict']['universal']),
+                                },
+             'to_universal': {'binance': deepcopy(universe_binance['convert_dict']['universal']),
+                              'binanceus': deepcopy(universe_binanceus['convert_dict']['universal']),
                               'kucoin': deepcopy(universe_kucoin['convert_dict']['universal']),
                               },
              }
 
 universe['universal'] = universal
-universe['binance_foreign'] = universe_binance_foreign
-universe['binance_us'] = universe_binance_us
+universe['binance'] = universe_binance
+universe['binanceus'] = universe_binanceus
 universe['kucoin'] = universe_kucoin
 
 # ### data format ---- for pretty much everything in the repo
@@ -239,7 +237,7 @@ universe['kucoin'] = universe_kucoin
 data_format = dict()
 
 # data format for
-data_format_binance_foreign = {
+data_format_binance = {
     'websocket_trade_columns': {'e': 'event_type',
                                 'E': 'msg_time',
                                 's': 'ticker',
@@ -338,7 +336,7 @@ data_format_binance_foreign = {
 }
 
 # ###PAUL just a copy paster from binance foreign, needs editing
-data_format_binance_us = {
+data_format_binanceus = {
     'websocket_trade_columns': {'e': 'event_type',
                                 'E': 'msg_time',
                                 's': 'ticker',
@@ -435,7 +433,6 @@ data_format_binance_us = {
                                 'marketStepSize': float  # min increment of BASE market order
                                 },
 }
-
 
 data_format_kucoin = {
     'websocket_trade_columns': {'type': 'event_type',
@@ -537,8 +534,8 @@ data_format_kucoin = {
 }  ###PAUL just a copy paster from binance foreign, needs editing
 ###PAUL just a copy paster from binance foreign, needs editing
 
-data_format['binance_foreign'] = data_format_binance_foreign
-data_format['binance_us'] = data_format_binance_us
+data_format['binance'] = data_format_binance
+data_format['binanceus'] = data_format_binanceus
 data_format['kucoin'] = data_format_kucoin
 
 # ### initialize ---- parameters and create the dictionary
