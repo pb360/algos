@@ -319,7 +319,7 @@ data_format_binance_foreign = {
                                     'stepSize', 'minNotional', 'marketMinQty', 'marketMaxQty', 'marketStepSize',
                                     ],
 
-    'order_filters_name_type': {'exchange_ticker': str,  # us  corresponding to pairs_tracked
+    'order_filters_name_type': {'exchange_symbol': str,  # us  corresponding to pairs_tracked
                                 'baseAsset': str,  # 'BTC' in 'BTCUSDT'
                                 'baseAssetPrecision': int,  # num of decimals for base
                                 'quoteAsset': str,  # 'USD' in 'BTCUSD'
@@ -418,7 +418,7 @@ data_format_binance_us = {
                                     'stepSize', 'minNotional', 'marketMinQty', 'marketMaxQty', 'marketStepSize',
                                     ],
 
-    'order_filters_name_type': {'exchange_ticker': str,  # us  corresponding to ticker_tracked
+    'order_filters_name_type': {'exchange_symbol': str,  # us  corresponding to ticker_tracked
                                 'baseAsset': str,  # 'BTC' in 'BTCUSDT'
                                 'baseAssetPrecision': int,  # num of decimals for base
                                 'quoteAsset': str,  # 'USD' in 'BTCUSD'

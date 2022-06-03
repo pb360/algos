@@ -728,7 +728,7 @@ def make_order_observation_csv_line(orderId, order_info_dict):
     """
 
     new_live_order_line = str(orderId) + ',' \
-                          + str(order_info_dict['ticker']) + ',' \
+                          + str(order_info_dict['symbol']) + ',' \
                           + str(order_info_dict['clientOrderId']) + ',' \
                           + str(order_info_dict['placedTime']) + ',' \
                           + str(order_info_dict['price']) + ',' \
@@ -762,7 +762,7 @@ def process_placed_order(placed_order_res):
 
     order_info_dict = dict()
 
-    order_info_dict['ticker'] = foreign_ticker  # ###PAUL_refractor
+    order_info_dict['symbol'] = foreign_ticker  # ###PAUL_refractor
     # order_info_dict['orderId']              = placed_order_res['orderId'] # put lower for dictionary return
     order_info_dict['clientOrderId'] = placed_order_res['clientOrderId']
     order_info_dict['placedTime'] = placed_order_res['transactTime']
@@ -900,7 +900,7 @@ def remove_order_from_open_tracking(tuple_key):
     orderId, foreign_ticker = tuple_key
 
     order_info_dict = order_open_dict[(orderId, foreign_ticker)]
-    ticker_us = order_info_dict['ticker']
+    ticker_us = order_info_dict['symbol']
 
     # ### remove order from open order tracking file
     #
