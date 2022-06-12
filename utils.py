@@ -255,22 +255,21 @@ def make_date_suffix(date, file_type='.csv'):
     return suffix
 
 
-def convert_pair(pair, in_exchange, out_exchange, params=params):
+def convert_symbol(symbol, in_exchange, out_exchange, params=params):
     # try:
-
 
     if out_exchange == 'universal':
         if in_exchange == 'universal':
             print('asking to convert pair from universal to universal')
             raise SyntaxWarning
         else:
-            return params['universe']['universal']['to_universal'][in_exchange][pair]
+            return params['universe']['universal']['to_universal'][in_exchange][symbol]
 
     if out_exchange != 'universal':
         if in_exchange == 'universal':
-            universal_pair = pair
+            universal_pair = symbol
         else:
-            universal_pair = params['universe']['universal']['to_universal'][in_exchange][pair]
+            universal_pair = params['universe']['universal']['to_universal'][in_exchange][symbol]
 
         try:
             return params['universe']['universal']['from_universal'][out_exchange][universal_pair]
@@ -303,7 +302,7 @@ def get_data_file_path(data_type, pair, date='live', port=None, exchange=None, p
     if pair_mode == 'asis':  # pair given in exchange's format
         pass
     elif pair_mode == 'universal':
-        pair = convert_pair(pair, in_exchange='universal', out_exchange=exchange, params=params)
+        pair = convert_symbol(pair, in_exchange='universal', out_exchange=exchange, params=params)
 
     fp = None
 
@@ -679,6 +678,7 @@ def make_day_of_prices_from_day_of_trades(pair, date, exchange, params=params):
     trades = get_data(data_type='trade', pair=pair, date=date, exchange=exchange)
     prices = convert_trades_df_to_prices(trades)
     prices_fp = get_data_file_path(data_type='prices', pair=pair, date=date, exchange=exchange)
+    check_if_dir_exists_and_make(fp=prices_fp)
     prices.to_csv(prices_fp)
 
     return None
@@ -693,8 +693,8 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, symbol_mod
         end_date (tuple): latest date to make prices for (inclusive)... other formats may work
     """
 
-    tick_and_date_errored = []
-    pairs_tracked = params['universe'][exchange]['pairs_tracked']
+    symbol_and_date_errored = []
+    symbols_tracked = params['universe'][exchange]['symbols_tracked']
 
     # try converting the start_date and end_date
     if start_date is not None:
@@ -703,17 +703,19 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, symbol_mod
     if end_date is not None:
         end_date = convert_date_format(end_date, 'datetime.date')
 
-    for pair in pairs_tracked:
+    for symbol in symbols_tracked:
 
         if symbol_mode == 'native_exchange':
-            symbol =
+            symbol = convert_symbol(symbol=symbol, in_exchange=exchange, out_exchange='universal')
+
         # get dir of trade data for that pair
-        pair_trade_dir = get_data_file_path(data_type='trade',
-                                              pair=pair,
+        daily_trade_exchange_symbol_level_dir = get_data_file_path(data_type='trade',
+                                              pair=symbol,
                                               date='pair_folder',
                                               exchange=exchange,
                                               params=params, )
-        trs = os.listdir(pair_trade_dir)
+
+        trs = os.listdir(daily_trade_exchange_symbol_level_dir)
 
         # identify dates with trading data`
         re_date_str = "([0-9]{4}\-[0-9]{2}\-[0-9]{2})"
@@ -748,14 +750,15 @@ def remake_price_files(start_date=None, end_date=None, exchange=None, symbol_mod
 
             try:
                 if make_pair_date_prices:
-                    print('MAKING:     pair:  ' + pair + '  date: ' + date + '  exchange: ' + exchange, flush=True)
-                    make_day_of_prices_from_day_of_trades(pair, file_date_tup, exchange)
+                    make_day_of_prices_from_day_of_trades(symbol, file_date_tup, exchange)
+                    print('MADE:     pair:  ' + symbol + '  date: ' + date + '  exchange: ' + exchange, flush=True)
 
             except:
                 print("  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n ", flush=True)
-                tick_and_date_errored.append((pair, date))
+                print('errored on:   pair:  ' + symbol + '  date: ' + date + '  exchange: ' + exchange, flush=True)
+                symbol_and_date_errored.append((symbol, date))
 
-    return tick_and_date_errored
+    return symbol_and_date_errored
 
 
 def find_runs(x):
@@ -878,10 +881,17 @@ def round_decimals_down(number: float, decimals: int = 2):
     return math.floor(number * factor) / factor
 
 
-def check_if_dir_exists_and_make(dir):
+def check_if_dir_exists_and_make(dir=None, fp=None):
+
     # check if directory heading to file exists, if not make all required on the way
-    if os.path.isdir(dir) == False:
-        os.makedirs(dir)
+    if dir is not None:
+        if os.path.isdir(dir) == False:
+            os.makedirs(dir)
+
+    if fp is not None:
+        fp_dirname = os.path.dirname(fp)
+        if os.path.isdir(fp_dirname) == False:
+            os.makedirs(fp_dirname)
 
     return None
 

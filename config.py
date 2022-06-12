@@ -94,7 +94,7 @@ universe_binance = {'exchange': 'binance',
                                              ],
 
                     # trade communication for exchange... this string is what is sent for trade requests
-                    'pairs_tracked': ['ADAUSDT', 'ADABTC',
+                    'symbols_tracked': ['ADAUSDT', 'ADABTC',
                                       'BNBUSDT', 'BNBBTC',
                                       'BTCUSDT',
                                       'DOGEUSDT', 'DOGEBTC',
@@ -143,7 +143,7 @@ universe_binanceus = {'exchange': 'binanceus',
                                                ],
 
                       # trade communication for exchange... this string is what is sent for trade requests
-                      'pairs_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
+                      'symbols_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
                                         'BNBUSDT', 'BNBBTC', 'BNBUSD',
                                         'BTCUSDT', 'BTCUSD',
                                         'DOGEUSDT', 'DOGEUSD',
@@ -189,7 +189,7 @@ universe_kucoin = {'exchange': 'kucoin',
 
                    # trade communication for exchange... this string is what is sent for trade requests
                    # identical list as  pair_collection_list  above (for kucoin unlike binance)
-                   'pairs_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
+                   'symbols_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
                                      'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
                                      'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
                                      'XTZ-USDT',
@@ -312,26 +312,21 @@ data_format_binance = {
                             'updateTime': int
                             },
 
-    'order_filters_col_name_list': ['ticker', 'ticker_us', 'baseAsset', 'baseAssetPrecision', 'quoteAsset',
-                                    'quoteAssetPrecision', 'minPrice', 'maxPrice', 'tickSize', 'minQty', 'maxQty',
-                                    'stepSize', 'minNotional', 'marketMinQty', 'marketMaxQty', 'marketStepSize',
-                                    ],
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
 
-    'order_filters_name_type': {'exchange_symbol': str,  # us  corresponding to pairs_tracked
-                                'baseAsset': str,  # 'BTC' in 'BTCUSDT'
-                                'baseAssetPrecision': int,  # num of decimals for base
-                                'quoteAsset': str,  # 'USD' in 'BTCUSD'
-                                'quoteAssetPrecision': int,  # num of decimals for quote
-                                'minPrice': float,  # min price for BASE in QUOTE
-                                'maxPrice': float,  # max price for BASE asset in QUOTE
-                                'tickSize': float,  # min price increment for QUOTE
-                                'minQty': float,  # min order of BASE asset allowed
-                                'maxQty': float,  # max order of BASE asset allowed
-                                'stepSize': float,  # min increment of BASE asset allowed
-                                'minNotional': float,  # min order in terms of QUOTE asset
-                                'marketMinQty': float,  # min BASE asset for market order
-                                'marketMaxQty': float,  # max BASE asset for market order
-                                'marketStepSize': float  # min increment of BASE market order
+
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': int,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': int,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
                                 },
 }
 
@@ -411,26 +406,20 @@ data_format_binanceus = {
                             'updateTime': int
                             },
 
-    'order_filters_col_name_list': ['ticker', 'ticker_us', 'baseAsset', 'baseAssetPrecision', 'quoteAsset',
-                                    'quoteAssetPrecision', 'minPrice', 'maxPrice', 'tickSize', 'minQty', 'maxQty',
-                                    'stepSize', 'minNotional', 'marketMinQty', 'marketMaxQty', 'marketStepSize',
-                                    ],
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
 
-    'order_filters_name_type': {'exchange_symbol': str,  # us  corresponding to ticker_tracked
-                                'baseAsset': str,  # 'BTC' in 'BTCUSDT'
-                                'baseAssetPrecision': int,  # num of decimals for base
-                                'quoteAsset': str,  # 'USD' in 'BTCUSD'
-                                'quoteAssetPrecision': int,  # num of decimals for quote
-                                'minPrice': float,  # min price for BASE in QUOTE
-                                'maxPrice': float,  # max price for BASE asset in QUOTE
-                                'tickSize': float,  # min price increment for QUOTE
-                                'minQty': float,  # min order of BASE asset allowed
-                                'maxQty': float,  # max order of BASE asset allowed
-                                'stepSize': float,  # min increment of BASE asset allowed
-                                'minNotional': float,  # min order in terms of QUOTE asset
-                                'marketMinQty': float,  # min BASE asset for market order
-                                'marketMaxQty': float,  # max BASE asset for market order
-                                'marketStepSize': float  # min increment of BASE market order
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': int,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': int,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
                                 },
 }
 
@@ -508,28 +497,20 @@ data_format_kucoin = {
                             'updateTime': int
                             },
 
-    # ###PAUL_todo TODO order managment for kucoin
-    'order_filters_col_name_list': ['ticker', 'ticker_us', 'baseAsset', 'baseAssetPrecision', 'quoteAsset',
-                                    'quoteAssetPrecision', 'minPrice', 'maxPrice', 'tickSize', 'minQty', 'maxQty',
-                                    'stepSize', 'minNotional', 'marketMinQty', 'marketMaxQty', 'marketStepSize',
-                                    ],
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
 
-    # ###PAUL_todo TODO order managment for kucoin
-    'order_filters_name_type': {'ticker_us': str,  # us  corresponding to ticker_tracked
-                                'baseAsset': str,  # 'BTC' in 'BTCUSDT'
-                                'baseAssetPrecision': int,  # num of decimals for base
-                                'quoteAsset': str,  # 'USD' in 'BTCUSD'
-                                'quoteAssetPrecision': int,  # num of decimals for quote
-                                'minPrice': float,  # min price for BASE in QUOTE
-                                'maxPrice': float,  # max price for BASE asset in QUOTE
-                                'tickSize': float,  # min price increment for QUOTE
-                                'minQty': float,  # min order of BASE asset allowed
-                                'maxQty': float,  # max order of BASE asset allowed
-                                'stepSize': float,  # min increment of BASE asset allowed
-                                'minNotional': float,  # min order in terms of QUOTE asset
-                                'marketMinQty': float,  # min BASE asset for market order
-                                'marketMaxQty': float,  # max BASE asset for market order
-                                'marketStepSize': float  # min increment of BASE market order
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': int,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': int,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
                                 },
 }  ###PAUL just a copy paster from binance foreign, needs editing
 ###PAUL just a copy paster from binance foreign, needs editing

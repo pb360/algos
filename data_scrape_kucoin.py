@@ -7,7 +7,7 @@
 """
 This script creates a websocket connection to binance and listens and records all trades for relevant pairs
 on or around 2/20/2022 the repo was migrated from algo2 --> algos allowing for easier data collection
-the data for 'pairs_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
+the data for 'symbols_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
  'ETHBTC', 'LINKUSDT', 'LINKBTC', 'LTCUSDT', 'LTCBTC', 'XLMUSDT', 'XRPUSDT', 'XRPBTC', ] goes back much earlier
 
 
@@ -69,7 +69,7 @@ consecutive_error_messages = 0
 message_counter = 0  # for debug only
 
 # parameters about investment universe
-pairs_tracked = params['universe'][exchange]['pairs_tracked']
+symbols_tracked = params['universe'][exchange]['symbols_tracked']
 pair_collection_list = params['universe'][exchange]['pair_collection_list']
 
 
@@ -231,11 +231,11 @@ async def trim_live_files(params=params):
 
     # variable definitions
     global exchange
-    global pairs_tracked
+    global symbols_tracked
 
     trade_col_names = params['data_format'][exchange]['trade_col_name_list']
 
-    for pair in pairs_tracked:
+    for pair in symbols_tracked:
         lock.acquire()
         live_fp = get_data_file_path(data_type='trade', pair=pair, date='live', exchange=exchange)
 

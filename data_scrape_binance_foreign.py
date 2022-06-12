@@ -7,7 +7,7 @@
 """
 This script creates a websocket connection to binance and listens and records all trades for relevant pairs
 on or around 2/20/2022 the repo was migrated from algo2 --> algos allowing for easier data collection
-the data for 'pairs_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
+the data for 'symbols_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
  'ETHBTC', 'LINKUSDT', 'LINKBTC', 'LTCUSDT', 'LTCBTC', 'XLMUSDT', 'XRPUSDT', 'XRPBTC', ] goes back much earlier
 
 
@@ -33,7 +33,7 @@ from twisted.internet import task, reactor
 #
 #
 import config
-from utils import send_email, get_data_file_path, convert_date_format, convert_pair
+from utils import send_email, get_data_file_path, convert_date_format, convert_symbol
 
 # needed to let the package to see itself for interior self imports
 sys.path.append('/mnt/algos/ext_packages/sams_binance_api')
@@ -64,7 +64,7 @@ api_key = params['keys']['binance_data_key_1']
 secret_key = params['keys']['binance_data_key_secret_1']
 
 # parameters about investment universe
-pairs_tracked = params['universe'][exchange]['pairs_tracked']
+symbols_tracked = params['universe'][exchange]['symbols_tracked']
 pair_collection_list = params['universe'][exchange]['pair_collection_list']
 
 
@@ -195,7 +195,7 @@ def process_message(msg):
 
         # get trade info from message
         pair = trade_info['s']
-        pair = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
+        pair = convert_symbol(pair, in_exchange=exchange, out_exchange='universal')
 
         new_line = make_new_trade_observation_for_trade_file(trade_info, pair)
 
@@ -235,12 +235,12 @@ def trim_live_files(params=params):
 
     # variable definitions
     global exchange
-    global pairs_tracked
+    global symbols_tracked
 
     trade_col_names = params['data_format'][exchange]['trade_col_name_list']
 
-    for pair in pairs_tracked:
-        pair = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
+    for pair in symbols_tracked:
+        pair = convert_symbol(pair, in_exchange=exchange, out_exchange='universal')
 
         lock.acquire()
         live_fp = get_data_file_path(data_type='trade', pair=pair, date='live', exchange=exchange)

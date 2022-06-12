@@ -120,7 +120,7 @@ def add_prices_to_all_pairs(exchange):
     ST = time.perf_counter()
 
     # investment universe from params
-    pairs_tracked = params['universe'][exchange]['pairs_tracked']
+    symbols_tracked = params['universe'][exchange]['symbols_tracked']
 
 
 
@@ -131,8 +131,8 @@ def add_prices_to_all_pairs(exchange):
 
 
 
-    for pair in pairs_tracked:
-        pair = convert_pair(pair, in_exchange=exchange, out_exchange='universal')
+    for pair in symbols_tracked:
+        pair = convert_symbol(pair, in_exchange=exchange, out_exchange='universal')
         add_prices_from_live_trade_data(pair, exchange)
 
     ET = time.perf_counter()
