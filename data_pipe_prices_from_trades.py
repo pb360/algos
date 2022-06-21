@@ -23,6 +23,7 @@ from utils import *  # import utils first for time zone considerations
 START_TIME = time.time()
 params = config.params
 
+exchange_pair_error_dict = {}  # if we error too many times on the same pair in a row send email
 
 def check_if_head_dir_if_no_make_path(fp):
     """if /path/to/ doesn't exist in /whole/ for fp='whole/path/to/file.txt' it makes /path/ and /to/ folders
@@ -40,9 +41,12 @@ def add_prices_from_live_trade_data(pair, exchange):
     """checkes the live trade file and will append trades to days file
     """
 
-    trades = get_live_trades_data(pair, exchange)
-
-
+    try:
+        trades = get_live_trades_data(pair, exchange)
+    except FileNotFoundError:
+        print(('LIVE TRADE FILE NOT FOUND FOR -- exchange: ' + exchange + ' -- pair: ' + pair)*3)
+        print('happens for pairs recently added to tracking, should resolve itself if trades come in')
+        return None
 
     # if there are no trades for pair's live file skip for this round (else it errors)
     if trades.shape[0] == 0:
@@ -60,8 +64,6 @@ def add_prices_from_live_trade_data(pair, exchange):
 
     if os.path.isfile(price_fp):
         last_line = get_last_line_of_file(price_fp)
-
-
 
         latest_time_price_written = last_line[:19]  # date will always be 19 characters...
 
@@ -122,14 +124,7 @@ def add_prices_to_all_pairs(exchange):
     # investment universe from params
     symbols_tracked = params['universe'][exchange]['symbols_tracked']
 
-
-
-
-
     # import pdb; pdb.set_trace()
-
-
-
 
     for pair in symbols_tracked:
         pair = convert_symbol(pair, in_exchange=exchange, out_exchange='universal')

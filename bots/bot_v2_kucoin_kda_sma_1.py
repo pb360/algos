@@ -1,7 +1,8 @@
+#!/home/paul/miniconda3/envs/algos/bin/python3 -u
 # ### imports
 #
 #
-
+print(20*'----starting script ----\n')
 # ### time zone change... this must happen first and utils must be imported first
 import os
 import time
@@ -13,10 +14,12 @@ time.tzset()
 import ccxt
 import pandas as pd
 from twisted.internet import task, reactor  # always keep, swich back and forth between using this
+import sys
 
 # local imports
 #
 #
+sys.path.append('/mnt/algos/')
 import config
 
 params = config.params
@@ -26,6 +29,7 @@ from utils import *
 START_TIME = time.time()
 this_scripts_process_ID = os.getpid()
 
+
 # ### user input variables
 #
 #
@@ -33,30 +37,19 @@ diff_thresh = 11  # min volume in $ (should be liq...) for order to be placed
 mins_short_term_price = 25  # how much of short term prices to keep
 
 # ### portfolio specific information
-port_name = 'sma_v2_even_BTC_LINK_KDA'
+
+
+port_name = 'kucoin_kda_sma_1'
 exchange = 'kucoin'
 data_exchange = 'kucoin'
 
+account_name = 'algostrading0'
+
 # all pairs to be considered in portfolio... in universal symbol format
-pairs_traded = ['BTC-USDT', 'KDA-USDT', 'LINK-USDT']
+pairs_traded = ['KDA-USDT']
 
-# ### API things
-api_key = params['keys']['kucoin']['algostrading0123456789']['trade_1']['key']
-secret_key = params['keys']['kucoin']['algostrading0123456789']['trade_1']['secret']
-kucoin_passphrase = params['keys']['kucoin']['algostrading0123456789']['trade_1']['passphrase']
-
-# ###PAUL probably want this to be based off exchange
-if exchange == 'kucoin':
-    client = ccxt.kucoin({'apiKey': api_key,
-                          'secret': secret_key,
-                          'password': kucoin_passphrase})
-
-if exchange == 'binance':
-    client = ccxt.binance({'apiKey': api_key, 'secret': secret_key})
-
-if exchange == 'binanceus':
-    client = ccxt.binanceus({'apiKey': api_key, 'secret': secret_key})
-
+short_term_sma_len = 3400 * 4
+long_term_sma_len = 3400 * 24
 
 # # ### for systemd deployment only
 # #
@@ -64,6 +57,34 @@ if exchange == 'binanceus':
 # assert(exchange in params['systemd_control']['active_exchanges'])
 # assert(port_name in params['systemd_control']['active_ports'])
 
+
+#
+#
+# ### END user input
+# ###
+# ### API things
+api_key = params['keys'][exchange][account_name]['trade_1']['key']
+secret_key = params['keys'][exchange][account_name]['trade_1']['secret']
+kucoin_passphrase = params['keys'][exchange][account_name]['trade_1']['passphrase']
+
+
+# ### create connection client
+#
+#
+if exchange == 'kucoin':
+    client = ccxt.kucoin({'apiKey': api_key,
+                          'secret': secret_key,
+                          'password': kucoin_passphrase})
+
+elif exchange == 'binance':
+    client = ccxt.binance({'apiKey': api_key, 'secret': secret_key})
+
+elif exchange == 'binanceus':
+    client = ccxt.binanceus({'apiKey': api_key, 'secret': secret_key})
+
+else:
+    print('exchange not supported')
+    raise ValueError
 
 # ### Global Variables
 #
@@ -75,7 +96,7 @@ iter_count = 0  # counter for decision cycles  i.e.   place_order_on_signals()
 # params['port_name'] = port_name  # ###PAUL no need to put this here... for now leave out and remove if can
 op_sys = params['constants']['os']
 
-# ### utility constants... these should be constant on a exchange basis (for crypto)
+# ### utility constants... these should be constant on an exchange basis (for crypto)
 prices_dtype_dict = params['data_format'][exchange]['price_name_and_type']
 order_filters_names_type_dict = params['data_format'][exchange]['order_filters_name_type']
 
@@ -401,8 +422,9 @@ def update_signals(params=params):
     for pair in pairs_traded:
         prices = prices_dfs_dict[pair]
 
-        sma_short = prices['buy_vwap'].rolling(window=3400 * 2).mean().fillna(method='bfill')[-1]
-        sma_long = prices['buy_vwap'].rolling(window=3400 * 8).mean().fillna(method='bfill')[-1]
+        sma_short = prices['buy_vwap'].rolling(window=short_term_sma_len).mean().fillna(method='bfill')[-1]
+        sma_long = prices['buy_vwap'].rolling(window=long_term_sma_len).mean().fillna(method='bfill')[-1]
+        print('sma_short = ' + str(sma_short) + '  --VS--  '  + str(sma_long) + ' = sma_long')
 
         # buy if shorter SMA is bigger than longer SMA
         if sma_short > sma_long:
@@ -639,6 +661,11 @@ def make_order_observation_csv_line(order_info_dict):
 
     """
 
+    try:
+        remaining = order_info_dict['remaining']
+    except KeyError:
+        remaining = 0
+
     new_live_order_line = order_info_dict['id'] + ',' \
                           + str(order_info_dict['symbol']) + ',' \
                           + str(order_info_dict['side']) + ',' \
@@ -646,7 +673,7 @@ def make_order_observation_csv_line(order_info_dict):
                           + str(order_info_dict['amount']) + ',' \
                           + str(order_info_dict['filled']) + ',' \
                           + str(order_info_dict['cost']) + ',' \
-                          + str(order_info_dict['remaining']) + ',' \
+                          + str(remaining) + ',' \
                           + str(order_info_dict['status']) + ',' \
                           + str(order_info_dict['timestamp']) + ',' \
                           + str(order_info_dict['type']) \
@@ -675,11 +702,11 @@ def process_placed_order(placed_order_res):
 
     # parse the placed order response
     order_info_dict = make_ccxt_order_info_dict(response=placed_order_res)
-    orderId = response['id']
-    symbol = response['symbol']
+    orderId = placed_order_res['id']
+    symbol = placed_order_res['symbol']
 
     # add the new order to the dictionary tracking open orders
-    order_open_dict[(orderId, 'symbol')] = order_info_dict
+    order_open_dict[(orderId, symbol)] = order_info_dict
 
     # ### write the order to the live files
     #
@@ -746,16 +773,16 @@ def place_order(B_or_S, pair, o_type, base_qty, price=None, order_id=None):
     #
     #
     # string used to place order on pair on the exchange
-    id = info['id']  # formerly 'exchange_symbol'... now labled id because CCXT unified structure
+    symbol = info['id']  # formerly 'exchange_symbol'... now labled id because CCXT unified structure
 
     if o_type == 'limit':
         print('placing order')
-        print('Limit Order:  ' + B_or_S + ' ' + str(base_qty) + ' ' + id + ' for $' + str(price))
+        print('Limit Order:  ' + B_or_S + ' ' + str(base_qty) + ' ' + symbol + ' for $' + str(price))
 
-        order_res = client.create_limit_order(symbol='NOIA-USDT',
+        order_res = client.create_limit_order(symbol=pair,
                                               side=B_or_S,
-                                              amount=5,
-                                              price=0.075)
+                                              amount=base_qty,
+                                              price=price)
 
     else:
         print('Error: order type not supported')
@@ -817,7 +844,7 @@ def remove_order_from_open_tracking(tuple_key):
                 f.write(line)
 
     # ### write to closed order files
-    write_closed_order(orderId, universal_symbol, order_info_dict)
+    write_closed_order(orderId, universal_symbol)
 
     # ### remove order from dictionary... must do last, info here used to write to closed order file
     #
@@ -964,7 +991,7 @@ def figure_price_qty_for_order(pair, diff, action):
             qty = buy_dollars / price * 0.98
 
     if diff <= -diff_thresh:  # we are selling
-        baseAsset = pair_info_df.loc[pair]['baseAsset']
+        baseAsset = pair_info_df.loc[pair]['base']
         baseAsset_holdings = port_holdings_dict[baseAsset]['free']
         sell_dollars = min(-diff, min(mid_vwap, mid_ewm) * baseAsset_holdings)
 
@@ -1014,7 +1041,7 @@ def check_for_closed_orders():
     return None
 
 
-def place_orders_on_signal(params):
+def reassess_bags_and_orders(params):
     """
     """
     global iter_count
@@ -1046,6 +1073,9 @@ def place_orders_on_signal(params):
         # place buy/sell order
         action = actions_dict[pair]
 
+        if iter_count % 10 == 0:
+            print_update_on_bot()
+
         # most actions should be neutral... save time by passing on other actions if neutral
         if action == 'neutural':
             continue
@@ -1068,7 +1098,7 @@ def place_orders_on_signal(params):
 
         ###PAUL TODO: should add order book info on prices to this to take advantage of scan wicks
         # this means buying at the scam price if lower than the above, vise versa selling
-        price, qty, B_or_S = figure_price_qty_for_order(pair, diff_thresh, action)
+        price, qty, B_or_S = figure_price_qty_for_order(pair, diff, action)
         total_order_value = qty * price
 
         print('debug_1 ---- price: ' + str(price))
@@ -1091,6 +1121,7 @@ def place_orders_on_signal(params):
             print('PLACING LIMIT ORDER ---- ' + B_or_S + ' - ' + str(qty) + ' - ' + pair
                   + ' for $' + str(price) + ' ---- in port_name: ' + port_name)
 
+
             order_res = place_order(B_or_S=B_or_S,
                                     pair=pair,
                                     o_type='limit',
@@ -1105,9 +1136,6 @@ def place_orders_on_signal(params):
     # only update the portfolios most recent update time if this function runs to fruition
     update_most_recent_order_check_file()
 
-    if iter_count % 10 == 0:
-        print_update_on_bot()
-
     iter_count += 1
 
     return None
@@ -1120,5 +1148,5 @@ def place_orders_on_signal(params):
 i = 0
 
 while i < 100000:
-    place_orders_on_signal(params)
+    reassess_bags_and_orders(params)
     time.sleep(10)

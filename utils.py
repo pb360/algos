@@ -258,6 +258,14 @@ def make_date_suffix(date, file_type='.csv'):
 def convert_symbol(symbol, in_exchange, out_exchange, params=params):
     # try:
 
+    # ### special handling of weird use cases
+    #
+    #
+    # here ccxt returns 'BTC-USD' as a universal symbol
+    if re.search('USD$', symbol) != None and in_exchange == 'universal' and \
+            out_exchange in ['binanceus']:
+        symbol += 'T'
+
     if out_exchange == 'universal':
         if in_exchange == 'universal':
             print('asking to convert pair from universal to universal')

@@ -6,12 +6,6 @@
 
 """
 This script creates a websocket connection to binance and listens and records all trades for relevant pairs
-on or around 2/20/2022 the repo was migrated from algo2 --> algos allowing for easier data collection
-the data for 'symbols_tracked': ['ADAUSDT', 'ADABTC', 'BNBUSDT', 'BNBBTC', 'BTCUSDT', 'BTCBTC', 'DOGEUSDT', 'ETHUSDT',
- 'ETHBTC', 'LINKUSDT', 'LINKBTC', 'LTCUSDT', 'LTCBTC', 'XLMUSDT', 'XRPUSDT', 'XRPBTC', ] goes back much earlier
-
-
- other pairs' data collection starts after
 """
 
 # ### imports
@@ -67,7 +61,7 @@ api_key = params['keys']['binance_data_key_1']
 secret_key = params['keys']['binance_data_key_secret_1']
 
 # parameters about investment universe
-symbols_tracked = params['universe'][exchange]['symbols_tracked']
+tracked_symbols_exchange_format = list(params['universe'][exchange]['convert_dict']['universal'].keys())
 pair_collection_list = params['universe'][exchange]['pair_collection_list']
 
 if exchange == 'binanceus':
@@ -238,11 +232,11 @@ def trim_live_files(params=params):
 
     # variable definitions
     global exchange
-    global symbols_tracked
+    global tracked_symbols_exchange_format
 
     trade_col_names = params['data_format'][exchange]['trade_col_name_list']
 
-    for pair in symbols_tracked:
+    for pair in tracked_symbols_exchange_format:
         pair = convert_symbol(pair, in_exchange=exchange, out_exchange='universal')
 
         lock.acquire()

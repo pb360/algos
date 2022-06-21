@@ -77,17 +77,21 @@ universe = dict()
 
 universe_binance = {'exchange': 'binance',
 
-                    # all tickers tracked as a base asset in at least one pair on this exchange
-                    'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
-
                     # websocket communication for exchange... this is how requests are sent
                     'pair_collection_list': ['adausdt@trade', 'adabtc@trade',
+                                             'ampusdt@trade', 'ampbtc@trade',
+                                             'api3usdt@trade', 'api3btc@trade',
+                                             'batusdt@trade', 'batbtc@trade',
                                              'bnbusdt@trade', 'bnbbtc@trade',
                                              'btcusdt@trade',
                                              'dogeusdt@trade', 'dogebtc@trade',
                                              'ethusdt@trade', 'ethbtc@trade',
+                                             'fluxusdt@trade', 'fluxbtc@trade',
+                                             'hbarusdt@trade', 'hbarbtc@trade',
+                                             'kdausdt@trade', 'kdabtc@trade',
                                              'linkusdt@trade', 'linkbtc@trade',
                                              'ltcusdt@trade', 'ltcbtc@trade',
+                                             'usdcusdt@trade',
                                              'xlmusdt@trade', 'xlmbtc@trade',
                                              'xrpusdt@trade', 'xrpbtc@trade',
                                              'xtzusdt@trade', 'xtzbtc@trade', 'xtzeth@trade',
@@ -95,28 +99,39 @@ universe_binance = {'exchange': 'binance',
 
                     # trade communication for exchange... this string is what is sent for trade requests
                     'symbols_tracked': ['ADAUSDT', 'ADABTC',
-                                      'BNBUSDT', 'BNBBTC',
-                                      'BTCUSDT',
-                                      'DOGEUSDT', 'DOGEBTC',
-                                      'ETHUSDT', 'ETHBTC',
-                                      'LINKUSDT', 'LINKBTC',
-                                      'LTCUSDT', 'LTCBTC',
-                                      'XLMUSDT', 'XLMBTC',
-                                      'XRPUSDT', 'XRPBTC',
-                                      'XTZUSDT', 'XTZBTC', 'XTZETH',
-                                      ],
+                                        'AMPUSDT', 'AMPBTC',
+                                        'API3USDT', 'API3BTC',
+                                        'BNBUSDT', 'BNBBTC',
+                                        'BATUSDT', 'BATBTC',
+                                        'BTCUSDT',
+                                        'DOGEUSDT', 'DOGEBTC',
+                                        'ETHUSDT', 'ETHBTC',
+                                        'FLUXUSDT', 'FLUXBTC',
+                                        'HBARUSDT', 'HBARBTC',
+                                        'KDAUSDT', 'KDABTC',
+                                        'LINKUSDT', 'LINKBTC',
+                                        'LTCUSDT', 'LTCBTC',
+                                        'USDCUSDT',
+                                        'XLMUSDT', 'XLMBTC',
+                                        'XRPUSDT', 'XRPBTC',
+                                        'XTZUSDT', 'XTZBTC', 'XTZETH',
+                                        ],
 
                     # how to convert the pair in exchange format to universal
                     'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDT', 'ADABTC': 'ADA-BTC',
+                                                   'AMPUSDT': 'AMP-USDT', 'AMPBTC': 'AMP-BTC',
+                                                   'API3USDT': 'API3-USDT', 'API3BTC': 'API3-BTC',
                                                    'BNBUSDT': 'BNB-USDT', 'BNBBTC': 'BNB-BTC',
+                                                   'BATUSDT': 'BAT-USDT', 'BATBTC': 'BAT-BTC',
                                                    'BTCUSDT': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
                                                    'DOGEUSDT': 'DOGE-USDT', 'DOGEBTC': 'DOGE-BTC',
                                                    'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
+                                                   'FLUXUSDT': 'FLUX-USDT', 'FLUXBTC': 'FLUX-BTC',
+                                                   'HBARUSDT': 'HBAR-USDT', 'HBARBTC': 'HBAR-BTC',
+                                                   'KDAUSDT': 'KDA-USDT', 'KDABTC': 'KDA-BTC',
                                                    'LINKUSDT': 'LINK-USDT', 'LINKBTC': 'LINK-BTC',
                                                    'LTCUSDT': 'LTC-USDT', 'LTCBTC': 'LTC-BTC',
+                                                   'USDCUSDT': 'USDC-USDT',
                                                    'XLMUSDT': 'XLM-USDT', 'XLMBTC': 'XLM-BTC',
                                                    'XRPUSDT': 'XRP-USDT', 'XRPBTC': 'XRP-BTC',
                                                    'XTZUSDT': 'XTZ-USDT', 'XTZBTC': 'XTZ-BTC',
@@ -127,46 +142,61 @@ universe_binance = {'exchange': 'binance',
 
 universe_binanceus = {'exchange': 'binanceus',
 
-                      # all tickers tracked as a base asset in at least one pair on this exchange
-                      'tickers_tracked': ['ada', 'bnb', 'btc', 'doge', 'eth', 'link', 'ltc', 'xlm', 'xrp', 'xtz'],
-
                       # how they are fed into the websocket function (as is)
                       'pair_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
+                                               'ampusd@trade',
+                                               'api3usdt@trade',
+                                               'batusd@trade',
                                                'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
                                                'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
                                                'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
                                                'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
+                                               'fluxusd@trade',
+                                               'hbarusd@trade',
                                                'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
                                                'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
+                                               'usdcusdt@trade',
                                                'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
                                                'xtzbtc@trade', 'xtzusd@trade',
                                                ],
 
                       # trade communication for exchange... this string is what is sent for trade requests
                       'symbols_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
-                                        'BNBUSDT', 'BNBBTC', 'BNBUSD',
-                                        'BTCUSDT', 'BTCUSD',
-                                        'DOGEUSDT', 'DOGEUSD',
-                                        'ETHUSDT', 'ETHBTC', 'ETHUSD',
-                                        'LINKUSDT', 'LINKBTC', 'LINKUSD',
-                                        'LTCUSDT', 'LTCBTC', 'LTCUSD',
-                                        'XLMUSDT', 'XLMUSD',
-                                        'XTZBTC', 'XTZUSD',
-                                        ],
+                                          'AMPUSD',
+                                          'API3USDT',
+                                          'BATUSD',
+                                          'BNBUSDT', 'BNBBTC', 'BNBUSD',
+                                          'BTCUSDT', 'BTCUSD',
+                                          'DOGEUSDT', 'DOGEUSD',
+                                          'ETHUSDT', 'ETHBTC', 'ETHUSD',
+                                          'FLUXUSD',
+                                          'HBARUSD',
+                                          'LINKUSDT', 'LINKBTC', 'LINKUSD',
+                                          'LTCUSDT', 'LTCBTC', 'LTCUSD',
+                                          'USDCUSDT',
+                                          'XLMUSDT', 'XLMUSD',
+                                          'XTZBTC', 'XTZUSD',
+                                          ],
 
                       # how to convert the pair in exchange format to universal
                       'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDTether', 'ADABTC': 'ADA-BTC',
                                                      'ADAUSD': 'ADA-USDT',
+                                                     'AMPUSD': 'AMP-USDT',
+                                                     'API3USDT': 'API3-USDT',
+                                                     'BATUSD': 'BAT-USDT',
                                                      'BNBUSDT': 'BNB-USDTether', 'BNBBTC': 'BNB-BTC',
                                                      'BNBUSD': 'BNB-USDT',
                                                      'BTCUSDT': 'BTC-USDTether', 'BTCUSD': 'BTC-USDT',
                                                      'DOGEUSDT': 'DOGE-USDTether', 'DOGEUSD': 'DOGE-USDT',
                                                      'ETHUSDT': 'ETH-USDTether', 'ETHBTC': 'ETH-BTC',
                                                      'ETHUSD': 'ETH-USDT',
+                                                     'FLUXUSD': 'FLUX-USDT',
+                                                     'HBARUSD': 'HBAR-USDT',
                                                      'LINKUSDT': 'LINK-USDTether', 'LINKBTC': 'LINK-BTC',
                                                      'LINKUSD': 'LINK-USDT',
                                                      'LTCUSDT': 'LTC-USDTether', 'LTCBTC': 'LTC-BTC',
                                                      'LTCUSD': 'LTC-USDT',
+                                                     'USDCUSDT': 'USDC-USDT',
                                                      'XLMUSDT': 'XLM-USDTether', 'XLMUSD': 'XLM-USDT',
                                                      'XTZBTC': 'XTZ-BTC', 'XTZUSD': 'XTZ-USDT',
                                                      },
@@ -175,25 +205,22 @@ universe_binanceus = {'exchange': 'binanceus',
 
 universe_kucoin = {'exchange': 'kucoin',
 
-                   # tickers tracked as a base asset in at least one pair on this exchange
-                   'tickers_tracked': ['btc', 'dag', 'eth', 'fil', 'icp', 'kava', 'kda', 'link', 'ltc', 'noia', 'qrdo',
-                                       'req', 'tel', 'vra', 'xlm', 'xmr', 'xpr', 'xrp', 'xtz'
-                                       ],
-
                    # how they are fed into the websocket function (as is)
+                   # identical list as  pair_collection_list  above (for kucoin unlike binance)
                    'pair_collection_list': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
                                             'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
-                                            'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
-                                            'XTZ-USDT',
+                                            'RSR-USDT', 'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT',
+                                            'XRP-USDT', 'XTZ-USDT',
                                             ],
 
+                   # ###PAUL should be able to get rid of this by using list(convert_dict.keys())
                    # trade communication for exchange... this string is what is sent for trade requests
-                   # identical list as  pair_collection_list  above (for kucoin unlike binance)
                    'symbols_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
-                                     'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
-                                     'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
-                                     'XTZ-USDT',
-                                     ],
+                                       'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 'REQ-USDT',
+                                       'RSR-USDT',
+                                       'TEL-USDT', 'VRA-USDT', 'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
+                                       'XTZ-USDT',
+                                       ],
 
                    # how to convert the pair in exchange format to universal
                    'convert_dict': {'universal': {'BTC-USDT': 'BTC-USDT', 'DAG-USDT': 'DAG-USDT',
@@ -202,6 +229,7 @@ universe_kucoin = {'exchange': 'kucoin',
                                                   'KDA-USDT': 'KDA-USDT', 'LINK-USDT': 'LINK-USDT',
                                                   'LTC-USDT': 'LTC-USDT', 'NOIA-USDT': 'NOIA-USDT',
                                                   'QRDO-USDT': 'QRDO-USDT', 'REQ-USDT': 'REQ-USDT',
+                                                  'RSR-USDT': 'RSR-USDT',
                                                   'TEL-USDT': 'TEL-USDT', 'VRA-USDT': 'VRA-USDT',
                                                   'XLM-USDT': 'XLM-USDT', 'XMR-USDT': 'XMR-USDT',
                                                   'XPR-USDT': 'XPR-USDT', 'XRP-USDT': 'XRP-USDT',
@@ -316,12 +344,11 @@ data_format_binance = {
                                     'precision_price', 'limits_price_min', 'limits_price_max',
                                     'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
 
-
     'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
                                 'base': str,  # 'BTC' in 'BTCUSDT'
-                                'precision_amount': int,  # num of decimals for base
+                                'precision_amount': float,  # num of decimals for base
                                 'quote': str,  # 'USD' in 'BTCUSD'
-                                'precision_price': int,  # num of decimals for quote
+                                'precision_price': float,  # num of decimals for quote
                                 'limits_price_min': float,  # min price for BASE in QUOTE
                                 'limits_price_max': float,  # max price for BASE asset in QUOTE
                                 'limits_amount_min': float,  # min order of BASE asset allowed
@@ -412,9 +439,9 @@ data_format_binanceus = {
 
     'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
                                 'base': str,  # 'BTC' in 'BTCUSDT'
-                                'precision_amount': int,  # num of decimals for base
+                                'precision_amount': float,  # num of decimals for base
                                 'quote': str,  # 'USD' in 'BTCUSD'
-                                'precision_price': int,  # num of decimals for quote
+                                'precision_price': float,  # num of decimals for quote
                                 'limits_price_min': float,  # min price for BASE in QUOTE
                                 'limits_price_max': float,  # max price for BASE asset in QUOTE
                                 'limits_amount_min': float,  # min order of BASE asset allowed
@@ -503,9 +530,9 @@ data_format_kucoin = {
 
     'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
                                 'base': str,  # 'BTC' in 'BTCUSDT'
-                                'precision_amount': int,  # num of decimals for base
+                                'precision_amount': float,  # num of decimals for base
                                 'quote': str,  # 'USD' in 'BTCUSD'
-                                'precision_price': int,  # num of decimals for quote
+                                'precision_price': float,  # num of decimals for quote
                                 'limits_price_min': float,  # min price for BASE in QUOTE
                                 'limits_price_max': float,  # max price for BASE asset in QUOTE
                                 'limits_amount_min': float,  # min order of BASE asset allowed

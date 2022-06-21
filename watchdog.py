@@ -6,7 +6,6 @@
 #
 import os
 import time
-
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
@@ -16,6 +15,7 @@ from twisted.internet import task, reactor
 #
 #
 from utils import *
+# from bot_utils import make_and_start_systemd_bot_service
 
 params = config.params
 
@@ -68,8 +68,14 @@ def restart_service(service_type, params_t, exchange=None, port=None, pword=word
             command = 'sudo systemctl restart ' + service + '.service'
             p = os.system('echo %s|sudo -S %s' % (pword, command))
         if mode == 'hard_restart':
+
+            try:
+                stop_command = 'sudo systemctl stop ' + service + '.service '
+                p = os.system('echo %s|sudo -S %s' % (pword, stop_command))
+            except:
+                print(3*('watchdog ---- stop errored on service: ' + service), flush=True)
+
             command = 'sudo chmod u+x ' + script \
-                      + '&& sudo systemctl stop ' + service + '.service ' \
                       + '&& sudo systemctl daemon-reload' \
                       + '&& sudo systemctl enable ' + service + '.service' \
                       + '&& sudo systemctl restart ' + service + '.service'
@@ -101,6 +107,7 @@ def trade_watchdog():
             trades = get_live_trades_data(check_ticker, exchange=exchange)
             time_since_last_btc_trade = time.time() - trades.iloc[-1]['trade_time']
 
+            # restart ---- too long since last trade received
             if time_since_last_btc_trade > no_trade_time:  # restart systemd service
                 # restart it
                 print(restart_notification_string, flush=True)
@@ -185,6 +192,7 @@ def check_if_orders_being_updated():
     """
 
     global params
+    global word
 
     print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG: ------------ CHECKING LIVE BOTS -=-=-=-=-=-=-=-= on ---- ' \
           + device_name + '\n', flush=True)
@@ -194,47 +202,74 @@ def check_if_orders_being_updated():
     if len(active_ports) == 0:
         print('-=-=-=-=-=-=-=-= no bots running on ---- ' + device_name, flush=True)
     for port_name in active_ports:
+        # try:
+        exchange = params['active_services']['ports'][port_name]['exchange']
+        service = params['active_services']['ports'][port_name]['service']
+        signal_based_order_interval = params['active_services']['ports'][port_name]['signal_based_order_interval']
+        restart_str = 3 * ('-=-=-=-=- ALGOS - RESTARTING LIVE BOT: ' + service + ' -=-=-=-=-=-=-\n')
+
+        fp = get_data_file_path(data_type='last_order_check',
+                                pair=None,
+                                date='live',
+                                port=port_name,
+                                exchange=exchange)
+
         try:
-            exchange = params['active_services']['ports'][port_name]['exchange']
-            service = params['active_services']['ports'][port_name]['service']
-            restart_str = (2 * '-=-=-=-=- ALGOS - RESTARTING LIVE BOT: ' + service + ' -=-=-=-=-=-=-')*5
-
-            fp = get_data_file_path(data_type='last_order_check',
-                                    pair=None,
-                                    date='live',
-                                    port=port_name,
-                                    exchange=exchange)
-
             with open(fp, 'r') as f:
                 last_update_time = f.readline()
+                last_update_time = float(last_update_time)
+                time_since_last_order_update = time.time() - last_update_time
             os.chmod(fp, 0o777)
+            new_file = False
 
-            last_update_time = float(last_update_time)
-            time_since_last_order_update = time.time() - last_update_time
+        except FileNotFoundError:
+            print(10*('   WATCHDOG - new systemd service to start up ---- ' + fp + '\n'))
+            new_file = True  # since its not there this is the first time spinning up a portfolio
 
-            if time_since_last_order_update > 60:
-                # restart it
-                print(restart_str, flush=True)
-                params = restart_service(service_type='ports',
-                                         params_t=params,
-                                         port=port_name,
-                                         )
+        service_exists = os.path.isfile('/usr/lib/systemd/system/' + service + '.service')
+        if new_file or not service_exists:
 
-            else:  # orders being checked / placed for this portfolio
-                params['active_services']['ports'][port_name]['error_count'] = 0
-                print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG:   port   ' + port_name + '  ---- is active on   ' + exchange
-                      + '   -=-=-=-=-=\n',
-                      flush=True)
-        except:
-            params['active_services']['ports'][port_name]['error_count'] += 1
 
-            if params['active_services']['ports'][port_name]['error_count'] > 3:
-                print('---- WACHDOG: restarting port due to ERRORS ----'*5, flush=True)
-                print(restart_str, flush=True)
-                params = restart_service(service_type='ports',
-                                         params_t=params,
-                                         port=port_name,
-                                         )
+
+            print(5 * ('   WATCHDOG - making service for - port_name ---- ' + port_name + '\n'), flush=True)
+
+            os.chmod('/mnt/algos/systemd_bot_spinup.py', 0o777)
+            give_bot_spinup_permissions = 'sudo chmod u+x /mnt/algos/systemd_bot_spinup.py'
+            _ = os.system('echo %s|sudo -S %s' % (word, give_bot_spinup_permissions))
+
+            os.chdir('/mnt/algos/')
+
+            command = 'ls'
+            _ = os.system(command)
+
+            command = './systemd_bot_spinup.py ' + port_name
+            _ = os.system('echo %s|sudo -S %s' % (word, command))
+
+        # too long without order ---- over 3 order cycles without updating the last order check file is too long
+        elif time_since_last_order_update > signal_based_order_interval*3:
+            # restart itclear
+            print(restart_str, flush=True)
+            params = restart_service(service_type='ports',
+                                     params_t=params,
+                                     port=port_name,
+                                     )
+
+        else:  # orders being checked / placed for this portfolio
+            params['active_services']['ports'][port_name]['error_count'] = 0
+            print('-=-=-=-=-=-=-=-= ALGOS WATCHDOG:   port   ' + port_name + '  ---- is active on   ' + exchange
+                  + '   -=-=-=-=-=\n',
+                  flush=True)
+
+        # except:
+        #     params['active_services']['ports'][port_name]['error_count'] += 1
+        #
+        #     if params['active_services']['ports'][port_name]['error_count'] > 3:
+        #         print('---- WACHDOG: restarting port due to ERRORS ----'*5, flush=True)
+        #         print(restart_str, flush=True)
+        #         params = restart_service(service_type='ports',
+        #                                  params_t=params,
+        #                                  port=port_name,
+        #                                  )
 
 print('---- WATCHDOG: started ---- \n' * 10, flush=True)
 
