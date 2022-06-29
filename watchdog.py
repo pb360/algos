@@ -217,6 +217,9 @@ def check_if_orders_being_updated():
         try:
             with open(fp, 'r') as f:
                 last_update_time = f.readline()
+
+                if last_update_time == '':
+                    last_update_time = 0  # this means we haven't checked yet
                 last_update_time = float(last_update_time)
                 time_since_last_order_update = time.time() - last_update_time
             os.chmod(fp, 0o777)
@@ -226,22 +229,17 @@ def check_if_orders_being_updated():
             print(10*('   WATCHDOG - new systemd service to start up ---- ' + fp + '\n'))
             new_file = True  # since its not there this is the first time spinning up a portfolio
 
+        # if the service does not exist or the order check file is not found, spin up service
         service_exists = os.path.isfile('/usr/lib/systemd/system/' + service + '.service')
         if new_file or not service_exists:
-
-
-
             print(5 * ('   WATCHDOG - making service for - port_name ---- ' + port_name + '\n'), flush=True)
 
+            # handle script permissions
             os.chmod('/mnt/algos/systemd_bot_spinup.py', 0o777)
             give_bot_spinup_permissions = 'sudo chmod u+x /mnt/algos/systemd_bot_spinup.py'
             _ = os.system('echo %s|sudo -S %s' % (word, give_bot_spinup_permissions))
 
             os.chdir('/mnt/algos/')
-
-            command = 'ls'
-            _ = os.system(command)
-
             command = './systemd_bot_spinup.py ' + port_name
             _ = os.system('echo %s|sudo -S %s' % (word, command))
 
@@ -271,8 +269,49 @@ def check_if_orders_being_updated():
         #                                  port=port_name,
         #                                  )
 
+
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+# ##PAUL_start_here
+
+
+
+def check_down_ports_not_running():
+    down_ports = params['active_services']['down_ports']
+
+
+    for port_name in down_ports.keys():
+        print(5 * ('   WATCHDOG - shutting down service for - port_name ---- ' + port_name + '\n'), flush=True)
+
+        # handle script permissions
+        os.chmod('/mnt/algos/systemd_bot_shutdown.py', 0o777)
+        command = 'sudo chmod u+x /mnt/algos/systemd_bot_shutdown.py'
+        _ = os.system('echo %s|sudo -S %s' % (word, command))
+
+
+        os.chdir('/mnt/algos/')
+        command = './systemd_bot_shutdown.py ' + port_name
+        _ = os.system('echo %s|sudo -S %s' % (word, command))
+
+    return None
+
+
 print('---- WATCHDOG: started ---- \n' * 10, flush=True)
 
+# run this task once at the beginning of each watchdog update (re-run) should be sufficient
+check_down_ports_not_running()
 
 # trade reception watchdog
 check_trades_interval = params['active_services']['watchdog']['check_trades_interval']
