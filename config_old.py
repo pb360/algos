@@ -1,16 +1,27 @@
-import os
+#!/home/paul/miniconda3/envs/binance/bin/python3
+# -*- coding: utf-8 -*-
+
+# ###PAUL TODO anywhere data is written with a column "ticker", but it is actually a pair, consider fixing this
+# TODO         its alot of work but also would make things nice for me... probably something to ignore for now
+# ### imports
+#
+#
+from copy import deepcopy
+import platform
 import sys
+import os
 import time
+
 # ### time zone change... this must happen first and utils must be imported first
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
-# local imports
-sys.path.insert(0, '..')  # for local imports from the top directory
-from algos.machine_specific.config_machine_specific import params_machine_specific
+# add algos
+algos_dir = '/mnt/'
+sys.path.append(algos_dir)
 
-from copy import deepcopy
-import platform
+from algos.machine_specfic.config_machine_specific import params_machine_specific
+from algos.local.configs_local import params_local
 
 
 # ### function definitions... must be here as config is imported into utils, not the other way around
@@ -28,7 +39,15 @@ def reverse_dict(d):
     return new_dict
 
 
+# ### machine specific and local params
+#
+#
+device_info = {'device_name': params_machine_specific['device_name'],
+               'os': str(platform.system()),
+               }
 active_services = params_machine_specific['active_services']
+addresses = params_local['addresses']
+keys = params_local['keys']
 
 # ### important constants ###PAUL_todo
 #
@@ -37,21 +56,19 @@ constants = {'os': str(platform.system()),  # ###PAUL alot relies on this, this 
              'email_port': 1025,
              }
 
-# ###PAUL this can likely be phased out (unless proves useful for live implementation for SC work)
 # this is used in get_data_fp()... not worth trying to get rid of it
-algos_dir = ''
-
-dirs = {  # ###PAUL TODO: once depriciated `dirs` are removed consider what can be moved to machine specific
-          #         TODO: and if a root directory can be established and put there. for now dont make it DRY
-    'data_dir': '/opt/shared/crypto/algos/data/',
-    'live_data_dir': '/opt/shared/crypto/algos/data/live/',
-    'ports_data_dir': '/opt/shared/crypto/algos/data/live/ports/',
-    # ###PAUL TODO: remove the below once positive they can be depricated but
-    'trade_data_dir': algos_dir + 'algos/data/trade/',
-    'price_data_dir': algos_dir + 'algos/data/price/',
-    'live_trade_data_dir': algos_dir + 'algos/data/live_trades/',
-    'order_data_dir': algos_dir + 'algos/data/orders/',
-}
+dirs = {'algos_dir': algos_dir,  # this is where the the algos directory is located on the machine
+        # 'repo_dir': algos_dir + 'algos/',
+        'data_dir': algos_dir + 'algos/data/',
+        'ext_pack_dir': algos_dir + 'algos/ext_packages',
+        'book_data_dir': algos_dir + 'algos/data/book/',
+        'trade_data_dir': algos_dir + 'algos/data/trade/',
+        'price_data_dir': algos_dir + 'algos/data/price/',
+        'live_trade_data_dir': algos_dir + 'algos/data/live_trades/',
+        'order_data_dir': algos_dir + 'algos/data/orders/',
+        'live_data_dir': algos_dir + 'algos/data/live/',
+        'ports_data_dir': algos_dir + 'algos/data/ports/',
+        }
 
 # ### universe ---- what is collected, tracked, and traded via each exchange
 #
@@ -67,7 +84,6 @@ universe_binance = {'exchange': 'binance',
                                              'batusdt@trade', 'batbtc@trade',
                                              'bnbusdt@trade', 'bnbbtc@trade',
                                              'btcusdt@trade',
-                                             'btctusd@trade',
                                              'dogeusdt@trade', 'dogebtc@trade',
                                              'ethusdt@trade', 'ethbtc@trade',
                                              'fluxusdt@trade', 'fluxbtc@trade',
@@ -88,7 +104,7 @@ universe_binance = {'exchange': 'binance',
                                         'API3USDT', 'API3BTC',
                                         'BNBUSDT', 'BNBBTC',
                                         'BATUSDT', 'BATBTC',
-                                        'BTCUSDT', 'BTCTUSD',
+                                        'BTCUSDT',
                                         'DOGEUSDT', 'DOGEBTC',
                                         'ETHUSDT', 'ETHBTC',
                                         'FLUXUSDT', 'FLUXBTC',
@@ -110,7 +126,6 @@ universe_binance = {'exchange': 'binance',
                                                    'BNBUSDT': 'BNB-USDT', 'BNBBTC': 'BNB-BTC',
                                                    'BATUSDT': 'BAT-USDT', 'BATBTC': 'BAT-BTC',
                                                    'BTCUSDT': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
-                                                   'BTCTUSD': 'BTC-TUSD',
                                                    'DOGEUSDT': 'DOGE-USDT', 'DOGEBTC': 'DOGE-BTC',
                                                    'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
                                                    'FLUXUSDT': 'FLUX-USDT', 'FLUXBTC': 'FLUX-BTC',
@@ -189,12 +204,14 @@ universe_binanceus = {'exchange': 'binanceus',
                                                      },
                                        },
                       }
+
+
 universe_kucoin = {'exchange': 'kucoin',
 
                    # how they are fed into the websocket function (as is)
                    # identical list as  pair_collection_list  above (for kucoin unlike binance)
                    'pair_collection_list': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
-                                            'KDA-USDT', 'LINK-USDT', 'LUNC-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT',
+                                            'KDA-USDT', 'LINK-USDT', 'LUNC-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT', 
                                             'REQ-USDT',
                                             'RSR-USDT', 'TEL-USDT', 'VRA-USDT', 'VIDT-USDT',
                                             'XLM-USDT', 'XMR-USDT', 'XPR-USDT',
@@ -235,9 +252,9 @@ universe_kucoin = {'exchange': 'kucoin',
 # ### the reverse dictionary flipping keys and values... this minimizes errors as only 1 conversion dict per exchange
 #
 #
-universal = {'from_universal': {'binance': deepcopy(reverse_dict(universe_binance['convert_dict']['universal'])),
-                                'binanceus': deepcopy(reverse_dict(universe_binanceus['convert_dict']['universal'])),
-                                'kucoin': deepcopy(reverse_dict(universe_kucoin['convert_dict']['universal'])),
+universal = {'from_universal': {'binance': reverse_dict(universe_binance['convert_dict']['universal']),
+                                'binanceus': reverse_dict(universe_binanceus['convert_dict']['universal']),
+                                'kucoin': reverse_dict(universe_kucoin['convert_dict']['universal']),
                                 },
              'to_universal': {'binance': deepcopy(universe_binance['convert_dict']['universal']),
                               'binanceus': deepcopy(universe_binanceus['convert_dict']['universal']),
@@ -542,8 +559,11 @@ data_format['kucoin'] = data_format_kucoin
 #
 params = dict()
 
+params['device_info'] = device_info
 params['constants'] = constants
 params['active_services'] = active_services
+params['addresses'] = addresses
+params['keys'] = keys
 params['dirs'] = dirs
 params['universe'] = universe
 params['data_format'] = data_format

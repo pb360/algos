@@ -56,7 +56,7 @@ def add_prices_from_live_trade_data(pair, exchange):
     #           flush=True)
     #     return None
 
-    prices = convert_trades_df_to_prices(trades)
+    prices = convert_trades_df_to_trading_summary(trades)
     prices = prices.iloc[:-1]  # remove last second as this second could still be happening
 
     now = time.time()  # must use timestamp as requesting date="live"

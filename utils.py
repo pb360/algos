@@ -1,6 +1,3 @@
-#!/home/paul/miniconda3/envs/binance/bin/python3
-# -*- coding: utf-8 -*-
-
 # ### imports
 #
 #
@@ -13,30 +10,40 @@ time.tzset()
 
 import sys
 
-sys.path.append('/mnt/algos/')
+sys.path.insert(0, '..')  # for local imports from the top directory
+sys.path.insert(0, '../..')  # quick fix, it works...
 
+from clickhouse_driver import Client as CH_Client
 import datetime
+from datetime import timedelta
 import dateutil
 from decimal import Decimal
+import json
+import lttb
 import math
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import numpy as np
-import os
 import pandas as pd
-# import pandas.api.types  # not sure if needed but added from notebook so ill keep dis here for now
+from pandas.tseries.offsets import Minute
+import pickle
 import re
-import smtplib
+import requests
 from typing import Union
+import zipfile
 
-# local packages
+# import pandas.api.types  # not sure if needed but added from notebook so ill keep dis here for now
+# import re
+# import smtplib
+# from typing import Union
 
-import config
 
-# ### variable definitions
-#
-#
-params = config.params
+# # ### local packages
+from algos.config import params
+
+
+# # ### variable definitions
+# #
+# #
+# params = config.params
 
 
 def convert_date_format(date, output_type):
@@ -63,28 +70,39 @@ def convert_date_format(date, output_type):
         # tuple to day resolution... ie: [2021, 01, 31]
         if len(date) == 3:
             year, month, day = date
-            if output_type == 'datetime' or output_type == 'datetime.date':
+            if output_type in ['datetime', 'datetime.date', 'datetime.datetime']:
                 return datetime.date(year=year, month=month, day=day)
             if output_type == 'tuple_to_day':
                 y, m, d = str(date[0]), str(date[1]), str(date[2])
                 return (y, m, d)
-
+            if output_type in ['pandas', 'pd.datetime']:
+                return pd.to_datetime(datetime.date(year=year, month=month, day=day))
+            if output_type in ['string_short', 'string_to_day', 'string', 'str']:
+                date = datetime.date(year=year, month=month, day=day)
+                return date.strftime('%Y-%m-%d')
+            if output_type in ['suffix']:
+                date = make_date_suffix(date, file_type='.csv')
         # tuple to sec  resolution... ie: [2021, 01, 31, 23, 59, 1]
         if len(date) == 6:
             year, month, day, hour, minute, second = date
             if output_type == 'datetime' or output_type == 'datetime.datetime':
-                return datetime.date(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
+                return datetime.datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
+            if output_type in ['pandas', 'pd.datetime']:
+                return pd.to_datetime(datetime.datetime(year=year, month=month, day=day,
+                                                        hour=hour, minute=minute, second=second))
+            if output_type == 'string_long':
+                return date.strftime('%Y-%m-%d %H:%M:%S')
 
         print("###PAUL make    tuple     to desired output work please", flush=True)
 
-    if isinstance(date, datetime.date) or isinstance(date, datetime.datetime):
+    elif isinstance(date, datetime.date) or isinstance(date, datetime.datetime):
         if output_type == 'epoch':
-            return test_date.timestamp()
-        if output_type == 'string_long':
+            return date.timestamp()
+        elif output_type in ['string_long', 'string_to_second', 'string']:
             return date.strftime('%Y-%m-%d %H:%M:%S')
-        if output_type == 'string_short':
+        elif output_type in ['string_short', 'string_to_day', ]:
             return date.strftime('%Y-%m-%d')
-        if output_type == 'tuple_to_day' or output_type == "tuple_to_second":
+        elif output_type == 'tuple_to_day' or output_type == "tuple_to_second":
             year = date.strftime('%Y')
             month = date.strftime('%m')
             day = date.strftime('%d')
@@ -97,17 +115,39 @@ def convert_date_format(date, output_type):
                 return (year, month, day, hour, minute, second)
             if output_type == 'datetime.date' or output_type == 'datetime.datetime' or output_type == 'datetime':
                 return date
+        elif output_type == 'pandas':
+            return date
+        else:
+            print(f"datetime conversion to output_type {output_type} from type: {type(date)} is not implemented")
+            raise NotImplementedError
 
+    elif isinstance(date, np.datetime64):
+        if output_type in ['string_short', 'string_to_day', 'string']:
+            # ### NOTE: if numpy goes to nanosecond precision MUST convert to pandas, so just do all the time...
+            date = pd.to_datetime(str(date))
+            return date.strftime('%Y-%m-%d')
 
-    # paul convert epoch time to various formats
     elif isinstance(date, int) or isinstance(date, float):
-        if output_type == 'tuple_to_day':
-            year = time.strftime('%Y', time.localtime(date))
-            month = time.strftime('%m', time.localtime(date))
-            day = time.strftime('%d', time.localtime(date))
+        # make the tuple because it is useful for many output types
+        year = time.strftime('%Y', time.gmtime(date))
+        month = time.strftime('%m', time.gmtime(date))
+        day = time.strftime('%d', time.gmtime(date))
+        hour = time.strftime('%H', time.gmtime(date))
+        min = time.strftime('%M', time.gmtime(date))
+        sec = time.strftime('%S', time.gmtime(date))
 
-            date_tuple = (year, month, day)
-            return date_tuple
+        tuple_to_day = (year, month, day)
+        tuple_to_second = (year, month, day, hour, min, sec)
+
+        if output_type == 'tuple_to_day':
+            return tuple_to_day
+        elif output_type == 'tuple_to_second':
+            return tuple_to_second
+        elif output_type in ['pandas', 'pd.datetime']:
+            return convert_date_format(tuple_to_second, output_type='pandas')
+        else:
+            print(f"request for output type: {output_type} not supported for input type: {type(date)}", flush=True)
+            raise NotImplementedError
 
     # convert string to various formats
     elif isinstance(date, str):
@@ -127,101 +167,6 @@ def convert_date_format(date, output_type):
     else:
         print('cant do that yet', flush=True)
         raise TypeError
-
-
-def check_if_file_in_directory(file, directory):
-    """check if file in directory... returns boolean
-    inputs:
-        file (str): name of file
-        directory (str): path to directory
-    outputs:
-        boolean: True or False
-    """
-    file_list = os.listdir(directory)
-    if file in file_list:
-        return True
-    else:
-        return False
-
-
-def send_email(subject, message, script=None, to='paulboehringer0989@gmail.com', params=params):
-    """sends an email from my protonmail to the
-    input:
-        subject (str): subject for email
-        message (str): message for email
-        params (dict): params dict used repo wide
-
-    output:
-        None: sends an email. Nothing is returned
-    """
-    # pull variables out of params
-    try:
-        port_number = params['constants']['email_port']
-        sender_email = params['keys']['mail_user']
-        email_password = params['keys']['mail_password']
-
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = to
-
-        msg['Subject'] = subject
-        begin_message_str = 'email from script ---- ' + str(script) \
-                            + ' \n \n running on  ----  ' + params['device_info']['device_name'] + '\n \n'
-
-        message = begin_message_str + message
-        msg.attach(MIMEText(message))
-
-        mailserver = smtplib.SMTP('127.0.0.1', port_number)
-        mailserver.login(sender_email, email_password)
-        mailserver.sendmail('paulboehringer@protonmail.com', 'paulboehringer0989@gmail.com', msg.as_string())
-        mailserver.quit()
-    except Exception as e:
-        print('---- an email failed to send \n the error will print out below \n \n \n ', flush=True)
-        print(e, flush=True)
-        print('\n \n \n', flush=True)
-        pass
-
-    return True
-
-
-def get_last_line_of_file(filepath, filesize='large'):
-    """gets the last line of a file.. see link for second way to do it
-    https://stackoverflow.com/questions/46258499/read-the-last-line-of-a-file-in-python
-    """
-
-    if not os.path.isfile(filepath):
-        print('FileNotFoundError: ' + filepath + 'in get_last_line_of_file()')
-        raise FileNotFoundError
-
-    if filesize == 'small':
-        with open(filepath) as f:
-            for line in f:
-                pass
-            last_line = line
-
-    if filesize == 'large':
-        # if the file is one line this method will fail, revert to small file method
-        try:
-            with open(filepath, 'rb') as f:
-                f.seek(-2, os.SEEK_END)
-                while f.read(1) != b'\n':
-                    f.seek(-2, os.SEEK_CUR)
-                last_line = f.readline().decode()
-        # turns out the file was one line
-        except OSError:
-            print(2 * ('file too short for the long method ---- ' + filepath + '\n'), flush=True)
-            # if the file is empty then this try except will hit
-            try:
-                with open(filepath) as f:
-                    for line in f:
-                        pass
-                    last_line = line
-            except NameError as e:
-                print(e, flush=True)
-                print('\n \n this file is empty  \n ', flush=True)
-                raise FileExistsError
-
-    return last_line
 
 
 def make_date_suffix(date, file_type='.csv'):
@@ -255,6 +200,7 @@ def make_date_suffix(date, file_type='.csv'):
     return suffix
 
 
+# ###PAUL TODO: EAORS considerations
 def convert_symbol(symbol, in_exchange, out_exchange, params=params):
     # try:
 
@@ -283,6 +229,8 @@ def convert_symbol(symbol, in_exchange, out_exchange, params=params):
             return params['universe']['universal']['from_universal'][out_exchange][universal_pair]
 
         except KeyError:
+            import pdb;
+            pdb.set_trace()
             # handle the case of tether pairs from exchanges that also have a separate USD (non tether quote)
             if 'ether' in universal_pair:
                 universal_pair = universal_pair.replace('ether', '')  # for tether, not ETH
@@ -291,142 +239,7 @@ def convert_symbol(symbol, in_exchange, out_exchange, params=params):
                 raise KeyError
 
 
-def get_data_file_path(data_type, pair, date='live', port=None, exchange=None, pair_mode='asis', params=params):
-    """returns string of filepath to requested datafile
-
-    :param port: (str) naming the portfolio strategy for orders and preformance data
-    inputs
-        data_type (str): options ----  ['price', 'trade', 'order', 'book']  ----
-            TODO add live order which means all open orders
-            TODO daily data files  add support for book eventually
-        pair (str):    pair  ---- 'BTCUSDT'
-        date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
-    """
-
-    live_data_dir = params['dirs']['live_data_dir']  # still used
-    port_data_dir = params['dirs']['port_data_dir']  # still used
-
-    # ###PAUL_todo: once data is saved under universal names the conditional is needed, should be done every time
-    if pair_mode == 'asis':  # pair given in exchange's format
-        pass
-    elif pair_mode == 'universal':
-        pair = convert_symbol(pair, in_exchange='universal', out_exchange=exchange, params=params)
-
-    fp = None
-
-    if date != 'pair_folder':
-        suffix = make_date_suffix(date)
-
-    # first handle if date is live... if not we attempt to convert it if not a tuple
-    if date == 'live' or date == 'open':
-
-        # ### live kept data
-        #
-        #
-        if data_type == 'trade' or data_type == 'trades' or data_type == 'price' or data_type == 'prices':
-            if exchange is None:
-                return IOError
-            elif data_type == 'trade' or data_type == 'trades':
-                fp = live_data_dir + 'trades_live/' + exchange + '/' + pair + '/' \
-                     + exchange + '_' + pair + '_live_trades.csv'
-
-            # ###PAUL this should be handled one day... maybe return just the price file for time.time()
-            elif data_type == 'price' or data_type == 'prices':
-                fp = live_data_dir + pair + '/' + pair + '_live_trades.csv'
-
-        # ### portfolio data
-        #
-        #
-        if data_type == 'orders' or data_type == 'order' or data_type == 'open_orders' \
-                or data_type == 'whose_turn' or data_type == 'last_order_check' \
-                or data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path' \
-                or data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
-            # if port not provided can't get any of these
-            if port is None:
-                return IOError
-            elif data_type == 'orders' or data_type == 'order' or data_type == 'open_orders':
-                fp = port_data_dir + exchange + '/' + port + '/open_orders.csv'
-            elif data_type == 'whose_turn':
-                fp = port_data_dir + exchange + '/' + port + '/whose_turn.csv'
-            elif data_type == 'last_order_check':
-                fp = port_data_dir + exchange + '/' + port + '/last_check.txt'
-            elif data_type == 'port' or data_type == 'port_folder' or data_type == 'port_path':
-                fp = port_data_dir + exchange + '/' + port + '/'
-            elif data_type == 'closed_order' or data_type == 'closed_orders' or data_type == 'orders_closed':
-                fp = port_data_dir + exchange + '/' + port + '/closed/' + pair + '/' \
-                     + 'orders----' + pair + '----' + suffix
-
-    # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
-    # if ~isinstance(date, tuple):
-    #     date = convert_date_format(date=date, output_type='tuple_to_day')
-
-    elif date == 'pair_folder':  # just gets the pair's folder.. will direct to folder of dates for data type
-        if exchange is not None:
-            if data_type == 'price' or data_type == 'prices':
-                fp = live_data_dir + 'price/' + exchange + '/' + pair + '/'
-            elif data_type == 'trade' or data_type == 'trades':
-                fp = live_data_dir + 'trades_daily/' + exchange + '/' + pair + '/'
-            elif data_type == 'book':
-                fp = live_data_dir + 'book_daily/' + exchange + '/' + pair + '/'
-        elif port is not None:
-            if data_type == 'order_closed':
-                fp = port_data_dir + exchange + '/' + port + '/closed/' + pair + '/' \
-                     + 'orders----' + pair + '----' + suffix
-        else:
-            return IOError
-
-    elif date != 'live':  # date is actually supplied
-
-        # live maintained data (historical, but still folder is managed in real time)
-        if exchange is not None and port is None:
-            if data_type == 'price' or data_type == 'prices':
-                fp = live_data_dir + 'price/' + exchange + '/' + pair \
-                     + '/prices----' + exchange + '_' + pair + suffix
-            elif data_type == 'trade' or data_type == 'trades':
-                fp = live_data_dir + 'trades_daily/' + exchange + '/' + pair \
-                     + '/trades----' + exchange + '_' + pair + suffix
-            elif data_type == 'book':
-                fp = live_data_dir + 'book/' + exchange + '/' + pair \
-                     + '/book----' + exchange + '_' + pair + suffix
-
-        # port related data
-        elif port is not None:
-            if data_type == 'order' or data_type == 'orders' or data_type == 'closed_orders':
-                ffp = port_data_dir + exchange + '/' + port + '/closed/' + pair + '/' \
-                      + 'orders----' + pair + '----' + suffix
-        else:
-            return IOError
-
-    if fp is not None:
-        return fp
-    else:
-        print('Nothing in data file path function matched the request', flush=True)
-        print('the request was:', flush=True)
-        print('    data_type=' + str(data_type) + ', pair=' + str(pair) + ', date=' + str(date) \
-              + ', port=' + str(port) + ', exchange=' + str(exchange), flush=True)
-        return IOError
-
-
-def get_live_trades_data(pair, exchange, params=params):
-    """gets dataframe of live data... most recent trades for last 10 mins
-
-    input
-        - pair (str): pair for data.       e.x.:  btcusdt
-    returns
-        - trades (pd.DataFrame): trades for last 10 minutes
-    """
-    col_dtype_dict = params['data_format'][exchange]['trade_name_and_type']
-    fp = get_data_file_path(data_type='trade', pair=pair, date='live', exchange=exchange)
-
-    return pd.read_csv(fp,
-                       header=0,  # ignore col_names... dont treat as data
-                       names=col_dtype_dict.keys(),  # name of columns
-                       dtype=col_dtype_dict,  # data type of cols
-                       index_col='msg_time'
-                       )
-
-
-def get_date_range(start_date, end_date, output_type='datetime.datetime'):
+def get_date_list(start_date, end_date, output_type='datetime.datetime', step_size='day'):
     """makes list from start_date to end date
 
     inputs:
@@ -437,6 +250,9 @@ def get_date_range(start_date, end_date, output_type='datetime.datetime'):
     outputs:
         date_list (list): containing datetime.datetime objects.... unless output_type specified otherwise
     """
+
+    start_date = convert_date_format(date=start_date, output_type=output_type)
+    end_date = convert_date_format(date=end_date, output_type=output_type)
 
     date_list = []
     delta = end_date - start_date  # as timedelta
@@ -452,150 +268,7 @@ def get_date_range(start_date, end_date, output_type='datetime.datetime'):
     return date_list
 
 
-def get_data(data_type,
-             pair,
-             params=params,
-             date=None,
-             start_date=None,
-             end_date=None,
-             duration=None,
-             port=None,
-             exchange=None,
-             fill_in=True
-             ):
-    """master data retriving function
-
-    input:
-        data_type (str): 'price'  OR  'trade
-        date (tuple): options:
-        date: datetime.datetime
-        start_date (tuple): ('2021', '01', '31') will work... all others not gaurenteed
-    """
-
-    # handle timing requests  ###PAUL TODO make this part of get_date_range function
-
-    # convert any dates to datetime as we do relative calculations with them
-    if start_date is not None:
-        start_date = convert_date_format(start_date, 'datetime')
-    if end_date is not None:
-        end_date = convert_date_format(end_date, 'datetime')
-    if start_date is None and end_date is None and date is None:
-        date = 'live'
-
-    # ### set start and end date according to input
-    #
-    # if date live --> get last 24 hours of data
-    if date == 'live':
-        if duration is None:  # this means look back one day... we take the last 24 hours of data when live no duration
-            duration = datetime.timedelta(days=1)
-        end_date = datetime.date.fromtimestamp(time.time())
-        start_date = end_date - duration
-
-    # only a date provided --> get that day or data
-    elif date is not None:
-        if type(date) != datetime.date or type(date) != datetime.datetime:
-            date = convert_date_format(date, 'datetime')
-        start_date = date
-        end_date = date
-
-    # only start date given --> use start_date  AND  duration argument
-    elif start_date is not None and end_date is None:
-        if duration is None:
-            end_date = start_date  # do this because only return start_date's data
-        else:
-            end_date = start_date + datetime.timedelta(duration)
-        if end_date > datetime.date.fromtimestamp(time.time()):
-            end_date = datetime.date.fromtimestamp(time.time())
-
-    # only end date given --> use end_date  and  duration argument
-    elif end_date is not None and start_date is None:
-        if duration is None:
-            start_date = end_date  # do this because only return start_date's data
-        else:
-            start_date = end_date - datetime.timedelta(duration)
-        if end_date > datetime.date.fromtimestamp(time.time()):
-            end_date = datetime.date.fromtimestamp(time.time())
-
-    # if start and end are provided --> use as given
-    elif start_date is not None and end_date is not None:
-        pass
-
-    # something wrong about the date request to this function. Its not worth trying to handle
-    else:
-        print('I cant handle the dates as given', flush=True)
-        raise DateError
-
-    if data_type == 'price' or data_type == 'prices':
-        col_dtype_dict = params['data_format'][exchange]['price_name_and_type']
-
-    if data_type == 'trade' or data_type == 'trades':
-        col_dtype_dict = params['data_format'][exchange]['trade_name_and_type']
-
-    # for now these must get fed in as datetime
-    date_list = get_date_range(start_date, end_date)
-
-    idx = 0
-
-    for data_date in date_list:
-        fp = get_data_file_path(data_type, pair, data_date, port, exchange, params=params)
-
-        try:
-            if idx == 0:
-                # pdb.set_trace()
-                data = pd.read_csv(fp,
-                                   header=0,  # ignore col_names... dont treat as data
-                                   # names=col_dtype_dict.keys(),     # name of columns
-                                   # dtype=col_dtype_dict,            # data type of cols
-                                   index_col='msg_time'
-                                   )
-            if idx > 0:
-                # pdb.set_trace()
-                data_t = pd.read_csv(fp,
-                                     header=0,  # ignore col_names... dont treat as data
-                                     # names=col_dtype_dict.keys(),  # name of columns
-                                     # dtype=col_dtype_dict,  # data type of cols
-                                     index_col='msg_time'
-                                     )
-
-                data = pd.concat([data, data_t])
-        except FileNotFoundError:
-            print('---- file missing: ' + fp, flush=True)
-            continue
-
-        idx += 1  # cant enumerate... only increase count if the file is found, otherwise breaks if first file not there
-
-    # convert index_col "YYYY-MM-DD HH:MM:SS" to pd.datetime AFTER price read... trade data is epoch time int, so OK
-    if data_type == 'price':
-        data.index = pd.to_datetime(data.index)
-        data.drop_duplicates(inplace=True)
-        data.dropna(inplace=True)
-        data.sort_index(inplace=True)
-
-        # fill in missing observations using this dictionary
-        observation_dict = {'buyer_is_maker': 0, 'buyer_is_taker': 0, 'buy_vol': 0, 'sell_vol': 0,
-                            'buy_base_asset': 0, 'sell_base_asset': 0, 'buy_vwap': np.nan, 'sell_vwap': np.nan}
-
-        empty_ts = pd.Series(data=pd.date_range(start=min(data.index), end=max(data.index), freq='s'))
-        mask = empty_ts.isin(data.index)
-        mask = ~mask
-        missing_times = empty_ts[mask]
-        missing_data = pd.DataFrame(observation_dict, index=missing_times)
-
-        if fill_in == True:
-            data = pd.concat([data, missing_data])
-
-        # sort everything with the missing enteries filled in as 0
-        data.sort_index(inplace=True)
-
-        # and fill in the NaNs from the missing enteries
-        data.fillna(method='ffill', inplace=True)
-        data.fillna(method='bfill', inplace=True)
-        data.fillna(method='ffill', inplace=True)
-
-    return data
-
-
-def convert_trades_df_to_prices(trades, exchange='standard_trade_format'):
+def convert_trades_df_to_trading_summary(trades, exchange_format='amberdata'):
     """reads CSV of trades. converts to prices in some interval
 
     input :
@@ -603,170 +276,98 @@ def convert_trades_df_to_prices(trades, exchange='standard_trade_format'):
         exchange (str): helps tell the format
     """
 
-    if exchange == 'standard_trade_format' or exchange in ['binance', 'binanceus', 'kucoin']:
-        trades.index = pd.to_datetime(trades.index, unit='s')
-        trades['buyer_is_maker'] = trades['buyer_is_maker'].astype('int')
-        trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
-        trades['buy_vol'] = trades['quantity'] * trades['buyer_is_maker']
-        trades['sell_vol'] = trades['quantity'] * trades['buyer_is_taker']
-        trades['buy_base_asset'] = trades['price'] * trades['buy_vol']
-        trades['sell_base_asset'] = trades['price'] * trades['sell_vol']
+    if exchange_format == 'EAORS':
+        """ 
+        logic for conversion of which side the trade was on... this is the link for the binance documentation.
+        https://developers.binance.com/docs/binance-trading-api/spot#recent-trades-list
+        going off this and the line ```"False if trade["m"] else True,``` in  `hoth/src/data/exchanges/binance_data`
+        if side==True in the table hoth.Trades the seller is the price maker for the trade
+        """
 
-        trades.drop(columns=['buy_order_id', 'sell_order_id', 'trade_time', 'trade_id'], inplace=True)
-        prices = trades.groupby(pd.Grouper(freq='s')).sum()
-
-        prices['buy_vwap'] = prices['buy_base_asset'] / prices['buy_vol']
-        prices['sell_vwap'] = prices['sell_base_asset'] / prices['sell_vol']
-
-        prices.drop(columns=['price', 'quantity'], inplace=True)
-
-        # fill in VWAP NaN's due to volume being 0 in a second...
-        prices.fillna(method='ffill', inplace=True)
-        prices.fillna(method='bfill', inplace=True)
-        prices.fillna(method='ffill', inplace=True)
-
-        if exchange == ' kucoin':
-            print(3 * 'kucoin not yet supported \n', flush=True)
-            raise FileExistsError
-
-        return prices
-
-
-def trim_data_frame_by_time(df,
-                            method='most_recent',
-                            days=0,
-                            hours=0,
-                            minutes=0,
-                            seconds=0,
-                            millieseconds=0,
-                            relative_to_now=False
-                            ):
-    """trims a dataframe.. for example 'most_recent' hour or 'least_recent' hour of trades
-
-    output (pd.DataFrame): df given, but now trimmed
-    ###PAUL dumb, also need the ability to do this from this point in time.. prolly not worth implementing yet
-    """
-    if method == 'most_recent':
-        days = -days
-        hours = -hours
-        minutes = -minutes
-        seconds = -seconds
-        millieseconds = -millieseconds
-
-    time_delta = datetime.timedelta(days=days,
-                                    hours=hours,
-                                    minutes=minutes,
-                                    seconds=seconds,
-                                    milliseconds=millieseconds
-                                    )
-
-    if relative_to_now == True:
-        cutoff_time = datetime.datetime.now() + time_delta
-    else:
-        cutoff_time = max(df.index) + time_delta
-    #
-    drop_mask = df.index > cutoff_time
-    df = df[drop_mask]
-
-    return df
-
-
-def make_day_of_prices_from_day_of_trades(pair, date, exchange, params=params):
-    """makes prices historical price csv using trades.
-
-    input:
-        pair
-        date
-        params
-    """
-
-    if type(date) != tuple:
-        date = convert_date_format(date, 'tuple_to_day')
-
-    trades = get_data(data_type='trade', pair=pair, date=date, exchange=exchange)
-    prices = convert_trades_df_to_prices(trades)
-    prices_fp = get_data_file_path(data_type='prices', pair=pair, date=date, exchange=exchange)
-    check_if_dir_exists_and_make(fp=prices_fp)
-    prices.to_csv(prices_fp)
-
-    return None
-
-
-def remake_price_files(start_date=None, end_date=None, exchange=None, symbol_mode='native_exchange', params=params):
-    """scans the trade history directory for each pair and remakes the price file
-
-    input:
-        params (dict): standard params as defined in ./data/config.py
-        start_date (tuple): earliest date to start making prices for (inclusive)... other formats may work
-        end_date (tuple): latest date to make prices for (inclusive)... other formats may work
-    """
-
-    symbol_and_date_errored = []
-    symbols_tracked = params['universe'][exchange]['symbols_tracked']
-
-    # try converting the start_date and end_date
-    if start_date is not None:
-        start_date = convert_date_format(start_date, 'datetime.date')
-
-    if end_date is not None:
-        end_date = convert_date_format(end_date, 'datetime.date')
-
-    for symbol in symbols_tracked:
-
-        if symbol_mode == 'native_exchange':
-            symbol = convert_symbol(symbol=symbol, in_exchange=exchange, out_exchange='universal')
-
-        # get dir of trade data for that pair
-        daily_trade_exchange_symbol_level_dir = get_data_file_path(data_type='trade',
-                                              pair=symbol,
-                                              date='pair_folder',
-                                              exchange=exchange,
-                                              params=params, )
-
-        trs = os.listdir(daily_trade_exchange_symbol_level_dir)
-
-        # identify dates with trading data`
-        re_date_str = "([0-9]{4}\-[0-9]{2}\-[0-9]{2})"
-        dates = [re.search(re_date_str, tr).group(0) for tr in trs]
-
-        for date in dates:
-            # two formats needed for the date from the trade file name
-            file_date_tup = convert_date_format(date, 'tuple_to_day')
-            file_dt = convert_date_format(date, 'datetime.date')
-
-            # assume we don't remake the price file, only if conditions are met
-            make_pair_date_prices = False
-
-            # no start or end date --> make everything
-            if start_date == None and end_date == None:
-                make_pair_date_prices = True
-
-                # only start_date provided
-            elif start_date is not None and end_date is None:
-                if start_date <= file_dt:
-                    make_pair_date_prices = True
-
-            # only end_date provided
-            elif start_date is None and end_date is not None:
-                if file_dt <= end_date:
-                    make_pair_date_prices = True
-
-            # both start_date and end_date were provided
+        try:
+            trades.set_index('timestamp', inplace=True)
+        except KeyError:
+            if trades.index.name == 'timestamp':
+                pass
             else:
-                if start_date <= file_dt and file_dt <= end_date:
-                    make_pair_date_prices = True
+                raise KeyError
 
-            try:
-                if make_pair_date_prices:
-                    make_day_of_prices_from_day_of_trades(symbol, file_date_tup, exchange)
-                    print('MADE:     pair:  ' + symbol + '  date: ' + date + '  exchange: ' + exchange, flush=True)
+        opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
+        highs = trades['price'].groupby(pd.Grouper(freq='min')).max()
+        lows = trades['price'].groupby(pd.Grouper(freq='min')).min()
+        closes = trades['price'].groupby(pd.Grouper(freq='min')).last()
 
-            except:
-                print("  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n  ERRORED \n ", flush=True)
-                print('errored on:   pair:  ' + symbol + '  date: ' + date + '  exchange: ' + exchange, flush=True)
-                symbol_and_date_errored.append((symbol, date))
+        # override name to be desired col name, currently is "price"
+        opens.name = 'open';
+        highs.name = 'high';
+        lows.name = 'low';
+        closes.name = 'close';
 
-    return symbol_and_date_errored
+        ohlc_df = pd.concat([opens, highs, lows, closes], axis=1)
+
+        trades['buyer_is_taker'] = trades['side'].astype('int')
+        trades['buyer_is_maker'] = trades['buyer_is_taker'].map({0: 1, 1: 0})
+        trades['buy_base_vol'] = trades['amount'] * trades['buyer_is_maker']
+        trades['sell_base_vol'] = trades['amount'] * trades['buyer_is_taker']
+        trades['buy_quote_vol'] = trades['buy_base_vol'] * trades['price']
+        trades['sell_quote_vol'] = trades['sell_base_vol'] * trades['price']
+        trades['total_quote_vol'] = trades['buy_quote_vol'] + trades['sell_quote_vol']
+        trades.rename(mapper={'amount': 'total_base_vol'}, axis='columns', inplace=True)
+
+        trades = trades.drop(columns=['exchange', 'symbol', 'price', 'side', 'id'])
+
+    if exchange_format == 'amberdata':  # this is for amberdata so amberdata.Trades
+        try:
+            trades.set_index('timestamp', inplace=True)
+        except KeyError:
+            if trades.index.name == 'timestamp':
+                pass
+            else:
+                raise KeyError
+
+        opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
+        highs = trades['price'].groupby(pd.Grouper(freq='min')).max()
+        lows = trades['price'].groupby(pd.Grouper(freq='min')).min()
+        closes = trades['price'].groupby(pd.Grouper(freq='min')).last()
+
+        # override name to be desired col name, currently is "price"
+        opens.name = 'open'
+        highs.name = 'high'
+        lows.name = 'low'
+        closes.name = 'close'
+
+        ohlc_df = pd.concat([opens, highs, lows, closes], axis=1)
+
+        trades['buyer_is_maker'] = trades['isBid'].astype('int')
+        trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
+        trades['buy_base_vol'] = trades['volume'] * trades['buyer_is_maker']
+        trades['sell_base_vol'] = trades['volume'] * trades['buyer_is_taker']
+        trades['buy_quote_vol'] = trades['buy_base_vol'] * trades['price']
+        trades['sell_quote_vol'] = trades['sell_base_vol'] * trades['price']
+        trades['total_quote_vol'] = trades['buy_quote_vol'] + trades['sell_quote_vol']
+        trades.rename(mapper={'volume': 'total_base_vol'}, axis='columns', inplace=True)
+
+        trades.drop(columns=['timestampNanoseconds', 'exchange', 'instrument', 'isBid', 'tradeId',
+                             'created_ts', 'price'],
+                    inplace=True)
+
+    # Add one minute offset... otherwise summary comes for the beginning of the minute
+    trades.index += Minute(1)
+    ohlc_df.index += Minute(1)
+    summation_price_data = trades.groupby(pd.Grouper(freq='min')).sum()
+
+    trading_summary = pd.concat([ohlc_df, summation_price_data], axis=1)
+
+    trading_summary['buy_vwap'] = trading_summary['buy_quote_vol'] / trading_summary['buy_base_vol']
+    trading_summary['sell_vwap'] = trading_summary['sell_quote_vol'] / trading_summary['sell_base_vol']
+    trading_summary['vwap'] = trading_summary['total_quote_vol'] / trading_summary['total_base_vol']
+
+    # fill in VWAP NaN's due to volume being 0 in a second...
+    trading_summary.fillna(method='ffill', inplace=True)
+    trading_summary.fillna(method='bfill', inplace=True)
+    trading_summary.fillna(method='ffill', inplace=True)
+
+    return trading_summary
 
 
 def find_runs(x):
@@ -806,126 +407,387 @@ def find_runs(x):
         return run_values, run_starts, run_lengths
 
 
-def make_alternating_buy_sell_signal(buy_idxs, sell_idxs, signal_shape):
-    """if signal may appear as buy, sell, sell, sell, buy   --transform-->   buy, sell, buy
+def check_prices_for_gaps(prices):
+    """
+    """
 
+    freq = 'min'
+    # prices.drop(prices.index[2:140], inplace=True)
+    #
+    # ### ^^^^^^^^ function input definitions ^^^^^^^
+    #
+
+    # get start and end of prices
+    start_pd_dti = prices.index[0]
+    end_pd_dti = prices.index[-1]
+
+    # make DatetimeIndex containing every period in interval via pandas
+    continuous_price_index = pd.date_range(start=start_pd_dti, end=end_pd_dti, freq=freq)
+
+    # # if the price index is not identical to the continuous price index....
+    # if not continuous_price_index.equals(prices.index):
+
+    # get a mask where True values are a missing index in prices
+    mask_in_index = continuous_price_index.isin(prices.index)
+
+    vals_missing, start_idxs_missing, lens_missing = find_runs(mask_in_index)
+    false_runs_mask = vals_missing == False
+    long_runs_mask = lens_missing > 60
+    long_missing_runs_mask = np.logical_and(false_runs_mask, long_runs_mask)
+    if long_missing_runs_mask.sum() > 0:
+        print(f"- RUNS OVER AN HOUR NOT IN IDX {long_missing_runs_mask.sum()} \n" * 3, flush=True)
+
+    missing_times = continuous_price_index[~mask_in_index]  # inverse mask, True if idx in prices...
+    empty_price_obvs = {'open': np.nan,
+                        'high': np.nan,
+                        'low': np.nan,
+                        'close': np.nan,
+                        'total_base_vol': 0,
+                        'buyer_is_maker': 0,
+                        'buyer_is_taker': 0,
+                        'buy_base_vol': 0,
+                        'sell_base_vol': 0,
+                        'buy_quote_vol': 0,
+                        'sell_quote_vol': 0,
+                        'total_quote_vol': 0,
+                        'buy_vwap': np.nan,
+                        'sell_vwap': np.nan, }  # ###PAUL may want to build non hard coded solution integrated higher up?
+
+    missing_data = pd.DataFrame(empty_price_obvs, index=missing_times)
+    prices = pd.concat([prices, missing_data]).sort_index()
+
+    prices.fillna(method='ffill', inplace=True)
+    prices.fillna(method='bfill', inplace=True)
+    prices.fillna(method='ffill', inplace=True)
+    prices.sort_index(inplace=True)
+
+    # now check for lack of trading volume for long periods of time
+    no_vol_mask = prices['total_base_vol'] == 0
+
+    vals_no_vol, start_idxs_no_vol, lens_no_vol = find_runs(no_vol_mask)
+    no_vol_runs = vals_no_vol == True
+    long_runs_mask = lens_no_vol > 60
+    long_no_vol_runs_mask = np.logical_and(no_vol_runs, long_runs_mask)
+    if long_no_vol_runs_mask.sum() > 0:
+        print(f"- RUNS OVER AN HOUR WITH NO VOLUME {long_no_vol_runs_mask.sum()} \n" * 3, flush=True)
+
+    # ### isolate info for long runs we don't want
+    #
+    # missing first
+    start_idxs_missing = start_idxs_missing[long_missing_runs_mask]
+    lens_missing = lens_missing[long_missing_runs_mask]
+    iter_info = zip(start_idxs_missing, lens_missing)
+    start_end_tuple_list_missing = []
+    for start_idx, run_len in iter_info:
+        start_dti = prices.index[start_idx - 1]
+        end_dti = prices.index[start_idx + run_len + 1]
+        start_end_tuple_list_missing.append((start_dti, end_dti))
+
+    # no volume second
+    start_idxs_no_vol = start_idxs_no_vol[long_no_vol_runs_mask]
+    lens_no_vol = lens_no_vol[long_no_vol_runs_mask]
+    iter_info = zip(start_idxs_no_vol, lens_no_vol)
+    start_end_tuple_list_no_vol = []
+    for start_idx, run_len in iter_info:
+        start_dti = prices.index[start_idx - 1]
+        end_dti = prices.index[start_idx + run_len + 1]
+        start_end_tuple_list_no_vol.append((start_dti, end_dti))
+
+    info_on_missing_price_data = \
+        {
+            'missing_info': \
+                {
+                    'start_idxs_missing': start_idxs_missing,
+                    'lens_missing': lens_missing,
+                    'start_end_tuple_list_missing': start_end_tuple_list_missing,
+                },
+            'no_vol_info': \
+                {
+
+                    'start_idxs_no_vol': start_idxs_no_vol,
+                    'lens_no_vol': lens_no_vol,
+                    'start_end_tuple_list_no_vol': start_end_tuple_list_no_vol,
+                },
+
+        }
+
+    return info_on_missing_price_data
+
+
+def get_trades_data(exchange, symbol, start_date=None, end_date=None, source='amberdata'):
+    """ get trades data from various intenral db sources...
+    need a start_date... maybe fix this later...
     input:
-        buy_idxs = np.array([0,  500])
-
-        sell_idxs = np.array([110, 300])
-
-        signal_shape = ex: (100000,.)  ###PAUL would be good if multi-dim capable... later things
-
-    output:
-        signal  = np.array([1, 0, 0, ..., 0, -1, 0, ..., 0, 1])
-
     """
 
-    i_in_sell_idxs = 0  # sell idx in queue to be compared to buy_idx
-    signal = np.zeros(signal_shape)  # 1 for buy,  -1 for sell,    0 for no action
+    ch_client = CH_Client('10.0.1.86', port='9009')
 
-    for i, buy_idx in enumerate(buy_idxs):
-        if i > 5:
-            break
+    # note in all cases -- not inclusive on the end in order to have no overlap of trades gathered when rolling
+    if end_date is not None and start_date is not None:
+        end_date_string = convert_date_format(end_date, output_type='string')
+        start_date_string = convert_date_format(start_date, output_type='string')
+        query_date_str_1 = f"""WITH 
+                                   toDateTime('{start_date_string}') as startdate,
+                                   toDateTime('{end_date_string}') as enddate"""
+        query_date_str_2 = """AND timestamp > startdate
+                              AND timestamp <= enddate"""
+    elif end_date is None and start_date is not None:
+        start_date_string = convert_date_format(start_date, output_type='string')
+        query_date_str_1 = f"WITH toDateTime('{start_date_string}') as startdate"
+        query_date_str_2 = """AND timestamp > startdate"""
+    elif end_date is not None and start_date is None:
+        query_date_str_1 = f"WITH toDateTime('{end_date_string}') as enddate"
+        query_date_str_2 = """AND timestamp <= enddate"""
 
-        whose_turn = 'buy'  # cant sell something you dont own
-        sell_idx = sell_idxs[i_in_sell_idxs]  # set sell_idx for the loop
+    if source == 'amberdata':
+        # preprocessing on symbol, amber data format is -->  f"btc_usdt"   vs   the EAORS -->  f"BTC-USDT"
+        symbol = symbol.lower().replace('-', '_')
 
-        if buy_idx < sell_idx:  # set a buy by flipping a zero in signal at the position of buy_idx's value
-            if whose_turn == 'buy':  # skip the next sell_idx
-                signal[buy_idx] == 1
-                whose_turn = 'sell'
+        query = f"""
+        {query_date_str_1}
+        SELECT * 
+        FROM amberdata.Trades 
+        WHERE 
+            exchange = '{exchange}'
+            AND instrument='{symbol}'
+            {query_date_str_2}
+        ORDER BY timestamp
+        """
 
-            else:  # it is not buys turn yet, go to next buy_idx, see if time for a sell yet
-                continue
+    elif source == "EAORS":
+        # preprocessing on symbol, amber data format is -->  f"btc_usdt"   vs   the EAORS -->  f"BTC-USDT"
+        symbol = symbol.upper().replace('_', '-')
 
-        if sell_idx < buy_idx:  # set a sell in signal with a -1 at position sell_idx's value
-            if whose_turn == 'sell':
-                signal[sell_idx] == -1
-                whose_turn = 'buy'
-            else:  # not sell's turn yet.. move to next sell_idx position and wait for buy
-                i_in_sell_idxs += 1
+        query = f"""
+        {query_date_str_1}
+        SELECT *
+        FROM hoth.Trades
+        WHERE
+            exchange = '{exchange}'
+            AND symbol='{symbol}'
+            {query_date_str_2}
+        ORDER BY timestamp;
+        """
 
-    return signal
+    else:
+        print(f"source {source} ---- NOT SUPPORTED")
+        raise ValueError
+
+    # print(f"{query}")
+    trades = ch_client.query_dataframe(query)
+
+    try:
+        trades.set_index('timestamp', inplace=True)  # replace counting index with time
+    except KeyError:
+        return 0  # this means there were no trades in the requested interval
+
+    return trades
 
 
-def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
-    """Rounds a given quantity to a specific step size
-    :param quantity: required
-    :param step_size: required
-    :return: decimal
+def downsample_pd_series(series, downsample_n=500_000):
+    len_series = series.shape[0]
+    counting_idx = np.arange(len_series)
+    downsampled_arr = np.array([counting_idx, series]).T
+    downsampled_arr = lttb.downsample(downsampled_arr, n_out=downsample_n)
+
+    ilocs = downsampled_arr.T[0, :].astype('int')
+    values = downsampled_arr.T[1, :]
+    dtis = series.index[ilocs]
+
+    downsampled_series = pd.Series(data=values, index=dtis)
+
+    return downsampled_series, ilocs
+
+
+# ###PAUL change name of this, and consider moving, I just wanted it out of the notebook
+# ###PAUL_RTI_CHECK____
+def preprocess_data(df, pct_nan):
     """
-    precision: int = int(round(-math.log(step_size, 10), 0))
-    return float(round(quantity, precision))
+        Remove columns with more than 'pct_nan' missing values.
 
-
-def round_decimals_up(number: float, decimals: int = 2):
+        :pct_nan: frequency threshold to remove signal.
     """
-    Returns a value rounded up to a specific number of decimal places.
+    df_nan = df.apply(lambda x: x.isna().mean())
+    keep_col = df_nan[df_nan < 0.05].index
+    df = df[keep_col]
+    return df
+
+
+# ###PAUL change name of this, and consider moving, I just wanted it out of the notebook
+# ###PAUL this would be a useful function also... but it needs a fequency input , actually already have this built...
+#         TODO: may want to apply printed feature making code to this, yes... do this
+def preprocessing(df, pct_nan, signal_transformation):
+    """ See init method for parameters description.
     """
-    if not isinstance(decimals, int):
-        raise TypeError("decimal places must be an integer")
-    elif decimals < 0:
-        raise ValueError("decimal places has to be 0 or more")
-    elif decimals == 0:
-        return math.ceil(number)
+    df = preprocess_data(df, pct_nan=pct_nan)
+    df.fillna(method="ffill", inplace=True)
+    df.fillna(method="bfill", inplace=True)
+    df.fillna(method="ffill", inplace=True)
 
-    factor = 10 ** decimals
-    return math.ceil(number * factor) / factor
+    if signal_transformation == "diff":
+        df = df.diff()
+    elif signal_transformation == "return":
+        df = df.pct_change()
+    elif signal_transformation == "MA":
+        window = 24 if self.freq == "hour" else 30
+        df = df - df.rolling(window).mean()
+    elif signal_transformation == "z_score":  # ###PAUL look into adding this, may need to employ a max_cut
+        window = 30
+        df = (df - df.rolling(window).mean()) / df.rolling(window).std()
+    df = preprocess_data(df, pct_nan=pct_nan)
+
+    df.fillna(method="ffill", inplace=True)
+    df.fillna(method="bfill", inplace=True)
+    df.fillna(method="ffill", inplace=True)
+
+    return df
 
 
-def round_decimals_down(number: float, decimals: int = 2):
+def get_data_file_path(data_type, pair, date='live', port=None, signal=None, exchange=None, pair_mode='asis',
+                       params=params):
+    """returns string of filepath to requested datafile
+
+    :param port: (str) naming the portfolio strategy for orders and preformance data
+    inputs
+        data_type (str): options ----  ['price', 'trade', 'order', 'book']  ----
+            TODO add live order which means all open orders
+            TODO daily data files  add support for book eventually
+        pair (str):    pair  ---- 'BTCUSDT'
+        date (tuple):    (year, month, day) such as (2021, 01, 31) ---- TODO make other time formats work
     """
-    Returns a value rounded down to a specific number of decimal places.
-    """
-    if not isinstance(decimals, int):
-        raise TypeError("decimal places must be an integer")
-    elif decimals < 0:
-        raise ValueError("decimal places has to be 0 or more")
-    elif decimals == 0:
-        return math.floor(number)
 
-    factor = 10 ** decimals
-    return math.floor(number * factor) / factor
+    live_data_dir = params['dirs']['live_data_dir']
+    ports_data_dir = params['dirs']['ports_data_dir']
+
+    # ###PAUL_todo: once data is saved under universal names the conditional is needed, should be done every time
+    if pair_mode == 'asis':  # pair given in exchange's format
+        pass
+    elif pair_mode == 'universal':
+        pair = convert_symbol(pair, in_exchange='universal', out_exchange=exchange, params=params)
+
+    fp = None
+
+    if date != 'path':
+        suffix = make_date_suffix(date)
+
+    # TODO: keep this method of keeping data live around... if fast responses eventually desired that system >>>
+    # first handle if date is live... if not we attempt to convert it if not a tuple
+    if date in {'live'}:
+        if data_type in {'trade', 'trades', 'price', 'prices'}:
+            live_data_dir = "THIS MOVED TO"  # TODO a reminder for later... trades and prices should be in database
+            # TODO: would be good to migrate this functionality to a broader `get_data()`
+            if exchange is None:
+                return IOError
+            elif data_type in {'trade', 'trades'}:
+                fp = live_data_dir + 'trades_live/' + exchange + '/' + pair + '/' \
+                     + exchange + '_' + pair + '_live_trades.csv'
+            elif data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + pair + '/' + pair + '_live_prices.csv'
+
+        # ### portfolio data
+        #
+        #
+        if data_type in {'state_dict', 'orders', 'order', 'open_orders', 'whose_turn', 'last_order_check',
+                         'port', 'port_folder', 'port_path', 'closed_order', 'closed_orders', 'orders_closed'}:
+            if port is None and signal is None:
+                print(f"---- need a `port` or `signal`  name for this data_type = {data_type}")
+                return IOError
+            elif data_type in {'port', 'port_folder', 'port_path'}:
+                fp = ports_data_dir + port + '/'
+            elif data_type in {'state_dict'}:
+                if port is not None:
+                    fp = ports_data_dir + port + '/state_dict.pickle'
+                elif signal is not None:
+                    fp = live_data_dir + 'signals/' + signal + '/state_dict.pickle'
+                else:
+                    print(f"need to provide a port or signal to get a state_dict")
+                    raise ValueError
+            elif data_type in {'open_orders', 'orders_open', 'open', }:
+                fp = ports_data_dir + port + '/orders/' + exchange + '/open_orders.csv'
+            elif data_type in {'closed_order', 'closed_orders', 'orders_closed', 'closed', }:
+                fp = ports_data_dir + port + '/orders/' + exchange + '/closed/' + pair + '/' \
+                     + 'orders----' + pair + '----' + suffix
+            elif data_type in {'last_order_check', }:
+                fp = ports_data_dir + port + '/last_check.txt'
+            else:
+                fp = None
+
+    # desired ordering...   /  <port_name
+    # >  /  <data_type>  /
+    #                                              ^^^ orders (open
+    # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
+    # if ~isinstance(date, tuple):
+    #     date = convert_date_format(date=date, output_type='tuple_to_day')
+
+    elif date == 'path':  # just gets the pair's folder.. will direct to folder of dates for data type
+        if exchange is not None:
+            if data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + 'price/' + exchange + '/' + pair + '/'
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + pair + '/'
+            elif data_type == 'book':
+                fp = live_data_dir + 'book_daily/' + exchange + '/' + pair + '/'
+            elif port is not None:
+                if data_type in {'closed_order', 'closed_orders', 'orders_closed', 'closed', }:
+                    fp = ports_data_dir + port + '/orders/' + exchange + '/closed/'
+        else:
+            return IOError
+
+    elif date != 'live':  # date is actually supplied
+
+        # live maintained data (historical, but still folder is managed in real time)
+        if exchange is not None and port is None:
+            if data_type == 'price' or data_type == 'prices':
+                fp = live_data_dir + 'price/' + exchange + '/' + pair \
+                     + '/prices----' + exchange + '_' + pair + suffix
+            elif data_type == 'trade' or data_type == 'trades':
+                fp = live_data_dir + 'trades_daily/' + exchange + '/' + pair \
+                     + '/trades----' + exchange + '_' + pair + suffix
+            elif data_type == 'book':
+                fp = live_data_dir + 'book/' + exchange + '/' + pair \
+                     + '/book----' + exchange + '_' + pair + suffix
+
+        else:
+            return IOError
+
+    if fp is not None:
+        return fp
+    else:
+        print('Nothing in data file path function matched the request', flush=True)
+        print('the request was:', flush=True)
+        print('    data_type=' + str(data_type) + ', pair=' + str(pair) + ', date=' + str(date) \
+              + ', port=' + str(port) + ', exchange=' + str(exchange), flush=True)
+        return IOError
 
 
 def check_if_dir_exists_and_make(dir=None, fp=None):
+    """acts the same if dir or fp passed, will make the dir or fp
+    returns True if directory already existed, False if it did not """
 
     # check if directory heading to file exists, if not make all required on the way
-    if dir is not None:
-        if os.path.isdir(dir) == False:
-            os.makedirs(dir)
+    if dir is None:
+        if fp is not None:
+            dir = os.path.dirname(fp)
+        else:
+            print(f"must provide dir or fp")
+            raise ValueError
 
-    if fp is not None:
-        fp_dirname = os.path.dirname(fp)
-        if os.path.isdir(fp_dirname) == False:
-            os.makedirs(fp_dirname)
+    if os.path.isdir(dir) == False:
+        dir_existed = False
+        os.makedirs(dir)
+    else:
+        dir_existed = True
 
-    return None
-
-
-def reverse_dictionary(d):
-    """takes a dictionary and flips the keys and values
-    """
-    new_dict = {}
-
-    for key in d.keys():
-        value = d[key]
-        new_dict[value] = key
-
-    return new_dict
+    return dir_existed
 
 
-def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=None, thread_lock=False):
+def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=None):
     # check that the file exists for the correct time period
     if os.path.isfile(file_path):
-        if thread_lock == True:
-            lock_thread_append_to_file(file_path, new_line)
-        if thread_lock == False:
-            # write trade to historical file... no lock as this script only appends to these files
-            with open(file_path, "a") as f:
-                f.write(new_line)
-            os.chmod(file_path, 0o777)
+        # write trade to historical file... no lock as this script only appends to these files
+        with open(file_path, "a") as f:
+            f.write(new_line)
+        os.chmod(file_path, 0o777)
 
     else:  # file does not exist
         # check if directory heading to file exists, if not make all required on the way
@@ -939,3 +801,750 @@ def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=N
                 f.write(header)
             f.write(new_line)
         os.chmod(file_path, 0o777)
+
+    return
+
+
+# # ###PAUL these were horrible, but done in a rush. its only meant for framework results... which has been totally
+# restructured. once the pipeline is known later (hopefully today) we can put this together.
+# # `signal_dict` can all go in 1 dictionary pickled, but the framework results can not
+# # the model needs to be saved at a separate path meaning this kind of functionality is needed
+# def wrap_up_framework_results_and_model(prices, results_name, model, framework_results, one_run_params):
+#     """ ###PAUL TODO: move one_run_params into framework_results
+#     """
+#     framework_results_fp = f"/opt/shared/crypto/algos/data/pickled_framework_results/{results_name}"
+#
+#     saved_model_fp = f"/opt/shared/crypto/algos/data/saved_models/{results_name}"
+#
+#
+#     # ###PAUL THE BELOW SHOULD BE MOVED INTO FUNCTIONALITY IN UTILS for `make_signal_df()` and `make_transacts_df()`
+#     # ###PAUL THE BELOW SHOULD BE MOVED INTO FUNCTIONALITY IN UTILS for `make_signal_df()` and `make_transacts_df()`
+#     # # ### making signal_df
+#     # #
+#     # signal_df = pd.DataFrame(framework_results['signal'])
+#     # signal_df.columns = ['signal_smoothed']
+#     # signal_df = pd.concat([prices.loc[signal_df.index]['vwap'], signal_df], axis=1)
+#     # signal_df['port_val'] = framework_results['port_value_ts']
+#     # signal_df['signal_not_smoothed'] = framework_results['preds']
+#     # signal_df.to_pickle(f"{framework_results_dir_path}preformance_df.pickle")
+#     #
+#     # # ### saving transactions in convenient df form
+#     # #
+#     # transacts_df = pd.DataFrame.from_records(framework_results['transacts_list'], index='datetime')
+#     # transacts_df.to_pickle(f"{framework_results_dir_path}transacts_df.pickle")
+#
+#
+#     # ### wrapping up one_run_params.... for future reproducability
+#     #
+#     one_run_params_fp = f"{framework_results_dir_path}one_run_params.pickle"
+#     with open(one_run_params_fp, 'wb') as f:
+#         pickle.dump(one_run_params, f)
+#
+#
+# def read_wrapped_framework_results(results_name):
+#     """ unwraps / reads all the results for a certain model run ---- the following are supported
+#         "2023_03_22____4_precent_peaks____test_period"
+#         "2023_03_22____4_precent_peaks____validation_period"
+#     """
+#
+#     framework_results_dir_path = f"/opt/shared/crypto/algos/data/framework_results/{results_name}/"
+#     transacts_df = pd.read_pickle(f"{framework_results_dir_path}transacts_df.pickle")
+#     signal_df = pd.read_pickle(f"{framework_results_dir_path}preformance_df.pickle")
+#
+#     # ### wrapping up all model results object for future analysis
+#     #
+#     framework_results_fp = f"{framework_results_dir_path}framework_results.pickle"
+#     with open(framework_results_fp, 'rb') as f:
+#         framework_results = pickle.load(f)  # protocol=pickle.HIGHEST_PROTOCOL
+#
+#     # ### wrapping up one_run_params.... for future reproducability
+#     #
+#     one_run_params_fp = f"{framework_results_dir_path}one_run_params.pickle"
+#     with open(one_run_params_fp, 'rb') as f:
+#         one_run_params = pickle.load(f)
+#
+#     return one_run_params, framework_results, signal_df, transacts_df
+
+
+def cut_two_pd_dti_objects_to_matching_dtis(dti_obj_1, dti_obj_2):
+    """force two pandas objects (pd.Series or pd.DataFrame to have the same date time index
+    """
+
+    start_dt = max(min(dti_obj_1.index), min(dti_obj_2.index))
+    end_dt = min(max(dti_obj_1.index), max(dti_obj_2.index))
+    dti_obj_1 = dti_obj_1.loc[start_dt:end_dt]
+    dti_obj_2 = dti_obj_2.loc[start_dt:end_dt]
+
+    indicies_equal = dti_obj_1.index.equals(dti_obj_2.index)
+    if indicies_equal != True:
+        print(f"observations missing from one pandas object")
+        raise IndexError
+
+    return dti_obj_1, dti_obj_2
+
+
+def fill_missing_minutes(dataframe, freq='1min', verbose=False):
+    """ looks at the dataframe and fills in the missing observations with NaNs
+    """
+
+    dataframe = dataframe.sort_index()
+    expected_index = pd.date_range(start=dataframe.index[0], end=dataframe.index[-1], freq=freq)
+    num_expected = expected_index.shape[0]
+    missing_minutes = expected_index[~expected_index.isin(dataframe.index)]
+    missing_data = pd.DataFrame(index=missing_minutes)
+    missing_data = missing_data.assign(**{col: np.nan for col in dataframe.columns})
+    num_missing = missing_data.shape[0]
+    dataframe = pd.concat([dataframe, missing_data])
+    dataframe = dataframe.sort_index()
+    p_missing = num_missing / num_expected
+
+    if verbose:
+        print(f"number of expected enteries: {num_expected} \n"
+              f"number of expected enteries: {num_expected} \n"
+              f"proportion of enteries missing: {p_missing} \n"
+              f"")
+
+    return dataframe
+
+
+def fill_trading_summary(trading_summary, out_cols=None):
+    """ function specific to `trading_summary` dataframe becasue some columns fill with zeros other interpolated
+    """
+
+    zero_cols = ['total_base_vol', 'buyer_is_maker',
+                 'buyer_is_taker', 'buy_base_vol', 'sell_base_vol', 'buy_quote_vol',
+                 'sell_quote_vol', 'total_quote_vol', ]
+
+    interpolate_cols = ['open', 'high', 'low', 'close', 'buy_vwap', 'sell_vwap', 'vwap']
+
+    # used if a supset of trading summary is given to this function (for example only the vwap col)
+    out_cols = list(trading_summary.columns)
+    zero_cols = [item for item in zero_cols if item in out_cols]
+    interpolate_cols = [item for item in interpolate_cols if item in out_cols]
+
+    trading_summary = fill_missing_minutes(dataframe=trading_summary)  # add missing observations to trading summary
+    trading_summary[zero_cols] = trading_summary[zero_cols].fillna(0)
+    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].interpolate()
+    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].fillna(method='ffill')
+    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].fillna(method='bfill')
+
+    return trading_summary
+
+
+def fill_trading_summary_interpolating_missing_minutes(trading_summary):
+    """designed to take one day of a `trading_summary` and fill in any missing minutes
+
+    because of the strucutre of how trading summaries are made day by day (on a historical basis) for 2021-03-13 it assumes that
+    the first observation should be 2021-03-13 00:01:00 and last should be 2021-03-14 00:00:00
+    it then makes the `full_index` of every minute in that time span where the rows are NaNs then filled by a custom fulling function
+    """
+    # Extract the day from the first row
+    day = trading_summary.index[0].date()
+
+    # Create datetime index for the entire day, starting from 00:01:00
+    full_index = pd.date_range(start=pd.Timestamp(day) + pd.Timedelta(minutes=1),
+                               end=pd.Timestamp(day) + pd.Timedelta(days=1),
+                               freq='min')
+
+    # Reindex the DataFrame with the full index, filling missing rows with NaN
+    trading_summary = trading_summary.reindex(full_index)
+    trading_summary = fill_trading_summary(trading_summary)
+
+    return trading_summary
+
+
+def make_and_get_trading_summary(exchange, symbol, date=None, start_date=None, end_date=None, freq='W',
+                                 source='amberdata'):
+    """ make and get trading summary for long period of time
+
+    a generally depricated function, only useful when adding new assets as trades table can not be queried over long
+    periods of time because they can take too much memory. This will query in intervals of `freq` and combine the
+    TradingSummary table which can be 1000x smaller than the trades table for the same time period.
+
+    input:
+        freq (str): step size to go by, see: https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
+    """
+
+    if end_date is not None and start_date is None:
+        raise ValueError  # don't want to support going forever forward. to current date, sure.
+    if end_date is None:
+        pass
+    if start_date is None and end_date is None:
+        date = 'live'
+    else:
+        # ### build an array of dates to get trades for
+        #
+        start_date = convert_date_format(start_date, output_type='pandas')  # outputs a Timestanp
+
+    if end_date is not None:
+        end_date = convert_date_format(end_date, output_type='pandas')  # outputs a Timestanp
+    else:  # if end date is none we want thru live ---- add a minute past now to ensure all minute prices grabbed
+        # ###PAUL TODO: check if dev2 / eu-dev are in UTC time
+        now = time.time() + 60
+        end_date = convert_date_format(now, output_type='pandas')
+
+    date_range_arr = pd.date_range(start=start_date, end=end_date, freq=freq)
+
+    # need a pandas DTI version to do concatenation as is done below
+    start_date_pd_dti = pd.DatetimeIndex([start_date])
+    end_date_pd_dti = pd.DatetimeIndex([end_date])
+
+    # add to the beginning and end of the date range which is really just dates to split intervals (doesnt include ends)
+    if date != 'live':
+        if date_range_arr.shape[0] == 0 or start_date_pd_dti != date_range_arr[0]:
+            date_range_arr = np.concatenate([start_date_pd_dti, date_range_arr])
+        if date_range_arr.shape[0] == 0 or end_date_pd_dti != date_range_arr[-1]:
+            date_range_arr = np.concatenate([date_range_arr, end_date_pd_dti])
+
+    # take off the first date due to how the for loop works on a window of two dates
+    iter_start_date = date_range_arr[0]
+    date_range_arr = date_range_arr[1:]
+
+    num_iterations = date_range_arr.shape[0]
+    df_list = []
+
+    for iter_count, date in enumerate(date_range_arr):
+        iter_end_date = date
+        if iter_count % 10 == 0:
+            print(
+                f" iter: {iter_count + 1} of {num_iterations} ---- start: {iter_start_date}  --  end: {iter_end_date}",
+                flush=True)
+
+        trades = get_trades_data(exchange=exchange,
+                                 symbol=symbol,
+                                 start_date=iter_start_date,
+                                 end_date=iter_end_date,
+                                 source=source)
+
+        if trades is 0 or trades.shape[0] == 0:  # if the above returns zero there are no trades for interval collected
+            continue
+        else:
+            trading_summary = convert_trades_df_to_trading_summary(trades, exchange_format=source)
+            df_list.append(trading_summary)
+            iter_start_date = iter_end_date
+
+    if len(df_list) != 0:
+        all_trading_summary = pd.concat(df_list)
+
+        pre_cleaned_nans = all_trading_summary.isna().sum().sum()
+        all_trading_summary = all_trading_summary[~all_trading_summary.index.duplicated(keep='first')]
+        all_trading_summary = fill_trading_summary(all_trading_summary)
+        all_trading_summary = all_trading_summary[~all_trading_summary.index.duplicated(keep='first')]
+        post_cleaned_nans = all_trading_summary.isna().sum().sum()
+
+        print(f" - final data clean ---- pre_cleaned_nans: {pre_cleaned_nans} "
+              f"                    ---- post_cleaned_nans {post_cleaned_nans}",
+              flush=True)
+    else:
+        print(f"no data for request to make a summary of trading ")
+        return 0  # no data for
+
+    push_trading_summary_to_clickhouse(all_trading_summary, exchange=exchange, symbol=symbol)
+
+    return all_trading_summary
+
+
+def check_minute_integrity(dataframe, verbose=False):
+    # Ensure DataFrame is sorted by DateTimeIndex
+    dataframe = dataframe.sort_index()
+
+    # Generate the expected DateTimeIndex with minute frequency
+    expected_index = pd.date_range(start=dataframe.index[0], end=dataframe.index[-1], freq='1min')
+
+    # Compare the expected index with the DataFrame's DateTimeIndex
+    if dataframe.index.equals(expected_index):
+        if verbose:
+            print("The DataFrame's DateTimeIndex includes every minute.")
+    else:
+        print("The DataFrame's DateTimeIndex is missing minute(s).")
+        raise ValueError
+
+    return None
+
+
+def create_trading_summary_table():
+    query = """
+            create table if not exists hoth.TradingSummary
+            (
+                timestamp date,  -- summary metrics for the close of the minute
+                symbol VARCHAR(32),
+                exchange VARCHAR(32),
+                open FLOAT,
+                high FLOAT,
+                low FLOAT,
+                close FLOAT,
+                total_base_vol FLOAT,
+                buyer_is_maker int,
+                buyer_is_taker int,
+                buy_base_vol FLOAT,
+                sell_base_vol FLOAT,
+                buy_quote_vol FLOAT,
+                sell_quote_vol FLOAT,
+                total_quote_vol FLOAT,
+                buy_vwap FLOAT,
+                sell_vwap FLOAT,
+                vwap FLOAT
+            )
+            ENGINE  = MergeTree()
+            ORDER BY timestamp;
+        """
+
+    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client.execute(query)
+
+
+def from_table_get_existing_dates_in_series(ch_client, table, exchange, symbol, series):
+    """assumes the series has a sorted datetime index"""
+
+    str_start = series.index[0].strftime("%Y-%m-%d %H:%M:%S")
+    str_end = series.index[-1].strftime("%Y-%m-%d %H:%M:%S")
+
+    # get existing data in the date range with matching
+    query = f"""SELECT timestamp
+                FROM {table}
+                WHERE exchange = '{exchange}' 
+                    AND symbol = '{symbol}'
+                    AND timestamp BETWEEN '{str_start}' AND '{str_end}' """
+    existing_dates = ch_client.execute(query)
+    existing_dates = set([_[0] for _ in existing_dates])
+
+    return existing_dates
+
+
+def delete_observations(ch_client, table, exchange, symbol, datetimes, ):
+    """will delete observations from a given table given [exchange, symbol, datetimes, table]
+
+    input:
+        exchange (str):
+        symbol (str):
+        datestimes (set): from `from_table_get_existing_dates_in_series(ch_client, table, exchange, symbol, series)`
+        table (str): name of the table ---- EX: 'hoth.TradingSummary
+    """
+
+    datetime_strs = [dt.strftime('%Y-%m-%d %H:%M:%S') for dt in datetimes]
+    datetime_list_str = ', '.join(f"'{dt_str}'" for dt_str in datetime_strs)
+    delete_query = f"""DELETE FROM {table}
+                       WHERE exchange = '{exchange}'
+                           AND symbol = '{symbol}'
+                           AND timestamp IN ({datetime_list_str})"""
+    ch_client.execute(delete_query)
+
+
+def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwrite_mode='python_side', output='quiet'):
+    """ ###PAUL TODO: in push_trading_summary_to_clickhouse() make sure that duplicate rows aren't being pushed
+    (probably best to make a parameter overwrite defaulted to True) to ensure the new row has
+    a unique ['timestamp ticker, exchange] combo
+    """
+
+    table = 'hoth.TradingSummary' # ###PAUL TODO: eventually want to use the new overwrite hook for
+    # TODO: trades and signals too, will need to handle unique identifiers for each table...
+    # TODO:
+    trading_summary = fill_trading_summary(trading_summary=trading_summary)
+    check_minute_integrity(dataframe=trading_summary)
+
+    trading_summary['exchange'] = exchange
+    trading_summary['symbol'] = symbol
+    trading_summary.index.name = 'timestamp'
+
+    trading_summary = trading_summary.astype({'buyer_is_maker': int, 'buyer_is_taker': int})
+
+    ch_client = CH_Client('10.0.1.86', port='9009')
+
+    existing_dates = from_table_get_existing_dates_in_series(ch_client,
+                                                             table=table,
+                                                             exchange=exchange,
+                                                             symbol=symbol,
+                                                             series=trading_summary, )
+
+    if overwrite_mode == 'python_side':
+        idxs_to_drop = []
+        for idx in trading_summary.index:
+            if idx.to_pydatetime() in existing_dates:
+                idxs_to_drop.append(idx)
+    if overwrite_mode == 'in_clickhouse':
+        delete_observations(exchange=exchange, symbol=symbol, datetimes=existing_dates, table=table)
+
+    if output == 'verbose':
+        print(f"there were {len(idxs_to_drop)} duplicates prevented from being entered ---- "
+              f" grouped by  [timestamp, exchange, symbol]")
+    trading_summary = trading_summary.drop(idxs_to_drop)
+
+    num_rows_entered = ch_client.execute("INSERT INTO hoth.TradingSummary VALUES",
+                                         trading_summary.reset_index().to_dict('records'))
+
+    return num_rows_entered
+
+
+def get_binance_data_zip_file(save_path, market, data_type, symbol, year, month, day=None, interval=None, unzip=True):
+    """downloads the zip file for binance data based on given input
+    """
+
+    base_url = "https://data.binance.vision"
+
+    # Validate and normalize market and data_type
+    if market.lower() not in ["spot", "futures"]:
+        raise ValueError("Invalid market. It must be either 'spot' or 'futures'")
+    market = market.lower()
+
+    if data_type.lower() not in ["klines", "trades"]:
+        raise ValueError("Invalid data type. It must be either 'klines' or 'trades'")
+    data_type = data_type.lower()
+
+    # Make sure month and day are two digits
+    month = str(month).zfill(2)
+
+    # Check if day is provided
+    if day is not None:
+        frequency = "daily"
+        day = str(day).zfill(2)
+    else:
+        frequency = "monthly"
+        day = ""
+
+    # Construct the URL based on the data type
+    if data_type == "klines":
+        if interval is None:
+            raise ValueError("Interval must be provided for klines data")
+        filename = f"{symbol}-{interval}-{year}-{month}{day}.zip"
+        url = f"{base_url}/data/{market}/{frequency}/klines/{symbol}/{interval}/{filename}"
+    elif data_type == "trades":
+        filename = f"{symbol}-trades-{year}-{month}-{day}.zip"
+        url = f"{base_url}/data/{market}/{frequency}/trades/{symbol}/{filename}"
+
+    # Full path for the zip file
+    zip_filepath = os.path.join(save_path, filename)
+
+    # Download the file
+    print(f"Downloading {filename} to {zip_filepath}...")
+    response = requests.get(url, stream=True)
+    with open(zip_filepath, 'wb') as fd:
+        for chunk in response.iter_content(chunk_size=1024):
+            fd.write(chunk)
+
+    # # If unzip is True, extract the zip file and load the data into a pandas DataFrame
+    # if unzip:
+    #     csv_filepath = zip_filepath.replace(".zip", ".csv")
+    #     print(f"Extracting {zip_filepath}...")
+    #     with zipfile.ZipFile(zip_filepath, 'r') as zip_ref:
+    #         zip_ref.extractall(save_path)
+    #     print(f"Loading {csv_filepath} into a pandas DataFrame...")
+    #     df = pd.read_csv(csv_filepath)
+    #     return df
+
+    return zip_filepath
+
+
+def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='quiet'):
+    """ gets the last time in the trading summary table and then makes the trading summary table up to the current point
+    # ###PAUL TODO: remove default values from this... I dont like that they are here. It seems like it could lead to issues
+    """
+    ch_client = CH_Client('10.0.1.86', port='9009')
+
+    query = f""" SELECT MAX(timestamp)
+                 FROM hoth.TradingSummary
+                 WHERE symbol = '{symbol}' 
+                    AND exchange = '{exchange}';"""
+    last_trading_summary_datetime = ch_client.execute(query)[0][0] - timedelta(minutes=60)  # ###PAUL_del_later ---- the time delta is not needed but we use it to ensure overwrite in push is working correctly
+
+    trades_df = get_trades_data(exchange=exchange, symbol=symbol, start_date=last_trading_summary_datetime,
+                                end_date=None, source='EAORS')
+
+    if isinstance(trades_df, pd.DataFrame):
+        new_trading_summary_info = convert_trades_df_to_trading_summary(trades_df, exchange_format='EAORS')
+        new_trading_summary_info = new_trading_summary_info[new_trading_summary_info.index > last_trading_summary_datetime]
+    elif trades_df == 0:
+        return None
+
+    if new_trading_summary_info.shape[0] != 0:
+        push_trading_summary_to_clickhouse(new_trading_summary_info, exchange=exchange, symbol=symbol, output='quiet')
+
+
+def get_query_date_strings(start_date, end_date):
+    """ start_date < timestamp   &&  timestamp <= end_date   ----  non-inclusive then inclusive points in the timespan
+
+    """
+    if end_date is not None and start_date is None:
+        print(f"warninng: running query with no start or end. could take awhile and memory overload")
+        query_date_str_1 = f""
+        query_date_str_2 = f""
+
+    if start_date is not None:
+        start_date = convert_date_format(start_date, output_type='pandas')  # outputs a Timestamp
+
+    if end_date is not None:
+        end_date = convert_date_format(end_date, output_type='pandas')  # outputs a Timestamp
+    else:  # if end date is none we want thru live ---- add a minute past now to ensure all minute prices grabbed
+        now = time.time() + 60  # ran into issues having this directly in fn input below ..?
+        end_date = convert_date_format(now, output_type='pandas')
+
+    # note in all cases -- not inclusive on the end in order to have no overlap of trades gathered when rolling
+    # not inclusive on start because we want all times greater when querying last_decision_time=last_decision_time
+    if end_date is not None and start_date is not None:
+        end_date_string = convert_date_format(end_date, output_type='string')
+        start_date_string = convert_date_format(start_date, output_type='string')
+        query_date_str_1 = f"""WITH 
+                                       toDateTime('{start_date_string}') as startdate,
+                                       toDateTime('{end_date_string}') as enddate"""
+        query_date_str_2 = """AND timestamp > startdate
+                                  AND timestamp <= enddate"""
+    elif end_date is None and start_date is not None:
+        start_date_string = convert_date_format(start_date, output_type='string')
+        query_date_str_1 = f"WITH toDateTime('{start_date_string}') as startdate"
+        query_date_str_2 = """AND timestamp > startdate"""
+    elif end_date is not None and start_date is None:
+        end_date_string = convert_date_format(end_date, output_type='string')
+        query_date_str_1 = f"WITH toDateTime('{end_date_string}') as enddate"
+        query_date_str_2 = """AND timestamp <= enddate"""
+
+    return query_date_str_1, query_date_str_2
+
+
+def query_trading_summary(exchange, symbol, start_date, end_date, columns='all', ch_client=None):
+    """ queries trading summary table
+    ###PAUL TODO: the start/end date handling in this came from two functions, can be merged and cleaned
+    """
+
+    query_date_str_1, query_date_str_2 = get_query_date_strings(start_date, end_date)
+
+    # preprocessing on symbol, amber data format is -->  f"btc_usdt"   vs   the EAORS -->  f"BTC-USDT"
+    symbol = symbol.upper().replace('_', '-')  # needed for trade queries (keep for now though)
+
+    if columns == 'all':
+        cols_str = f"*"
+    else:
+        if 'timestamp' not in columns:
+            columns.append('timestamp')
+        cols_str = ', '.join([str(elem) for elem in columns if isinstance(elem, str)])
+
+    query = f"""
+        {query_date_str_1}
+        SELECT {cols_str}
+        FROM hoth.TradingSummary
+        WHERE
+            exchange = '{exchange}'
+            AND symbol='{symbol}'
+            {query_date_str_2}
+        ORDER BY timestamp;
+            """
+
+    if ch_client == None:
+        print(f"warning -- clickhouse client set to none in utils.py `query_trading_summary()`\n"*3)
+        ch_client = CH_Client('10.0.1.86', port='9009')
+
+    trading_summary = ch_client.query_dataframe(query)
+
+    try:
+        trading_summary = trading_summary.set_index('timestamp')  # replace counting index with time
+    except KeyError:
+        return 0  # this means there were no trades in the requested interval
+
+    return trading_summary
+
+
+def get_signal_id(signal_name, ):
+    """gets the `signal_id` (int) for a given `signal_name`, option to add signal_id if there is one"""
+    ch_client = CH_Client('10.0.1.86', port='9009')
+    query = f"""SELECT signal_id FROM hoth.AlgosSignalNames WHERE signal_name = '{signal_name}';"""
+    signal_id = ch_client.execute(query)
+    assert (len(signal_id) <= 1)
+    signal_id = False if signal_id == [] else signal_id[0][0]
+
+    return signal_id
+
+
+def add_signal_name_to_foreign_key_table(signal_name):
+    """inserts a signal name into hoth.AlgosSignalNames if it is not there already, otherwise raises an error
+    returns the signal_id that now corresponds to that signal_name
+    """
+
+    signal_id = get_signal_id(signal_name, )
+    if signal_id is not False:
+        raise ValueError(f"Signal name '{signal_name}' already exists in SignalNames.")
+    else:
+        ch_client = CH_Client('10.0.1.86', port='9009')
+        signal_id = ch_client.execute('SELECT max(signal_id) FROM hoth.AlgosSignalNames')[0][0]
+        signal_id = signal_id + 1
+        ch_client.execute(f"""INSERT INTO hoth.AlgosSignalNames (signal_id, signal_name) VALUES""",
+                          [(signal_id, signal_name)])
+
+        return signal_id
+
+
+def bulk_insert_signal_observations(signal_name, signal):
+
+    print(f"dont want this to work without adding the logic to add trading summary which checks "
+          f"for matching existing times we have observations for (should add a keep or replace mode) ")
+    raise NotImplementedError
+
+    # need signal as a dataframe (if it comes as a series convert it)
+    if type(signal) == pd.Series:
+        signal = pd.DataFrame(signal, columns=['value'])
+        signal.index.name = 'timestamp'
+
+    ch_client = CH_Client('10.0.1.86', port='9009')
+
+    query = f"SELECT signal_id FROM hoth.AlgosSignalNames WHERE signal_name = '{signal_name}'"
+    signal_id = ch_client.execute(query)[0][0]  # comes as [(1,)]
+
+    if signal_id:  # the above query returns False if there is no signal name matching
+        signal['signal_id'] = signal_id
+        num_rows_entered = ch_client.execute("INSERT INTO hoth.AlgosSignals VALUES",
+                                             signal.reset_index().to_dict('records'))
+    else:
+        print(f"Signal name {signal_name} does not exist in SignalNames.")
+
+    return num_rows_entered
+
+
+def query_signal_by_name(signal_name, start_date=None, end_date=None):
+    ch_client = CH_Client('10.0.1.86', port='9009')
+
+    query = f"SELECT signal_id FROM hoth.AlgosSignalNames WHERE signal_name = '{signal_name}'"
+    signal_id = ch_client.execute(query)[0][0]  # comes as [(1,)]
+
+    query_date_str_1, query_date_str_2 = get_query_date_strings(start_date, end_date)
+    query = f"""
+        {query_date_str_1}
+        SELECT timestamp, value
+        FROM hoth.AlgosSignals
+        WHERE signal_id = '{signal_id}'
+        {query_date_str_2}
+        ORDER BY timestamp;
+        """
+
+    # query = f"""
+    #     {query_date_str_1}
+    #     SELECT timestamp, value
+    #     FROM hoth.AlgosSignals AS s
+    #     JOIN hoth.AlgosSignalNames AS sn ON s.signal_id = sn.signal_id
+    #     {query_date_str_2}
+    #     AND sn.signal_name = '{signal_name}'
+    #     ORDER BY timestamp;
+    #     """
+
+    # print(f"{query}")
+    signal = ch_client.query_dataframe(query)
+
+    try:
+        signal = signal.set_index('timestamp')  # replace counting index with time
+        # signal = pd.DataFrame(signal, columns=['timestamp', 'value'])
+    except KeyError:
+        return 0  # this means there were no trades in the requested interval
+
+    return signal
+
+
+def get_latest_signal_timestamp(signal_name):
+    ch_client = CH_Client('10.0.1.86', port='9009')
+
+    return timestamp
+
+
+def update_signals_table(signal, signal_name=None, signal_id=None, overwrite=False, ch_client=None):
+    """ gets the last time in the trading summary table and then makes the trading summary table up to the current point
+    # ###PAUL TODO: add overwrite argument which overwrites a signal
+    """
+    signal.columns = ['value']
+    signal.index.name = 'timestamp'  # sometimes it comes as 'datetime' if not in the live pipeline
+    # TODO: are we comfortable with this ugly index renaming fix???
+
+    if ch_client is None:
+        print(f"warning ch_client set to None in `update_signals_table` \n *3")
+        ch_client = CH_Client('10.0.1.86', port='9009')
+
+    if signal_id is None:
+        signal_id = get_signal_id(signal_name)
+
+    query = f"""SELECT MAX(timestamp) FROM hoth.AlgosSignals WHERE signal_id={signal_id};"""
+    latest_signal_timestamp = ch_client.execute(query)[0][0]
+
+    if overwrite is False:
+        signal_to_push = signal[signal.index > latest_signal_timestamp]
+        signal_to_push = pd.DataFrame(signal_to_push, columns=['value'])
+        signal_to_push['signal_id'] = signal_id
+    else:  # ###PAUL TODO:  handle this with the same pattern (made a function for this for trading_summary (& trades?)
+        raise NotImplementedError
+
+    num_rows_entered = ch_client.execute("INSERT INTO hoth.AlgosSignals VALUES",
+                                         signal_to_push.reset_index().to_dict('records'))
+
+    return num_rows_entered
+
+
+def write_dict_to_json(dict_obj, fp):
+    with open(fp, 'w') as file:
+        json.dump(dict_obj, file)
+
+
+def read_json_to_dict(fp):
+    with open(fp, 'r') as file:
+        dict_obj = json.load(file)
+    return dict_obj
+
+
+def remove_duplicates_from_trading_summary():
+    """removes duplicates from trading summary in clickhouse based on input parameters"""
+
+    query = """ALTER TABLE hoth.TradingSummary DELETE WHERE (timestamp, exchange, symbol) IN (
+SELECT timestamp, exchange, symbol
+FROM (
+        SELECT timestamp, exchange, symbol
+        FROM hoth.TradingSummary
+        GROUP BY timestamp, exchange, symbol
+        HAVING count(*) > 1
+        ));"""
+
+    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client.execute(query)
+
+
+def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
+    """Rounds a given quantity to a specific step size
+    :param quantity: required
+    :param step_size: required
+    :return: decimal
+    """
+    precision: int = int(round(-math.log(step_size, 10), 0))
+    return float(round(quantity, precision))
+
+
+def get_secret(key):
+    if key not in os.environ:
+        raise KeyError(f"Key {key} not found!")
+    return os.environ[key]
+
+
+def get_mutual_min_max_datetimes(pandas_objects):
+    # Initialize min_date and max_date with the values of the first DataFrame
+    min_date = pandas_objects[0].index.min()
+    max_date = pandas_objects[0].index.max()
+
+    # Iterate over the pandas objects and update min_date and max_date
+    for df in pandas_objects[1:]:
+        current_min = df.index.min()
+        current_max = df.index.max()
+
+        # If the current min date is later than the overall min date, update min_date
+        if current_min > min_date:
+            min_date = current_min
+
+        # If the current max date is earlier than the overall max date, update max_date
+        if current_max < max_date:
+            max_date = current_max
+
+    # Check if there is any overlap
+    if min_date > max_date:
+        print("There is no overlap in dates among the provided dataframes.")
+        return None, None
+
+    return min_date, max_date
+
+
+def deduplicate_df_on_index_only(df):
+    df = df.reset_index()
+    df = df.drop_duplicates(subset='index')
+    df = df.set_index('index')
+
+    return df
+
+
