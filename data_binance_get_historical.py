@@ -113,7 +113,7 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
 
     trades_df = convert_binance_trades_to_eaors(trades_df, exchange, pair=table_pair)
 
-    delete_query = f"""ALTER TABLE hoth.Trades 
+    delete_query = f"""ALTER TABLE algos_db.Trades 
     DELETE WHERE
         exchange = '{exchange}'
         AND symbol = '{table_pair}'
@@ -122,7 +122,7 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
     ch_client = CH_Client('10.0.1.86', port='9009')
 
     ch_client.execute(delete_query)
-    ch_client.execute('INSERT INTO hoth.Trades VALUES', trades_df.to_dict('records'))
+    ch_client.execute('INSERT INTO algos_db.Trades VALUES', trades_df.to_dict('records'))
 
     os.remove(zip_filepath)
     os.remove(csv_filepath)

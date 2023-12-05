@@ -88,7 +88,7 @@ def make_eaors_trades_features(eaors_trade_request):
 
     return x_from_eaors_trades, vwap_dict  # vwap dict for backtesting... may want to match to features. this is only a historical thing so maybe just worth
     # keepping here because won't be this "dirty" for live purposes.
-    # the alternative would be to just build a quick query when it comes backtest time (get vwap from hoth.TradingSummary)
+    # the alternative would be to just build a quick query when it comes backtest time (get vwap from algos_db.TradingSummary)
 
 
 def make_utc_time_based_column(pd_obj, freq, precast=True, verbose=False):

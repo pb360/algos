@@ -394,7 +394,7 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
 
     # insert positions df into bob's table
     positions_df = pd.DataFrame(positions_list)
-    ch_client.execute('INSERT INTO hoth.Positions VALUES ',
+    ch_client.execute('INSERT INTO algos_db.Positions VALUES ',
                       positions_df.reset_index().to_dict('records'),
                       types_check=True, )
 
@@ -552,7 +552,7 @@ def update_bag_dicts(state_dict, ch_client, params):
 
             # insert positions df into bob's table
             positions_df = pd.DataFrame(positions_list)
-            ch_client.execute('INSERT INTO hoth.Positions VALUES ',
+            ch_client.execute('INSERT INTO algos_db.Positions VALUES ',
                               positions_df.reset_index().to_dict('records'),
                               types_check=True, )
 

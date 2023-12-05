@@ -35,9 +35,9 @@ class Runner:
         if os.path.exists(version_file):
             with open(version_file, "r") as f:
                 version = f.read()
-            self.logger.info(f"Hoth version={version.strip()}")
+            self.logger.info(f"algos_db version={version.strip()}")
         else:
-            self.logger.info(f"Unable to determine hoth version information")
+            self.logger.info(f"Unable to determine algos_db version information")
         self.logger.info(f"Config file: {self.config}")
 
     def _cancel_tasks(self):

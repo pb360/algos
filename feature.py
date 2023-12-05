@@ -537,7 +537,7 @@ def adjust_start_dates_of_feature_params(feature_params, model_params, max_cut_t
 
     # try:   # ###PAUL_del_later
     max_signal_timestamp = ch_client.execute(f"""SELECT max(timestamp)
-                                                FROM hoth.AlgosSignals
+                                                FROM algos_db.AlgosSignals
                                                 WHERE signal_id == '{signal_id}';""")[0][0]
 
     # if there is not a signal the following query returns 1970-1-1 instead of no signal with this signal_id
