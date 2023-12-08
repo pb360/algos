@@ -255,6 +255,8 @@ universe['kucoin'] = universe_kucoin
 #
 data_format = dict()
 
+
+# ### TODO: DEPRICATE DATA FORMAT.... delete all except CCXT cause it exists now 
 # data format for
 data_format_binance = {
     'websocket_trade_columns': {'e': 'event_type',
@@ -533,9 +535,106 @@ data_format_kucoin = {
 }  ###PAUL just a copy paster from binance foreign, needs editing
 ###PAUL just a copy paster from binance foreign, needs editing
 
+
+# data format for
+data_format_ccxt = {
+    'websocket_trade_columns': {'e': 'event_type',
+                                'E': 'msg_time',
+                                's': 'ticker',
+                                't': 'trade_id',
+                                'p': 'price',
+                                'q': 'quantity',
+                                'b': 'buy_order_id',
+                                'a': 'sell_order_id',
+                                'T': 'trade_time',
+                                'm': 'buyer_is_maker',
+                                'M': 'ignore'
+                                },
+
+    'websocket_trade_example': {"e": "trade",  # message type
+                                "E": 1609300202081,  # message time
+                                "s": "BNBBTC",  # Symbol
+                                "t": 12345,  # Trade ID
+                                "p": "0.001",  # Price
+                                "q": "100",  # Quantity
+                                "b": 88,  # Buyer order ID
+                                "a": 50,  # Seller order ID
+                                "T": 123456785,  # Trade time
+                                "m": True,  # Is the buyer the market maker?
+                                "M": True,
+                                # Ignore...  some legacy thing on binance side
+                                },
+
+    'book_response_structure': {'structure': '###PAUL do this later'},
+
+    'book_response_example': {'structure': '###PAUL do this later'},
+
+    'trade_col_name_list': ['msg_time', 'ticker', 'trade_id', 'price', 'quantity',
+                            'buy_order_id', 'sell_order_id', 'trade_time', 'buyer_is_maker'
+                            ],
+
+    'trade_name_and_type': {'msg_time': float,
+                            'ticker': str,
+                            'trade_id': int,
+                            'price': float,
+                            'quantity': float,
+                            'buy_order_id': int,
+                            'sell_order_id': int,
+                            'trade_time': float,
+                            'buyer_is_maker': bool,
+                            },
+
+    'price_name_and_type': {'buyer_is_maker': int,
+                            'buyer_is_taker': int,
+                            'buy_vol': float,
+                            'sell_vol': float,
+                            'buy_base_asset': float,
+                            'sell_base_asset': float,
+                            'buy_vwap': float,
+                            'sell_vwap': float
+                            },
+
+    'order_col_name_list': ['orderId', 'ticker', 'clientOrderId', 'placedTime', 'price', 'origQty',
+                            'executedQty', 'cummulativeQuoteQty', 'side', 'status', 'ord_type', 'updateTime',
+                            ],
+
+    'order_col_name_type': {'orderId': int,
+                            'ticker': str,
+                            'clientOrderId': str,
+                            'placedTime': int,
+                            'price': float,
+                            'origQty': float,
+                            'executedQty': float,
+                            'cummulativeQuoteQty': float,
+                            'side': str,
+                            'status': str,
+                            'ord_type': str,
+                            'updateTime': int
+                            },
+
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
+
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': float,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': float,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
+                                },
+}
+
+
 data_format['binance'] = data_format_binance
 data_format['binanceus'] = data_format_binanceus
 data_format['kucoin'] = data_format_kucoin
+data_format['ccxt'] = data_format_ccxt
+
 
 # ### initialize ---- parameters and create the dictionary
 #

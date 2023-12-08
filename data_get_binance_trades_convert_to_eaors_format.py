@@ -37,9 +37,7 @@ except NameError:
 
 # ### process trades data to match EAORS format
 #
-df.columns = ['id', 'price', 'amount', 'quote_amount', 'timestamp', 'side', 'depricated']
-df = df.drop(columns=['depricated', 'quote_amount'])
-# df = df.drop('quote_amount', axis=1)
+df.columns = ['timestamp', 'id', 'price', 'amount', 'side']
 df['side'] = df['side'].map({False: 1, True: 0})  # invert, their side bool is buyer_is_maker, ours is seller_is_maker
 df['timestamp'] = pd.to_datetime(df['timestamp'] / 1000, unit='s')
 df = df.set_index('timestamp')

@@ -21,7 +21,7 @@ import sys
 #
 #
 sys.path.insert(0, '..')
-sys.path.insert(0, '../..')  # for hoth
+sys.path.insert(0, '../..')  # for algos_db
 
 from algos.bot_utils import (directory_check_for_portfolio_data,
                              make_pair_info_df,

@@ -10,8 +10,8 @@ time.tzset()
 
 import sys
 
-sys.path.insert(0, '..')  # for local imports from the top directory
-sys.path.insert(0, '../..')  # quick fix, it works...
+sys.path.insert(0, '..')  # ###TODO RUN FROM TOP DIR CHECK       for local imports from the top directory
+sys.path.insert(0, '../..')  # ###TODO RUN FROM TOP DIR CHECK    quick fix, it works...
 
 from clickhouse_driver import Client as CH_Client
 import datetime
@@ -280,8 +280,8 @@ def convert_trades_df_to_trading_summary(trades, exchange_format='amberdata'):
         """ 
         logic for conversion of which side the trade was on... this is the link for the binance documentation.
         https://developers.binance.com/docs/binance-trading-api/spot#recent-trades-list
-        going off this and the line ```"False if trade["m"] else True,``` in  `hoth/src/data/exchanges/binance_data`
-        if side==True in the table hoth.Trades the seller is the price maker for the trade
+        going off this and the line ```"False if trade["m"] else True,``` in  `algos_db/src/data/exchanges/binance_data`
+        if side==True in the table algos_db.Trades the seller is the price maker for the trade
         """
 
         try:
@@ -561,7 +561,7 @@ def get_trades_data(exchange, symbol, start_date=None, end_date=None, source='am
         query = f"""
         {query_date_str_1}
         SELECT *
-        FROM hoth.Trades
+        FROM algos_db.Trades
         WHERE
             exchange = '{exchange}'
             AND symbol='{symbol}'
@@ -1064,7 +1064,7 @@ def check_minute_integrity(dataframe, verbose=False):
 
 def create_trading_summary_table():
     query = """
-            create table if not exists hoth.TradingSummary
+            create table if not exists algos_db.TradingSummary
             (
                 timestamp date,  -- summary metrics for the close of the minute
                 symbol VARCHAR(32),
@@ -1118,7 +1118,7 @@ def delete_observations(ch_client, table, exchange, symbol, datetimes, ):
         exchange (str):
         symbol (str):
         datestimes (set): from `from_table_get_existing_dates_in_series(ch_client, table, exchange, symbol, series)`
-        table (str): name of the table ---- EX: 'hoth.TradingSummary
+        table (str): name of the table ---- EX: 'algos_db.TradingSummary
     """
 
     datetime_strs = [dt.strftime('%Y-%m-%d %H:%M:%S') for dt in datetimes]
@@ -1136,7 +1136,7 @@ def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwr
     a unique ['timestamp ticker, exchange] combo
     """
 
-    table = 'hoth.TradingSummary' # ###PAUL TODO: eventually want to use the new overwrite hook for
+    table = 'algos_db.TradingSummary' # ###PAUL TODO: eventually want to use the new overwrite hook for
     # TODO: trades and signals too, will need to handle unique identifiers for each table...
     # TODO:
     trading_summary = fill_trading_summary(trading_summary=trading_summary)
@@ -1169,7 +1169,7 @@ def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwr
               f" grouped by  [timestamp, exchange, symbol]")
     trading_summary = trading_summary.drop(idxs_to_drop)
 
-    num_rows_entered = ch_client.execute("INSERT INTO hoth.TradingSummary VALUES",
+    num_rows_entered = ch_client.execute("INSERT INTO algos_db.TradingSummary VALUES",
                                          trading_summary.reset_index().to_dict('records'))
 
     return num_rows_entered
@@ -1241,7 +1241,7 @@ def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='
     ch_client = CH_Client('10.0.1.86', port='9009')
 
     query = f""" SELECT MAX(timestamp)
-                 FROM hoth.TradingSummary
+                 FROM algos_db.TradingSummary
                  WHERE symbol = '{symbol}' 
                     AND exchange = '{exchange}';"""
     last_trading_summary_datetime = ch_client.execute(query)[0][0] - timedelta(minutes=60)  # ###PAUL_del_later ---- the time delta is not needed but we use it to ensure overwrite in push is working correctly
@@ -1319,7 +1319,7 @@ def query_trading_summary(exchange, symbol, start_date, end_date, columns='all',
     query = f"""
         {query_date_str_1}
         SELECT {cols_str}
-        FROM hoth.TradingSummary
+        FROM algos_db.TradingSummary
         WHERE
             exchange = '{exchange}'
             AND symbol='{symbol}'
@@ -1344,7 +1344,7 @@ def query_trading_summary(exchange, symbol, start_date, end_date, columns='all',
 def get_signal_id(signal_name, ):
     """gets the `signal_id` (int) for a given `signal_name`, option to add signal_id if there is one"""
     ch_client = CH_Client('10.0.1.86', port='9009')
-    query = f"""SELECT signal_id FROM hoth.AlgosSignalNames WHERE signal_name = '{signal_name}';"""
+    query = f"""SELECT signal_id FROM algos_db.AlgosSignalNames WHERE signal_name = '{signal_name}';"""
     signal_id = ch_client.execute(query)
     assert (len(signal_id) <= 1)
     signal_id = False if signal_id == [] else signal_id[0][0]
@@ -1353,7 +1353,7 @@ def get_signal_id(signal_name, ):
 
 
 def add_signal_name_to_foreign_key_table(signal_name):
-    """inserts a signal name into hoth.AlgosSignalNames if it is not there already, otherwise raises an error
+    """inserts a signal name into algos_db.AlgosSignalNames if it is not there already, otherwise raises an error
     returns the signal_id that now corresponds to that signal_name
     """
 
@@ -1362,9 +1362,9 @@ def add_signal_name_to_foreign_key_table(signal_name):
         raise ValueError(f"Signal name '{signal_name}' already exists in SignalNames.")
     else:
         ch_client = CH_Client('10.0.1.86', port='9009')
-        signal_id = ch_client.execute('SELECT max(signal_id) FROM hoth.AlgosSignalNames')[0][0]
+        signal_id = ch_client.execute('SELECT max(signal_id) FROM algos_db.AlgosSignalNames')[0][0]
         signal_id = signal_id + 1
-        ch_client.execute(f"""INSERT INTO hoth.AlgosSignalNames (signal_id, signal_name) VALUES""",
+        ch_client.execute(f"""INSERT INTO algos_db.AlgosSignalNames (signal_id, signal_name) VALUES""",
                           [(signal_id, signal_name)])
 
         return signal_id
@@ -1383,12 +1383,12 @@ def bulk_insert_signal_observations(signal_name, signal):
 
     ch_client = CH_Client('10.0.1.86', port='9009')
 
-    query = f"SELECT signal_id FROM hoth.AlgosSignalNames WHERE signal_name = '{signal_name}'"
+    query = f"SELECT signal_id FROM algos_db.AlgosSignalNames WHERE signal_name = '{signal_name}'"
     signal_id = ch_client.execute(query)[0][0]  # comes as [(1,)]
 
     if signal_id:  # the above query returns False if there is no signal name matching
         signal['signal_id'] = signal_id
-        num_rows_entered = ch_client.execute("INSERT INTO hoth.AlgosSignals VALUES",
+        num_rows_entered = ch_client.execute("INSERT INTO algos_db.AlgosSignals VALUES",
                                              signal.reset_index().to_dict('records'))
     else:
         print(f"Signal name {signal_name} does not exist in SignalNames.")
@@ -1399,14 +1399,14 @@ def bulk_insert_signal_observations(signal_name, signal):
 def query_signal_by_name(signal_name, start_date=None, end_date=None):
     ch_client = CH_Client('10.0.1.86', port='9009')
 
-    query = f"SELECT signal_id FROM hoth.AlgosSignalNames WHERE signal_name = '{signal_name}'"
+    query = f"SELECT signal_id FROM algos_db.AlgosSignalNames WHERE signal_name = '{signal_name}'"
     signal_id = ch_client.execute(query)[0][0]  # comes as [(1,)]
 
     query_date_str_1, query_date_str_2 = get_query_date_strings(start_date, end_date)
     query = f"""
         {query_date_str_1}
         SELECT timestamp, value
-        FROM hoth.AlgosSignals
+        FROM algos_db.AlgosSignals
         WHERE signal_id = '{signal_id}'
         {query_date_str_2}
         ORDER BY timestamp;
@@ -1415,8 +1415,8 @@ def query_signal_by_name(signal_name, start_date=None, end_date=None):
     # query = f"""
     #     {query_date_str_1}
     #     SELECT timestamp, value
-    #     FROM hoth.AlgosSignals AS s
-    #     JOIN hoth.AlgosSignalNames AS sn ON s.signal_id = sn.signal_id
+    #     FROM algos_db.AlgosSignals AS s
+    #     JOIN algos_db.AlgosSignalNames AS sn ON s.signal_id = sn.signal_id
     #     {query_date_str_2}
     #     AND sn.signal_name = '{signal_name}'
     #     ORDER BY timestamp;
@@ -1455,7 +1455,7 @@ def update_signals_table(signal, signal_name=None, signal_id=None, overwrite=Fal
     if signal_id is None:
         signal_id = get_signal_id(signal_name)
 
-    query = f"""SELECT MAX(timestamp) FROM hoth.AlgosSignals WHERE signal_id={signal_id};"""
+    query = f"""SELECT MAX(timestamp) FROM algos_db.AlgosSignals WHERE signal_id={signal_id};"""
     latest_signal_timestamp = ch_client.execute(query)[0][0]
 
     if overwrite is False:
@@ -1465,7 +1465,7 @@ def update_signals_table(signal, signal_name=None, signal_id=None, overwrite=Fal
     else:  # ###PAUL TODO:  handle this with the same pattern (made a function for this for trading_summary (& trades?)
         raise NotImplementedError
 
-    num_rows_entered = ch_client.execute("INSERT INTO hoth.AlgosSignals VALUES",
+    num_rows_entered = ch_client.execute("INSERT INTO algos_db.AlgosSignals VALUES",
                                          signal_to_push.reset_index().to_dict('records'))
 
     return num_rows_entered
@@ -1485,17 +1485,17 @@ def read_json_to_dict(fp):
 def remove_duplicates_from_trading_summary():
     """removes duplicates from trading summary in clickhouse based on input parameters"""
 
-    query = """ALTER TABLE hoth.TradingSummary DELETE WHERE (timestamp, exchange, symbol) IN (
-SELECT timestamp, exchange, symbol
-FROM (
-        SELECT timestamp, exchange, symbol
-        FROM hoth.TradingSummary
-        GROUP BY timestamp, exchange, symbol
-        HAVING count(*) > 1
-        ));"""
+    query = """ALTER TABLE algos_db.TradingSummary DELETE WHERE (timestamp, exchange, symbol) IN (
+    SELECT timestamp, exchange, symbol
+    FROM (
+            SELECT timestamp, exchange, symbol
+            FROM algos_db.TradingSummary
+            GROUP BY timestamp, exchange, symbol
+            HAVING count(*) > 1
+            ));"""
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
-    ch_client.execute(query)
+        ch_client = CH_Client('10.0.1.86', port='9009')
+        ch_client.execute(query)
 
 
 def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
@@ -1547,4 +1547,48 @@ def deduplicate_df_on_index_only(df):
 
     return df
 
+
+# ### DATA UTILS    TODO: consider including these things in a data_utils.py at the top level
+def insert_trades(ccxt_trades): 
+    """list of  trades, the historical fetch_trades() has format 
+        {   'amount': 0.00654,
+            'cost': 285.8708556,
+            'datetime': '2023-12-07T16:51:43.789Z',
+            'fee': None,
+            'fees': [],
+            'id': '25243312',
+            'info': {'M': True,
+                    'T': '1701967903789',
+                    'a': '25243312',
+                    'f': '26655598',
+                    'l': '26655598',
+                    'm': True,
+                    'p': '43711.14000000',
+                    'q': '0.00654000'},
+            'order': None,
+            'price': 43711.14,
+            'side': 'sell',
+            'symbol': 'BTC/USDT',
+            'takerOrMaker': None,
+            'timestamp': 1701967903789,
+            'type': None}
+        # ###PAUL TODO: figure out optimal way to work formatting into config. i think the current way is sufficient
+        # ###PAUL TODO: but then need to consider how to handle sql format, this is a later documentation issue, just get it all up 
+    """
+
+    if type(ccxt_trades) == pd.DataFrame: 
+          cc    
+
+    for trade in ccxt_trades: 
+
+        trade = {'timestamp': trade['datetime'],  # ###PAUL TODO: gon need to verify this 
+                 'id': trade['id'], 
+                 'price': trade['price'],
+                 'amount': trade['amount'],
+                 'side' 1 if trade['side'] == 'buy' else 0 
+        }
+
+        data_tuple = tuple(data_dict.values())
+
+    data_tuples = [tuple(d[col] for col in columns_order) for d in data_dicts]
 

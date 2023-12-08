@@ -40,7 +40,6 @@ import time
 
 dotenv.load_dotenv()
 
-
 # ### functions that affect `params`
 #
 #

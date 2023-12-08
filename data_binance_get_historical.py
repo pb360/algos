@@ -51,7 +51,6 @@ def get_and_save_futures_csvs(date_str, file_prefix='BTCUSDT-1h-'):
 
 def convert_binance_trades_to_eaors(trades_df, exchange, pair):
 
-    trades_df = trades_df.drop(columns=['depricated', 'quote_amount'])
     trades_df['side'] = trades_df['side'].map(
         {False: True, True: False})  # invert, their side bool is buyer_is_maker, ours is seller_is_maker
     trades_df['timestamp'] = pd.to_datetime(trades_df['timestamp'] / 1000, unit='s')
@@ -92,7 +91,7 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
     with zipfile.ZipFile(zip_filepath, 'r') as zip_ref:
         zip_ref.extractall(save_path)
 
-    cols = ['id', 'price', 'amount', 'quote_amount', 'timestamp', 'side', 'depricated']
+    cols = ['timestamp', 'id', 'price', 'amount', 'side']
 
     trades_df = pd.read_csv(csv_filepath, names=cols)
     if trades_df.shape[0] < 1:
