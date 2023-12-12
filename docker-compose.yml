@@ -1,0 +1,47 @@
+version: "3.8"
+
+x-base-config: &base
+  image: algos:latest   # this could be updated to be automated 
+  network_mode: bridge
+  env_file:
+    - /home/paul/src/algos/.env
+
+services:
+  data_scrape:
+    <<: *base
+    entrypoint: /bin/bash  # debugging line 
+    tty: true  # debugging line 
+    # command: python3.10 -u data_trade_scraper.py  # --exchange binance # want exchange flag for multiple
+
+  # data_update_trading_summary:
+  #   <<: *base
+  #   command: python -u update_trading_summary.py
+
+  # data_update_signal:
+  #   <<: *base
+  #   command: python -u update_signal.py  # --signal_name btc_sig_1
+
+  # live_framework: 
+  #   <<: *base 
+  #   command: python -u live_framework_v2.py # --signal_name 
+
+  # # ### old stuff that I would like to explore more before deleting 
+  # #
+  # #
+  # filebeat:
+  #   image: elastic/filebeat:8.2.2
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /var/lib/docker:/var/lib/docker
+  #     - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
+  #   depends_on:
+  #     - logstash
+  #   command: -strict.perms=false
+  #   user: root
+
+  # logstash:
+  #   image: opensearchproject/logstash-oss-with-opensearch-output-plugin
+  #   volumes:
+  #     - ./logstash.conf:/usr/share/logstash/conf/logstash.conf
+  #   command: ["-f", "/usr/share/logstash/conf/logstash.conf"]
+  #   user: root

@@ -1494,8 +1494,8 @@ def remove_duplicates_from_trading_summary():
             HAVING count(*) > 1
             ));"""
 
-        ch_client = CH_Client('10.0.1.86', port='9009')
-        ch_client.execute(query)
+    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client.execute(query)
 
 
 def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
@@ -1585,7 +1585,7 @@ def insert_trades(ccxt_trades):
                  'id': trade['id'], 
                  'price': trade['price'],
                  'amount': trade['amount'],
-                 'side' 1 if trade['side'] == 'buy' else 0 
+                 'side': 1 if trade['side'] == 'buy' else 0 
         }
 
         data_tuple = tuple(data_dict.values())
