@@ -6,12 +6,6 @@ import sys
 os.environ['TZ'] = 'UTC'
 time.tzset()
 # sys.path.insert(0, '/home/paul/src')
-
-print(f"this isn't printing \n" * 10)
-print(os.getcwd() )
-print(f"\n" * 10)
-
-
 sys.path.insert(0, '..')
 
 from algos.utils import get_secret
