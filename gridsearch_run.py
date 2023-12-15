@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(0, '..')  # for local imports from the top directory
 
+from algos.config import params
 from algos.gridsearch import make_list_of_combo_dicts, decision_multiprocess
 from algos.utils import (query_trading_summary,
                          fill_trading_summary,)
@@ -12,13 +13,14 @@ import os
 import pickle
 import random
 
+data_dir = params['dirs']
 #
 ch_client = Client('10.0.1.86', port='9009')
 
 n_gridsearch_options = 10_000  # ###PAUL TODO: get this into a gridsearch params
 
 gs_file = f"grid_search____2023_09_06____on____signal_dict____2023_09_01___mlp_rolling_smaller_model____any_two_set"
-gs_fp = f"/opt/shared/crypto/algos/data/gridsearches/{gs_file}.pickle"
+gs_fp = f"{data_dir}gridsearches/{gs_file}.pickle"
 if os.path.isfile(gs_fp):
     print(f"gs_df already exists at that filepath")
     raise FileExistsError
@@ -33,7 +35,7 @@ vwap = deepcopy(trading_summary['vwap'])
 
 # read signal
 signal_dict_name = f"signal_dict____2023_09_01___mlp_rolling_smaller_model"
-signal_dict_fp = f"/opt/shared/crypto/algos/data/pickled_signal_dicts/{signal_dict_name}.pickle"
+signal_dict_fp = f"{data_dir}pickled_signal_dicts/{signal_dict_name}.pickle"
 with open(signal_dict_fp, 'rb') as f:
     signal_dict = pickle.load(f)  # <<<------- COPY PASTE DESIRED VARIABLE HERE
 

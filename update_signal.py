@@ -18,6 +18,8 @@ import pandas as pd
 import pickle
 import time
 
+
+data_dir = params['dir']['data_dir']
 ch_client = Client('10.0.1.86', port='9009')
 
 # ### signals ---- get the signal and setup around it.
@@ -30,7 +32,7 @@ ch_client = Client('10.0.1.86', port='9009')
 signal_name = sys.argv[1]
 params['signal_name'] = signal_name
 params['signal'] = params['active_services']['signals'][signal_name]
-signal_dict_fp = f"/opt/shared/crypto/algos/data/pickled_signal_dicts/{signal_name}.pickle"
+signal_dict_fp = f"{data_dir}pickled_signal_dicts/{signal_name}.pickle"
 # # TODO:   vvvvvvvvvvvvvvvvvvvvv  add `signal_dict`s support to `get_data_file_path()`vvvvvvvvvvvvvvvvvvvvv
 # signal_dict_fp = get_data_file_path(data_type='signal_dict',
 #                                    date='',

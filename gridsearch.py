@@ -3,6 +3,7 @@ import sys
 import time
 
 sys.path.insert(0, '..')  # for local imports from the top directory
+from algos.config import params 
 from algos.targets import split_train_test
 from algos.decision import (backtest_decision_making, backtest_decision_making_multiprocess, )
 
@@ -16,6 +17,7 @@ import pandas as pd
 import pickle
 from time import sleep
 
+data_dir = params['dirs']['data_dir']
 
 def make_list_of_combo_dicts(dict_of_gridsearch_lists):
     """
@@ -279,7 +281,7 @@ def analyze_framework_run(framework_results, ts_freq='min'):
 def delete_CURRENT_GRID_SEARCH_CSV_file():
     """before the decision multi process delete the file path"""
 
-    fp = f"/opt/shared/crypto/algos/data/gridsearches/CURRENT_GRID_SEARCH.csv"
+    fp = f"{data_dir}gridsearches/CURRENT_GRID_SEARCH.csv"
 
     try:
         os.remove(fp)
@@ -310,7 +312,7 @@ def write_gridsearch_iter_results_and_file_first_iter(iter_results, gridsearch_p
 
     # col_names = get_col_names_from_gridsearch_params(gridsearch_params)
 
-    fp = f"/opt/shared/crypto/algos/data/gridsearches/CURRENT_GRID_SEARCH.csv"
+    fp = f"{data_dir}gridsearches/CURRENT_GRID_SEARCH.csv"
 
     header = f""
     new_line = f""
@@ -494,7 +496,7 @@ def grid_search_over_parameters(x, prices, gridsearch_params):
             #     import pdb;
             #     pdb.set_trace()
 
-    fp = '/opt/shared/crypto/algos/data/gridsearches/grid_search____most_recent.pickle'
+    fp = '{data_dir}gridsearches/grid_search____most_recent.pickle'
     pickle.dump(results_df, open(fp, "wb"))
 
     return results_df

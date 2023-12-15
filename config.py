@@ -43,14 +43,9 @@ algos_dir = ''
 
 dirs = {  # ###PAUL TODO: once depriciated `dirs` are removed consider what can be moved to machine specific
           #         TODO: and if a root directory can be established and put there. for now dont make it DRY
-    'data_dir': '/opt/shared/crypto/algos/data/',
-    'live_data_dir': '/opt/shared/crypto/algos/data/live/',
-    'ports_data_dir': '/opt/shared/crypto/algos/data/live/ports/',
-    # ###PAUL TODO: remove the below once positive they can be depricated but
-    'trade_data_dir': algos_dir + 'algos/data/trade/',
-    'price_data_dir': algos_dir + 'algos/data/price/',
-    'live_trade_data_dir': algos_dir + 'algos/data/live_trades/',
-    'order_data_dir': algos_dir + 'algos/data/orders/',
+    'data_dir': '/home/paul/src/algos/data/',
+    'live_data_dir': '/home/paul/src/algos/data/live/',
+    'ports_data_dir': '/home/paul/src/algos/data/live/ports/',
 }
 
 # ### universe ---- what is collected, tracked, and traded via each exchange

@@ -2,6 +2,7 @@ import sys
 sys.path.insert(0, '..')  # for local imports from the top directory
 sys.path.insert(0, '../..')  # for local imports from the top directory
 
+from algos.config import params
 from algos.decision import (make_requests_dict,
                             actions_to_bull_or_bear_dict,
                             update_state_dict, 
@@ -19,6 +20,8 @@ import numpy as np
 import pandas as pd
 import pickle
 import time
+
+data_dir = params['dirs']['data_dir']
 
 # ### hard coded solutions which should be finalized and then handled better
 exchange = 'binance'
@@ -50,7 +53,7 @@ decision_params = {'fee': 0.01,
 # #### STARTUP LOGIC
 #
 #
-port_path = f"/opt/shared/crypto/algos/data/live/{signal_name}/"
+port_path = f"{data_dir}live/{signal_name}/"
 dir_existed = check_if_dir_exists_and_make(dir=port_path)
 if dir_existed is False:
     first_time_signal = True

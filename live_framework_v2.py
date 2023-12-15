@@ -70,7 +70,7 @@ get_primary_pricing_pair_per_asset(params)
 directory_check_for_portfolio_data(params=params)
 
 try:
-    # DESIRED:   /opt/shared/crypto/algos/data/live/ports/prod_1____BTC_USDT_trades_only_data/state_dict.pickle'
+    # DESIRED:   {data_dir}live/ports/prod_1____BTC_USDT_trades_only_data/state_dict.pickle'
     state_dict = load_cached_state_dict(params)
 except FileNotFoundError:  # SHOULD ALWAYS BE THE FIRST TIME THE PORTFOLIO IS BEING RAN IN THIS CASE
     state_dict = {}

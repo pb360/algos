@@ -2,6 +2,7 @@ import sys
 sys.path.insert(0, '../')
 sys.path.insert(0, '../..')
 
+from algos.config import params 
 from algos.utils import convert_date_format
 
 from clickhouse_driver import Client as CH_Client
@@ -12,6 +13,16 @@ import pickle
 import requests
 import zipfile
 
+data_dir = params['dirs']['data_dir']
+
+def generate_dates(start_date, end_date, date_out_type='string'):
+    while start_date <= end_date:
+        if date_out_type == 'string':
+            yield start_date.strftime('%Y-%m-%d')
+        if date_out_type == 'tuple':
+            yield convert_date_format(start_date, 'tuple_to_day')
+        start_date += datetime.timedelta(days=1)
+
 
 def download_file(url, filename):
     """simple utility to download a file"""
@@ -21,6 +32,7 @@ def download_file(url, filename):
             fd.write(chunk)
 
 
+# ###PAUL TODO: separate function for futures, not needed... if it is would prefer to unify it under one function 
 def get_and_save_futures_csvs(date_str, file_prefix='BTCUSDT-1h-'):
     """gets binance futures klines data from their own website by downloading zip files and extracting them
     LIKELY BEST TO DEPRICATE TO AN IMPROVED VERSION OF
@@ -32,7 +44,7 @@ def get_and_save_futures_csvs(date_str, file_prefix='BTCUSDT-1h-'):
     zip_filename = "test.zip"  # The name you want to save the file as
     csv_filename = filename.replace(".zip", ".csv")
 
-    save_path = "/opt/shared/crypto/algos/data/temp_trades_storage/"  # Replace with your desired path
+    save_path = f"{data_dir}temp_trades_storage/"  # Replace with your desired path
     extracted_kline_csv_path = save_path + 'kline_csvs/'
 
     # Full paths for the zip and csv files
@@ -78,7 +90,7 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
     zip_filename = f"{filename}"  # The name you want to save the file as
     csv_filename = filename.replace(".zip", ".csv")
 
-    save_path = "/opt/shared/crypto/algos/data/temp_trades_storage/trade_csvs/"
+    save_path = f"{data_dir}temp_trades_storage/trade_csvs/"
 
     # Full paths for the zip and csv files
     zip_filepath = os.path.join(save_path, zip_filename)
@@ -129,34 +141,25 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
     return trades_df
 
 
-def generate_dates(start_date, end_date, date_out_type='string'):
-    while start_date <= end_date:
-        if date_out_type == 'string':
-            yield start_date.strftime('%Y-%m-%d')
-        if date_out_type == 'tuple':
-            yield convert_date_format(start_date, 'tuple_to_day')
-        start_date += datetime.timedelta(days=1)
-
-
 def download_binance_trades(pair, start_date, end_date, output='quiet', pickle_failed_days=False):
     i = 0
     failed_dates = []
     for date in generate_dates(start_date, end_date, date_out_type='tuple'):
         if i%1 == 0:
             print(date)
-        try:
-            # get_and_save_futures_csvs(date=date, file_prefix='BTCUSDT-1h-')  # requires sting date
-            get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair=pair,
-                                                                                date_tuple=date,
-                                                                                exchange='binance')
-        except:
-            if output == 'verbose':
-                print(f"failed on {date}")
-                failed_dates.append(date)
+        # try:
+        # get_and_save_futures_csvs(date=date, file_prefix='BTCUSDT-1h-')  # requires sting date
+        get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair=pair,
+                                                                            date_tuple=date,
+                                                                            exchange='binance')
+        # except:
+        #     if output == 'verbose':
+        #         print(f"failed on {date}")
+        #         failed_dates.append(date)
         i += 1
 
     if pickle_failed_days:
-        fp = f"/opt/shared/crypto/algos/data/temp_trades_storage/trade_csvs/missing_days_for_{pair}.pickle"
+        fp = f"{data_dir}temp_trades_storage/trade_csvs/missing_days_for_{pair}.pickle"
         # SAVING
         pickle.dump(failed_dates, open(fp, "wb"))
 

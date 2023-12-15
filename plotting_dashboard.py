@@ -3,6 +3,7 @@ import sys
 
 sys.path.insert(0, '..')  # for local imports from the top directory
 
+from algos.config import params
 from algos.feature import get_multiasset_trading_summaries
 from algos.plotting import plot_framework
 
@@ -12,6 +13,7 @@ from dash import html
 from dash.dependencies import Input, Output
 import pickle
 
+data_dir = params['dirs']['data_dir']
 signal_or_framework = 'signal'
 
 
@@ -22,7 +24,7 @@ if signal_or_framework == 'signal':
     # signal_dict_name = f"signal_dict____2023_08_01____mlp_rolling____v2"
     # signal_dict_name = f"signal_dict____2023_08_01____mlp_rolling____v4"
     signal_dict_name = f"signal_dict____2023_08_03___mlp_rolling____validate"
-    signal_dict_fp = f"/opt/shared/crypto/algos/data/pickled_signal_dicts/{signal_dict_name}.pickle"
+    signal_dict_fp = f"{data_dir}pickled_signal_dicts/{signal_dict_name}.pickle"
 
     # # ### OPENING
     # #
@@ -34,7 +36,7 @@ if signal_or_framework == 'framework':
     # ### `framework_results`
     #
     framework_results_name = f"framework_results____0_06_peaks____MSE_loss____on_preds__0_0075_ewm__4_day_rolling_norm____split_0_65__0_15____NO_shuffled_train"
-    framework_results_fp = f"/opt/shared/crypto/algos/data/pickled_framework_results/{framework_results_name}.pickle"
+    framework_results_fp = f"{data_dir}pickled_framework_results/{framework_results_name}.pickle"
     # ### OPENING
     #
     with open(framework_results_fp, 'rb') as f:
@@ -107,7 +109,7 @@ def update_graph(n):
     # go.Figure(data=go.Scatter(x=[1, 2, 3], y=[1, 3, 2]))
 
     import pickle;
-    with open('/opt/shared/crypto/algos/data/temp/plotly_graph.pickle', 'wb') as f:
+    with open('{data_dir}temp/plotly_graph.pickle', 'wb') as f:
         pickle.dump(fig, f)
         print(f"pickled it")
     return fig

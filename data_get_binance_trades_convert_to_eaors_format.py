@@ -26,7 +26,7 @@ except NameError:
 
     # ### read it in and make a copy
     #
-    save_path = "/opt/shared/crypto/algos/data/temp_trades_storage"  # Replace with your desired path
+    save_path = f"{data_dir}temp_trades_storage"  # Replace with your desired path
     zip_filename = "BTCUSDT-trades-2023-02.zip"  # The name you want to save the file as
     csv_filename = zip_filename.replace(".zip", ".csv")
     csv_filepath = os.path.join(save_path, csv_filename)

@@ -39,6 +39,7 @@ import zipfile
 # # ### local packages
 from algos.config import params
 
+data_dir = params['dir']['data_dir']
 
 # # ### variable definitions
 # #
@@ -812,9 +813,9 @@ def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=N
 # def wrap_up_framework_results_and_model(prices, results_name, model, framework_results, one_run_params):
 #     """ ###PAUL TODO: move one_run_params into framework_results
 #     """
-#     framework_results_fp = f"/opt/shared/crypto/algos/data/pickled_framework_results/{results_name}"
+#     framework_results_fp = f"{data_dir}pickled_framework_results/{results_name}"
 #
-#     saved_model_fp = f"/opt/shared/crypto/algos/data/saved_models/{results_name}"
+#     saved_model_fp = f"{data_dir}saved_models/{results_name}"
 #
 #
 #     # ###PAUL THE BELOW SHOULD BE MOVED INTO FUNCTIONALITY IN UTILS for `make_signal_df()` and `make_transacts_df()`
@@ -847,7 +848,7 @@ def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=N
 #         "2023_03_22____4_precent_peaks____validation_period"
 #     """
 #
-#     framework_results_dir_path = f"/opt/shared/crypto/algos/data/framework_results/{results_name}/"
+#     framework_results_dir_path = f"{data_dir}framework_results/{results_name}/"
 #     transacts_df = pd.read_pickle(f"{framework_results_dir_path}transacts_df.pickle")
 #     signal_df = pd.read_pickle(f"{framework_results_dir_path}preformance_df.pickle")
 #
@@ -966,7 +967,7 @@ def make_and_get_trading_summary(exchange, symbol, date=None, start_date=None, e
     """
 
     if end_date is not None and start_date is None:
-        raise ValueError  # don't want to support going forever forward. to current date, sure.
+        raise ValueError  # ###PAUL TODO:  don't want to support going forever forward, need to reconclie this view with date='live' option... i like live 
     if end_date is None:
         pass
     if start_date is None and end_date is None:

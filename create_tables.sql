@@ -8,6 +8,7 @@
 -- -- -- -- -- DROP TABLE algos_db.AlgosSignalNames;
 -- -- -- -- -- DROP TABLE algos_db.AlgosSignals;
 
+CREATE DATABASE IF NOT EXISTS algos_db;
 
 CREATE TABLE IF NOT EXISTS algos_db.TradingSideConversion
 ( 
