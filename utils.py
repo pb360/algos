@@ -18,6 +18,7 @@ import datetime
 from datetime import timedelta
 import dateutil
 from decimal import Decimal
+import dotenv
 import json
 import lttb
 import math
@@ -39,13 +40,36 @@ import zipfile
 # # ### local packages
 from algos.config import params
 
-data_dir = params['dir']['data_dir']
+dotenv.load_dotenv()  # ###PAUL TODO: do i want to move this somewhere into the params hook? 
+data_dir = params['dirs']['data_dir']
 
 # # ### variable definitions
 # #
 # #
 # params = config.params
 
+
+def get_secret(key):
+    if key not in os.environ:
+        raise KeyError(f"Key {key} not found!")
+    return os.environ[key]
+
+
+def init_ch_client(): 
+    ch_client = CH_Client(host=get_secret('CH_ALGOS_DB_HOST'),
+                      port=int(get_secret('CH_ALGOS_DB_PORT')),
+                      user=get_secret('CH_ALGOS_DB_USER'),
+                      password=get_secret('CH_ALGOS_DB_PASSWORD'), 
+                      database=get_secret('CH_ALGOS_DB_DATABASE'))
+    
+    return ch_client
+    
+
+# ###PAUL TODO: do this, and replace (probably want it here over bot_utils.py)
+def init_ccxt_client():
+
+    ccxt_client = None 
+    return ccxt_client
 
 def convert_date_format(date, output_type):
     """takes a date in a given format and returns it in another
@@ -521,7 +545,7 @@ def get_trades_data(exchange, symbol, start_date=None, end_date=None, source='am
     input:
     """
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     # note in all cases -- not inclusive on the end in order to have no overlap of trades gathered when rolling
     if end_date is not None and start_date is not None:
@@ -1017,7 +1041,7 @@ def make_and_get_trading_summary(exchange, symbol, date=None, start_date=None, e
                                  end_date=iter_end_date,
                                  source=source)
 
-        if trades is 0 or trades.shape[0] == 0:  # if the above returns zero there are no trades for interval collected
+        if trades == 0 or trades.shape[0] == 0:  # if the above returns zero there are no trades for interval collected
             continue
         else:
             trading_summary = convert_trades_df_to_trading_summary(trades, exchange_format=source)
@@ -1090,7 +1114,7 @@ def create_trading_summary_table():
             ORDER BY timestamp;
         """
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
     ch_client.execute(query)
 
 
@@ -1149,7 +1173,7 @@ def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwr
 
     trading_summary = trading_summary.astype({'buyer_is_maker': int, 'buyer_is_taker': int})
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     existing_dates = from_table_get_existing_dates_in_series(ch_client,
                                                              table=table,
@@ -1239,7 +1263,7 @@ def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='
     """ gets the last time in the trading summary table and then makes the trading summary table up to the current point
     # ###PAUL TODO: remove default values from this... I dont like that they are here. It seems like it could lead to issues
     """
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     query = f""" SELECT MAX(timestamp)
                  FROM algos_db.TradingSummary
@@ -1330,7 +1354,7 @@ def query_trading_summary(exchange, symbol, start_date, end_date, columns='all',
 
     if ch_client == None:
         print(f"warning -- clickhouse client set to none in utils.py `query_trading_summary()`\n"*3)
-        ch_client = CH_Client('10.0.1.86', port='9009')
+        ch_client = init_ch_client()
 
     trading_summary = ch_client.query_dataframe(query)
 
@@ -1344,7 +1368,7 @@ def query_trading_summary(exchange, symbol, start_date, end_date, columns='all',
 
 def get_signal_id(signal_name, ):
     """gets the `signal_id` (int) for a given `signal_name`, option to add signal_id if there is one"""
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
     query = f"""SELECT signal_id FROM algos_db.AlgosSignalNames WHERE signal_name = '{signal_name}';"""
     signal_id = ch_client.execute(query)
     assert (len(signal_id) <= 1)
@@ -1362,7 +1386,7 @@ def add_signal_name_to_foreign_key_table(signal_name):
     if signal_id is not False:
         raise ValueError(f"Signal name '{signal_name}' already exists in SignalNames.")
     else:
-        ch_client = CH_Client('10.0.1.86', port='9009')
+        ch_client = init_ch_client()
         signal_id = ch_client.execute('SELECT max(signal_id) FROM algos_db.AlgosSignalNames')[0][0]
         signal_id = signal_id + 1
         ch_client.execute(f"""INSERT INTO algos_db.AlgosSignalNames (signal_id, signal_name) VALUES""",
@@ -1382,7 +1406,7 @@ def bulk_insert_signal_observations(signal_name, signal):
         signal = pd.DataFrame(signal, columns=['value'])
         signal.index.name = 'timestamp'
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     query = f"SELECT signal_id FROM algos_db.AlgosSignalNames WHERE signal_name = '{signal_name}'"
     signal_id = ch_client.execute(query)[0][0]  # comes as [(1,)]
@@ -1398,7 +1422,7 @@ def bulk_insert_signal_observations(signal_name, signal):
 
 
 def query_signal_by_name(signal_name, start_date=None, end_date=None):
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     query = f"SELECT signal_id FROM algos_db.AlgosSignalNames WHERE signal_name = '{signal_name}'"
     signal_id = ch_client.execute(query)[0][0]  # comes as [(1,)]
@@ -1436,7 +1460,7 @@ def query_signal_by_name(signal_name, start_date=None, end_date=None):
 
 
 def get_latest_signal_timestamp(signal_name):
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     return timestamp
 
@@ -1451,7 +1475,7 @@ def update_signals_table(signal, signal_name=None, signal_id=None, overwrite=Fal
 
     if ch_client is None:
         print(f"warning ch_client set to None in `update_signals_table` \n *3")
-        ch_client = CH_Client('10.0.1.86', port='9009')
+        ch_client = init_ch_client()
 
     if signal_id is None:
         signal_id = get_signal_id(signal_name)
@@ -1495,7 +1519,7 @@ def remove_duplicates_from_trading_summary():
             HAVING count(*) > 1
             ));"""
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
     ch_client.execute(query)
 
 
@@ -1508,11 +1532,6 @@ def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Dec
     precision: int = int(round(-math.log(step_size, 10), 0))
     return float(round(quantity, precision))
 
-
-def get_secret(key):
-    if key not in os.environ:
-        raise KeyError(f"Key {key} not found!")
-    return os.environ[key]
 
 
 def get_mutual_min_max_datetimes(pandas_objects):

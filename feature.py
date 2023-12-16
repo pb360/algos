@@ -1,7 +1,8 @@
 # ### local imports
 import sys
 sys.path.insert(0, '..')  # for local imports from the top directory
-from algos.utils import (convert_date_format,
+from algos.utils import (init_ch_client, 
+                         convert_date_format,
                          query_trading_summary,
                          fill_trading_summary,
                          deduplicate_df_on_index_only, )
@@ -21,7 +22,7 @@ from algos.make_feature_set_printed_fn import make_feature_set_printed_fn  # imp
 from algos.make_feature_set_printed_fn import make_feature_set_printed_fn
 # ###PAUL TODO: this should be depricated by code which goes off last rolling value (significant engineering needed...)
 
-from clickhouse_driver import Client as CH_Client
+# from clickhouse_driver import Client as CH_Client  # ###PAUL TODO: delete this line once confirmed OKAY 
 from copy import deepcopy
 import datetime
 import numpy as np
@@ -533,7 +534,7 @@ def adjust_start_dates_of_feature_params(feature_params, model_params, max_cut_t
 
     if ch_client == None:
         print(f"warning -- clickhouse client set to none in `adjust_start_dates_of_feature_params()`")
-        ch_client = CH_Client('10.0.1.86', port='9009')
+        ch_client = init_ch_client()
 
     # try:   # ###PAUL_del_later
     max_signal_timestamp = ch_client.execute(f"""SELECT max(timestamp)

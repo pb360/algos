@@ -3,9 +3,9 @@ sys.path.insert(0, '../')
 sys.path.insert(0, '../..')
 
 from algos.config import params 
-from algos.utils import convert_date_format
+from algos.utils import init_ch_client, convert_date_format, check_if_dir_exists_and_make
 
-from clickhouse_driver import Client as CH_Client
+# from clickhouse_driver import Client as CH_Client
 import datetime
 import os
 import pandas as pd
@@ -36,7 +36,7 @@ def download_file(url, filename):
 def get_and_save_futures_csvs(date_str, file_prefix='BTCUSDT-1h-'):
     """gets binance futures klines data from their own website by downloading zip files and extracting them
     LIKELY BEST TO DEPRICATE TO AN IMPROVED VERSION OF
-    get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file
+    get_spot_trades_convert_to_algos_delete_temp_csv_n_zip
     """
     filename = f"{file_prefix}{date_str}.zip"
 
@@ -51,6 +51,8 @@ def get_and_save_futures_csvs(date_str, file_prefix='BTCUSDT-1h-'):
     zip_filepath = os.path.join(save_path, zip_filename)
     csv_filepath = os.path.join(extracted_kline_csv_path, csv_filename)
 
+    check_if_dir_exists_and_make(dir=None, fp=None)
+
     # Download the file
     # print(f"Downloading {zip_filename} to {zip_filepath}...")
     download_file(url, zip_filepath)
@@ -61,7 +63,7 @@ def get_and_save_futures_csvs(date_str, file_prefix='BTCUSDT-1h-'):
         zip_ref.extractall(extracted_kline_csv_path)
 
 
-def convert_binance_trades_to_eaors(trades_df, exchange, pair):
+def convert_binance_trades_to_algos(trades_df, exchange, pair):
 
     trades_df['side'] = trades_df['side'].map(
         {False: True, True: False})  # invert, their side bool is buyer_is_maker, ours is seller_is_maker
@@ -78,7 +80,7 @@ def convert_binance_trades_to_eaors(trades_df, exchange, pair):
     return trades_df
 
 
-def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, date_tuple, exchange='binance'):
+def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(pair, date_tuple, exchange):
     """ what the name of the function says... """
 
     date_str = convert_date_format(date_tuple, 'string')
@@ -86,11 +88,19 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
     file_prefix = f"{pair}"
     filename = f"{file_prefix}-trades-{date_str}.zip"
 
-    url = f"https://data.binance.vision/data/spot/daily/trades/{pair}/{filename}"
+    if exchange=='binance':
+        url = f"https://data.binance.vision/data/spot/daily/trades/{pair}/{filename}"
+    elif exchange=='binance_us':
+        print(f"need to implement binance us ")
+        raise ValueError
+    else:
+        raise ValueError
+    
     zip_filename = f"{filename}"  # The name you want to save the file as
     csv_filename = filename.replace(".zip", ".csv")
 
     save_path = f"{data_dir}temp_trades_storage/trade_csvs/"
+    check_if_dir_exists_and_make(dir=save_path)
 
     # Full paths for the zip and csv files
     zip_filepath = os.path.join(save_path, zip_filename)
@@ -103,9 +113,14 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
     with zipfile.ZipFile(zip_filepath, 'r') as zip_ref:
         zip_ref.extractall(save_path)
 
-    cols = ['timestamp', 'id', 'price', 'amount', 'side']
+    cols = ['timestamp', 'id', 'price', 'amount', 'side']  # what we want to keep for 
+
+    cols = ['id', 'price', 'amount', 'dollar_amount', 'timestamp', 'side', 'depricated']
 
     trades_df = pd.read_csv(csv_filepath, names=cols)
+
+    import pdb; pdb.set_trace()
+
     if trades_df.shape[0] < 1:
         raise ValueError
 
@@ -122,7 +137,7 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
         print(f"ticker not mapped!")
 
 
-    trades_df = convert_binance_trades_to_eaors(trades_df, exchange, pair=table_pair)
+    trades_df = convert_binance_trades_to_algos(trades_df, exchange, pair=table_pair)
 
     delete_query = f"""ALTER TABLE algos_db.Trades 
     DELETE WHERE
@@ -130,7 +145,7 @@ def get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair, da
         AND symbol = '{table_pair}'
         AND toStartOfDay(timestamp) = toDateTime('{date_str}')"""
 
-    ch_client = CH_Client('10.0.1.86', port='9009')
+    ch_client = init_ch_client()
 
     ch_client.execute(delete_query)
     ch_client.execute('INSERT INTO algos_db.Trades VALUES', trades_df.to_dict('records'))
@@ -149,7 +164,7 @@ def download_binance_trades(pair, start_date, end_date, output='quiet', pickle_f
             print(date)
         # try:
         # get_and_save_futures_csvs(date=date, file_prefix='BTCUSDT-1h-')  # requires sting date
-        get_spot_trade_data_convert_to_eaors_format_delete_csv_and_zip_file(pair=pair,
+        get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(pair=pair,
                                                                             date_tuple=date,
                                                                             exchange='binance')
         # except:
