@@ -38,6 +38,11 @@ RUN python3.10 -m venv ~/venv \
     && pip install --upgrade wheel pip==23.0 \
     && pip install -r /root/algos/requirements.txt
 
+
+# Instead of just `python3.10 -m pip install ...`
+RUN /root/venv/bin/python3.10 -m pip install --upgrade wheel pip==23.0 \
+    && /root/venv/bin/python3.10 -m pip install -r /root/algos/requirements.txt
+
 # ARG ALGOS_COMMIT
 # ENV ALGOS_COMMIT=${ALGOS_COMMIT}
 # RUN echo $ALGOS_COMMIT > /root/VERSION.txt

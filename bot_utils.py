@@ -670,7 +670,7 @@ def make_ccxt_order_info_dict(response):
     order_info_dict['amount'] = response['amount']
     order_info_dict['filled'] = response['filled']
     order_info_dict['cost'] = response['cost']
-    order_info_dict['side'] = response['side']
+    order_info_dict['side'] = response['side']   # ###PAUL TODO: maybe need to switch this to [0, 1]?
     order_info_dict['status'] = response['status']
     order_info_dict['type'] = response['type']
 

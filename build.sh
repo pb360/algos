@@ -5,7 +5,7 @@ result="${dirname%"${dirname##*[!/]}"}" # extglob-free multi-trailing-/ trim
 result="${result##*/}" # remove everything before the last / (like basename)
 
 if [ "$result" != "hoth" ]; then
-    echo 'ERROR: Run this command from the hoth root directory!'
+    echo 'ERROR: Run this command from the algos root directory!'
     return 1
 fi
 

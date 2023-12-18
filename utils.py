@@ -293,6 +293,7 @@ def get_date_list(start_date, end_date, output_type='datetime.datetime', step_si
     return date_list
 
 
+# ###PAUL TODO: arg, exchange_format, should be depricated. Everything handled via CCXT 
 def convert_trades_df_to_trading_summary(trades, exchange_format='amberdata'):
     """reads CSV of trades. converts to prices in some interval
 
@@ -978,11 +979,11 @@ def fill_trading_summary_interpolating_missing_minutes(trading_summary):
     return trading_summary
 
 
-def make_and_get_trading_summary(exchange, symbol, date=None, start_date=None, end_date=None, freq='W',
+def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, start_date=None, end_date=None, freq='W',
                                  source='amberdata'):
     """ make and get trading summary for long period of time
 
-    a generally depricated function, only useful when adding new assets as trades table can not be queried over long
+    only useful when adding new assets as trades table can not be queried over long
     periods of time because they can take too much memory. This will query in intervals of `freq` and combine the
     TradingSummary table which can be 1000x smaller than the trades table for the same time period.
 
@@ -1605,7 +1606,7 @@ def insert_trades(ccxt_trades):
                  'id': trade['id'], 
                  'price': trade['price'],
                  'amount': trade['amount'],
-                 'side': 1 if trade['side'] == 'buy' else 0 
+                 'buyer_is_taker': 1 if trade['side'] == 'buy' else 0 
         }
 
         data_tuple = tuple(data_dict.values())

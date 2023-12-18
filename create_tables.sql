@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS algos_db.Trades
     id String, 
     price Float64,
     amount Float64,
-    side UInt8
+    buyer_is_taker UInt8
 
 )
 ENGINE = MergeTree()

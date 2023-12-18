@@ -8,7 +8,7 @@ time.tzset()
 # sys.path.insert(0, '/home/paul/src')
 sys.path.insert(0, '..')
 
-from algos.utils import get_secret
+from algos.utils import init_ch_client
 from ccxt.pro import binanceus
 import asyncio
 import dotenv
@@ -17,11 +17,7 @@ from clickhouse_driver import Client as CH_Client
 from collections import defaultdict
 import datetime
 
-ch_client = CH_Client(host=get_secret('CH_ALGOS_DB_HOST'),
-                      port=int(get_secret('CH_ALGOS_DB_PORT')),
-                      user=get_secret('CH_ALGOS_DB_USER'),
-                      password=get_secret('CH_ALGOS_DB_PASSWORD'), 
-                      database=get_secret('CH_ALGOS_DB_DATABASE'))
+ch_client = init_ch_client()
 
 
 # Connect to Binance
@@ -46,7 +42,7 @@ async def process_trade_data(trades, ch_client, exchange):
                  'id': trade['id'], 
                  'price': trade['price'],
                  'amount': trade['amount'],
-                 'side': 1 if trade['side'] == 'buy' else 0 
+                 'buyer_is_take': 1 if trade['side'] == 'buy' else 0 
                 }
         ch_formatted_trades.append(trade)
 
