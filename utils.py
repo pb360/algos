@@ -55,16 +55,19 @@ def get_secret(key):
     return os.environ[key]
 
 
-def init_ch_client(): 
+def init_ch_client(send_receive_timeout=12*60, max_execution_time=12*60): 
     ch_client = CH_Client(host=get_secret('CH_ALGOS_DB_HOST'),
                       port=int(get_secret('CH_ALGOS_DB_PORT')),
                       user=get_secret('CH_ALGOS_DB_USER'),
                       password=get_secret('CH_ALGOS_DB_PASSWORD'), 
-                      database=get_secret('CH_ALGOS_DB_DATABASE'))
+                      database=get_secret('CH_ALGOS_DB_DATABASE'),
+                      settings={
+                                    'send_receive_timeout': send_receive_timeout,  # Timeout in seconds for send/receive operations
+                                    'max_execution_time': max_execution_time     # Maximum execution time for a query
+                                })
     
     return ch_client
     
-
 # ###PAUL TODO: do this, and replace (probably want it here over bot_utils.py)
 def init_ccxt_client():
 

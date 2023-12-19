@@ -3,13 +3,12 @@ import sys
 sys.path.insert(0, "../")
 sys.path.insert(0, "../..")
 
+import argparse
 from algos.config import params
 from algos.utils import (
     init_ch_client,
     convert_date_format,
-    check_if_dir_exists_and_make,
-)
-
+    check_if_dir_exists_and_make,)
 # from clickhouse_driver import Client as CH_Client
 import datetime
 import os
@@ -17,6 +16,7 @@ import pandas as pd
 import pickle
 import requests
 import zipfile
+from zipfile import BadZipFile
 
 
 data_dir = params["dirs"]["data_dir"]
@@ -75,8 +75,18 @@ def convert_binance_trades_to_algos(trades_df, exchange, pair):
     #     {False: True, True: False}
     # )  # invert, their side bool is buyer_is_maker, ours is seller_is_maker
 
-    trades_df['buyer_is_taker'] = trades_df['isBuyerMaker'].map({False: 1, True: 0})
-    trades_df = trades_df.drop(columns=['isBuyerMaker', 'depricated', ])
+    if exchange == 'binance': 
+        trades_df['buyer_is_taker'] = trades_df['isBuyerMaker'].map({False: 1, True: 0})
+        trades_df = trades_df.drop(columns=['isBuyerMaker', 'depricated', ])
+    elif exchange == 'binance_us': 
+        # cols = ["id", "price", "amount", "dollar_amount", "timestamp", "isBuyerMaker", "depricated"]
+        #    id    price    qty  quote_qty           time  is_buyer_maker
+        trades_df['buyer_is_taker'] = trades_df['is_buyer_maker'].map({False: 1, True: 0})
+        trades_df = trades_df.rename(columns={'time': 'timestamp', 'qty': 'amount'})
+        trades_df = trades_df.drop(columns=['is_buyer_maker', 'quote_qty'])
+    else: 
+        print(f"exchange not supported \n" * 10)
+        raise ValueError
 
     trades_df["timestamp"] = pd.to_datetime(trades_df["timestamp"] / 1000, unit="s")
     trades_df = trades_df.set_index("timestamp")
@@ -98,15 +108,6 @@ def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(pair, date_tuple, exc
     pair = pair.upper()
     file_prefix = f"{pair}"
     filename = f"{file_prefix}-trades-{date_str}.zip"
-
-    if exchange == "binance":
-        url = f"https://data.binance.vision/data/spot/daily/trades/{pair}/{filename}"
-    elif exchange == "binance_us":
-        print(f"need to implement binance us ")
-        raise ValueError
-    else:
-        raise ValueError
-
     zip_filename = f"{filename}"  # The name you want to save the file as
     csv_filename = filename.replace(".zip", ".csv")
 
@@ -117,21 +118,58 @@ def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(pair, date_tuple, exc
     zip_filepath = os.path.join(save_path, zip_filename)
     csv_filepath = os.path.join(save_path, csv_filename)
 
-    # Download the file
-    # print(f"Downloading {zip_filename} to {zip_filepath}...")
-    download_file(url, zip_filepath)
-
-    with zipfile.ZipFile(zip_filepath, "r") as zip_ref:
-        zip_ref.extractall(save_path)
-
-    # note that binance side is denoted by isBuyerMaker, need to switch this 
-    cols = ["id", "price", "amount", "dollar_amount", "timestamp", "isBuyerMaker", "depricated"]
-
-    trades_df = pd.read_csv(csv_filepath, names=cols)
-
-    if trades_df.shape[0] < 1:
+    
+    # ###PAUL TODO, ugly patterning of if exchange, because of the intermediary zipfile i don't wantt o include in each case..
+    # TODO: how to handle this DRYer 
+    if exchange == "binance":
+        # to check when a ticker becomes available just check manually via 
+       # https://data.binance.vision/?prefix=data/spot/daily/trades/BTCUSDT/
+        url = f"https://data.binance.vision/data/spot/daily/trades/{pair}/{filename}"
+    elif exchange == "binance_us":
+        # check here for start date of pair:  https://www.binance.us/institutions/market-history
+        url = f"https://data.binance.us/public_data/spot/daily/trades/{pair}/{filename}"
+    elif exchange == 'kraken': 
+        print(f"need to implement binance us ")
+        raise ValueError
+    else:
         raise ValueError
 
+    # download and extract 
+    download_file(url, zip_filepath)
+
+    try: 
+        with zipfile.ZipFile(zip_filepath, "r") as zip_ref:
+            zip_ref.extractall(save_path)
+    except BadZipFile: 
+        print(f"BadZipFile on {date_tuple} \n"*5)
+        os.remove(zip_filepath)
+        return None 
+    
+    if exchange == "binance":
+        cols = ["id", "price", "amount", "dollar_amount", "timestamp", "isBuyerMaker", "depricated"]
+        trades_df = pd.read_csv(csv_filepath , names=cols)
+    elif exchange == "binance_us":
+        trades_df = pd.read_csv(csv_filepath)
+    elif exchange == 'kraken': 
+        print(f"need to implement binance us ")
+        raise ValueError
+    else:
+        print(f"exchange not supported ")
+        raise ValueError
+
+    if trades_df.shape[0] < 1: 
+        raise ValueError
+
+    # this pair map is specific to binance / binance_us because the historical downloading feature,
+    # CCXT may already offer this pair conversion however at this point in life its probably best to just do it manually 
+    pair_map = {"BTCTUSD": "BTC-TUSD", "BTCUSDT": "BTC-USDT", "BTCUSD": "BTC-USD",
+                "ETHTUSD": "ETH-TUSD", "ETHUSDT": "ETH-USDT", "ETHUSD": "ETH-USD",
+                } 
+    
+    if pair in pair_map: 
+        table_pair = pair_map[pair] 
+    else:
+        print(f"ticker not mapped!")
     # TODO: better to use a map for this (find out about universal ticker map from EAORS
     # TODO: best to do this in configs, but perfection takes forever 
     if pair == "BTCTUSD":
@@ -142,8 +180,7 @@ def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(pair, date_tuple, exc
         table_pair = "ETH-TUSD"  
     elif pair == "ETHUSDT":
         table_pair = "ETH-USDT"  # solely used for adding a '-' to the pair
-    else:
-        print(f"ticker not mapped!")
+    
 
     trades_df = convert_binance_trades_to_algos(trades_df, exchange, pair=table_pair)
 
@@ -171,7 +208,8 @@ def download_binance_trades(exchange, pair, start_date, end_date, output="quiet"
     failed_dates = []
     for date in generate_dates(start_date, end_date, date_out_type="tuple"):
         if i % 1 == 0:
-            print(date)
+            print(f"{exchange}  --  {pair}  --  {date}")
+            
         # try:
         # get_and_save_futures_csvs(date=date, file_prefix='BTCUSDT-1h-')  # requires sting date
             
@@ -192,15 +230,30 @@ def download_binance_trades(exchange, pair, start_date, end_date, output="quiet"
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='process input parameters')
+
+    # Define arguments
+    parser.add_argument('--exchange', type=str, required=True, help='Exchange name (e.g., binance, binance_us)')
+    parser.add_argument('--pair', type=str, required=True, help='Currency pair (e.g., BTCUSDT, BTCUSD)')
+    parser.add_argument('--start_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='Start date in YYYY-MM-DD format')
+    parser.add_argument('--end_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='End date in YYYY-MM-DD format')
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Use arguments
+    exchange = args.exchange
+    pair = args.pair
+    start_date = args.start_date
+    end_date = args.end_date
+
     # ### SAVING DATA
     #
     #
-    exchange='binance'
-    pair = f"BTCUSDT"
-    # to check when a ticker becomes available just check manually via 
-    # https://data.binance.vision/?prefix=data/spot/daily/trades/BTCUSDT/
-    start_date = datetime.datetime(2017, 8, 18)
-    end_date = datetime.datetime(2023, 12, 17)
+    # exchange='binance'
+    # pair = f"BTCUSDT"
+    # start_date = datetime.datetime(2021, 5, 18)
+    # end_date = datetime.datetime(2023, 12, 17)
 
     download_binance_trades(
         exchange=exchange, 
