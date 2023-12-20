@@ -296,7 +296,7 @@ if __name__ == "__main__":
 
                 {'exchange': 'binance_us', 'ccxt_pair': 'BTC/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 19)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'ETH/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 19)},
-                {'exchange': 'binance_us', 'ccxt_pair': 'LINK/USDT'    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 15)},
+                {'exchange': 'binance_us', 'ccxt_pair': 'LINK/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 15)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'KDA/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'ROSE/USDT',   'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'ICP/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
