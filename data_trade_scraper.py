@@ -8,7 +8,7 @@ time.tzset()
 # sys.path.insert(0, '/home/paul/src')
 sys.path.insert(0, '..')
 
-from algos.utils import init_ch_client
+from algos.utils import init_ch_client, get_secret
 from ccxt.pro import binanceus
 import asyncio
 import dotenv
@@ -42,7 +42,7 @@ async def process_trade_data(trades, ch_client, exchange):
                  'id': trade['id'], 
                  'price': trade['price'],
                  'amount': trade['amount'],
-                 'buyer_is_take': 1 if trade['side'] == 'buy' else 0 
+                 'buyer_is_taker': 1 if trade['side'] == 'buy' else 0 
                 }
         ch_formatted_trades.append(trade)
 
@@ -54,7 +54,7 @@ async def process_trade_data(trades, ch_client, exchange):
 async def process_trades_periodically(processing_interval, ch_client):
     while True:
         if accumulated_trades:  # Check if there are trades to process
-            await process_trade_data(accumulated_trades, ch_client, exchange='binance')
+            await process_trade_data(accumulated_trades, ch_client, exchange='binance_us_test')  # ###PAUL TODO: don't specify exchange for collection here. 
             accumulated_trades.clear()  # Clear the list after processing
         await asyncio.sleep(processing_interval)
 
@@ -74,7 +74,10 @@ async def process_trades_periodically(processing_interval, ch_client):
 async def main():
     processing_task = asyncio.create_task(process_trades_periodically(processing_interval, ch_client))
     while True:
-        trades = await ccxt_binanceus.watch_trades_for_symbols(symbols=['BTC/USDT', 'KDA/USDT', 'ETH/USDT', 'LINK/USDT', 'ROSE/USDT'])
+        # ###PAUL TODO, this list should be in config, likely needs to go under machine specific, don't want multiple machines running collection (yet)
+        # TODO: outline reconcialiation to make sure that 
+        trades = await ccxt_binanceus.watch_trades_for_symbols(symbols=['BTC/USDT', 'KDA/USDT', 'ETH/USDT',  'LINK/USDT', 'ROSE/USDT', 'ICP/USDT', 'AVAX/USDT',
+                                                                        'SOL/USDT', 'BNB/USDT', 'DOGE/USDT', 'GRT/USDT', ])
         accumulated_trades.extend(trades)
 
 if __name__ == "__main__":
