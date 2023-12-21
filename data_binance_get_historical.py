@@ -192,12 +192,13 @@ def check_to_increase_start_date(exchange, symbol, requested_start_date):
     AND symbol = '{symbol}'
     """
     
+    ch_client = init_ch_client()
     latest_data_date = ch_client.execute(query)[0][0]
     
     if type(requested_start_date) != datetime.datetime: 
         requested_start_date = convert_date_format(requested_start_date, 'datetime.datetime')
     
-    start_date = latest_data_date if requested_start_date < latest_data_date else requested_start
+    start_date = latest_data_date if requested_start_date < latest_data_date else requested_start_date
     
     state_date = convert_date_format(start_date, 'tuple_to_day') 
     
