@@ -55,7 +55,7 @@ def get_secret(key):
     return os.environ[key]
 
 
-def init_ch_client(send_receive_timeout=12*60, max_execution_time=12*60): 
+def init_ch_client(send_receive_timeout=120*60, max_execution_time=120*60): 
     ch_client = CH_Client(host=get_secret('CH_ALGOS_DB_HOST'),
                       port=int(get_secret('CH_ALGOS_DB_PORT')),
                       user=get_secret('CH_ALGOS_DB_USER'),
@@ -73,6 +73,7 @@ def init_ccxt_client():
 
     ccxt_client = None 
     return ccxt_client
+
 
 def convert_date_format(date, output_type):
     """takes a date in a given format and returns it in another
@@ -98,12 +99,14 @@ def convert_date_format(date, output_type):
         # tuple to day resolution... ie: [2021, 01, 31]
         if len(date) == 3:
             year, month, day = date
-            if output_type in ['datetime', 'datetime.date', 'datetime.datetime']:
+            if output_type in ['datetime.date']:
                 return datetime.date(year=year, month=month, day=day)
+            if output_type in ['datetime', 'datetime.datetime']:
+                return datetime.datetime(year=year, month=month, day=day, hour=0, minute=0, second=0, microsecond=0)
             if output_type == 'tuple_to_day':
                 y, m, d = str(date[0]), str(date[1]), str(date[2])
                 return (y, m, d)
-            if output_type in ['pandas', 'pd.datetime']:
+            if output_type in ['pandas', 'pd.datetime']:  # ###PAUL TODO: (datetime should imply to millisecond, which is microsecond in datetime)
                 return pd.to_datetime(datetime.date(year=year, month=month, day=day))
             if output_type in ['string_short', 'string_to_day', 'string', 'str']:
                 date = datetime.date(year=year, month=month, day=day)
@@ -297,7 +300,7 @@ def get_date_list(start_date, end_date, output_type='datetime.datetime', step_si
 
 
 # ###PAUL TODO: arg, exchange_format, should be depricated. Everything handled via CCXT 
-def convert_trades_df_to_trading_summary(trades, exchange_format='amberdata'):
+def convert_trades_df_to_trading_summary(trades, exchange_format='algos'):
     """reads CSV of trades. converts to prices in some interval
 
     input :
@@ -305,7 +308,7 @@ def convert_trades_df_to_trading_summary(trades, exchange_format='amberdata'):
         exchange (str): helps tell the format
     """
 
-    if exchange_format == 'EAORS':
+    if exchange_format == 'algos':
         """ 
         logic for conversion of which side the trade was on... this is the link for the binance documentation.
         https://developers.binance.com/docs/binance-trading-api/spot#recent-trades-list

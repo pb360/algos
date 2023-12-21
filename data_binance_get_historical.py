@@ -17,6 +17,7 @@ import os
 import pandas as pd
 import pickle
 import requests
+import traceback
 import zipfile
 from zipfile import BadZipFile
 
@@ -110,9 +111,23 @@ def read_trades_from_exchange_specific_format_csv_convert_to_algos(exchange, csv
     return trades_df 
 
 
+def insert_df_in_batches(client, df, table_name='algos_db.Trades', batch_size=25000):
+    total_rows = len(df)
+
+    for start in range(0, total_rows, batch_size):
+        end = min(start + batch_size, total_rows)
+        batch = df.iloc[start:end]
+        client.execute(
+            f"INSERT INTO {table_name} VALUES", 
+            batch.to_dict("records")
+        )
+        # print(f"Inserted rows {start} to {end} out of {total_rows}")
+
+
 def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair, date_tuple, exchange):
     """what the name of the function says..."""
 
+    print(f"{exchange} -- {ccxt_pair} -- {date_tuple} ---- starting download, convert, and write to db")
     exchange_pair = markets[ccxt_pair]['id']
     
     date_str = convert_date_format(date_tuple, "string")
@@ -158,9 +173,10 @@ def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair, date_tuple
     ch_client = init_ch_client()
 
     ch_client.execute(delete_query)
-    ch_client.execute(
-        "INSERT INTO algos_db.Trades VALUES", trades_df.to_dict("records")
-    )
+
+    insert_df_in_batches(client=ch_client, df=trades_df, table_name='algos_db.Trades', batch_size=25000)
+
+    print(f"fully ran db delete / write {exchange} -- {ccxt_pair} -- {date_tuple}") 
 
     os.remove(zip_filepath)
     os.remove(csv_filepath)
@@ -168,14 +184,35 @@ def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair, date_tuple
     return trades_df
 
 
+def check_to_increase_start_date(exchange, symbol, requested_start_date): 
+    query = f"""
+    SELECT MAX(timestamp) AS max_timestamp
+    FROM algos_db.Trades
+    WHERE exchange = '{exchange}'
+    AND symbol = '{symbol}'
+    """
+    
+    latest_data_date = ch_client.execute(query)[0][0]
+    
+    if type(requested_start_date) != datetime.datetime: 
+        requested_start_date = convert_date_format(requested_start_date, 'datetime.datetime')
+    
+    start_date = latest_data_date if requested_start_date < latest_data_date else requested_start
+    
+    state_date = convert_date_format(start_date, 'tuple_to_day') 
+    
+    return start_date 
+
+
 def download_binance_trades(exchange, ccxt_pair, start_date, end_date, output="quiet", pickle_failed_days=False):
     i = 0
     failed_dates = []
-    for date in generate_dates(start_date, end_date, date_out_type="tuple"):
-        if i % 1 == 0:
-            print(f"{exchange}  --  {ccxt_pair}  --  {date}")
 
-            
+    # ###PAUL TODO: hook for getting lastest date of trading, redefine start_date IF IT IS LATER THAN GIVEN START DATE 
+    # note that if its earlier than a given start deate then it is likely that 
+    start_date = check_to_increase_start_date(exchange=exchange, symbol=ccxt_pair, requested_start_date=start_date)
+
+    for date in generate_dates(start_date, end_date, date_out_type="tuple"):
         get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair=ccxt_pair, 
                                                                date_tuple=date,
                                                                exchange=exchange)
@@ -189,14 +226,45 @@ def download_binance_trades(exchange, ccxt_pair, start_date, end_date, output="q
     return failed_dates
 
 
-def download_wrapper(params):
+def download_binance_trades_multithreaded(exchange, ccxt_pair, start_date, end_date, output="quiet", pickle_failed_days=False, n_workers=5):
+    failed_dates = []
 
+    def worker(date):
+        try:
+            get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair=ccxt_pair, 
+                                                                   date_tuple=date,
+                                                                   exchange=exchange)
+            return None  # No error
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            return date  # Return the date if there was an error
+
+    dates = generate_dates(start_date, end_date, date_out_type="tuple")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
+        results = executor.map(worker, dates)
+
+    for date, result in zip(dates, results):
+        if result is not None:
+            failed_dates.append(result)
+            print(f"Failed for date: {date}")
+
+    if pickle_failed_days and failed_dates:
+        fp = f"{data_dir}temp_trades_storage/trade_csvs/missing_days_for_{ccxt_pair}.pickle"
+        pickle.dump(failed_dates, open(fp, "wb"))
+
+    return failed_dates
+
+
+def download_wrapper(params):
     try:
         # Unpack the parameters and call the download function
         download_binance_trades(params['exchange'], params['ccxt_pair'], params['start_date'], params['end_date'])
     except Exception as e: 
         print(f"\n \n \n the error was \n \n \n {e}")
         traceback.print_exc()
+
 
 # ### an aside function unused, don't want to delete 
 def get_and_save_futures_klines_csvs(date_str, file_prefix="BTCUSDT-1h-"):
@@ -229,10 +297,15 @@ def get_and_save_futures_klines_csvs(date_str, file_prefix="BTCUSDT-1h-"):
         zip_ref.extractall(extracted_kline_csv_path)
 
 
+def edit_start_date_of_trades_to_download(trades_to_download):
+    
+
+    return None 
+
 if __name__ == "__main__":
-    # # ### START:  SINGLE THREAD VERSION OF MAIN COMMENTED OUT 
-    # # ##
-    # # # 
+    # # ### START:  SINGLE TICKER DEPTH FIRST VERSION ---- really for BTC mainly as it has so much data 
+    # # ##          SINGLE TICKER DEPTH FIRST VERSION 
+    # # #           SINGLE TICKER DEPTH FIRST VERSION 
     # parser = argparse.ArgumentParser(description='process input parameters')
 
     # # Define arguments
@@ -250,23 +323,28 @@ if __name__ == "__main__":
     # start_date = args.start_date
     # end_date = args.end_date
 
-    # download_binance_trades(
+    # # download_binance_trades(
+    # download_binance_trades_multithreaded(
     #     exchange=exchange, 
     #     ccxt_pair=ccxt_pair,
     #     start_date=start_date,
     #     end_date=end_date,
     #     output="verbose",
     #     pickle_failed_days=True,
+    #     n_workers=18,
     # )
-    # # #
-    # # ##
-    # # ### START:  SINGLE THREAD VERSION OF MAIN COMMENTED OUT 
+
+    # # #         SINGLE TICKER DEPTH FIRST VERSION 
+    # # ##        SINGLE TICKER DEPTH FIRST VERSION 
+    # # ### END:  SINGLE TICKER DEPTH FIRST VERSION 
 
     
-    # Example list of dictionaries with parameters
     
+    # ### START:  MULTI THREADED BREADTH FIRST (many tickers, one date ) 
+    # ##
+    # # 
     trades_to_download = [
-                {'exchange': 'binance', 'ccxt_pair': 'BTC/USDT',    'start_date': (2021, 8, 14),   'end_date': (2023, 12, 18)},
+                # {'exchange': 'binance', 'ccxt_pair': 'BTC/USDT',    'start_date': (2021, 8, 14),   'end_date': (2023, 12, 18)},
                 {'exchange': 'binance', 'ccxt_pair': 'ETH/USDT',    'start_date': (2019, 1, 27),   'end_date': (2023, 12, 18)},
                 {'exchange': 'binance', 'ccxt_pair': 'LINK/USDT',   'start_date': (2019, 1, 16),   'end_date': (2023, 12, 18)},
                 {'exchange': 'binance', 'ccxt_pair': 'KDA/USDT',    'start_date': (2022, 3, 11),   'end_date': (2023, 12, 18)},
@@ -291,7 +369,6 @@ if __name__ == "__main__":
                 {'exchange': 'binance_us', 'ccxt_pair': 'AVAX/USD',   'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'SOL/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'BNB/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
-                {'exchange': 'binance_us', 'ccxt_pair': 'BNB/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'GRT/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
 
                 {'exchange': 'binance_us', 'ccxt_pair': 'BTC/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 19)},
@@ -303,16 +380,16 @@ if __name__ == "__main__":
                 {'exchange': 'binance_us', 'ccxt_pair': 'AVAX/USDT',   'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'SOL/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'BNB/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
-                {'exchange': 'binance_us', 'ccxt_pair': 'BNB/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
                 {'exchange': 'binance_us', 'ccxt_pair': 'GRT/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
-
                 ]
-
 
     # Use ThreadPoolExecutor to execute the function in multiple threads
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
 
         # Map the download_wrapper function to the list of dictionaries
         executor.map(download_wrapper, trades_to_download)
+    # # 
+    # ##
+    # ### MULTI THREADED BREADTH FIRST (many tickers, one date ) 
 
     print('done')

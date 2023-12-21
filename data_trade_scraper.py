@@ -54,7 +54,7 @@ async def process_trade_data(trades, ch_client, exchange):
 async def process_trades_periodically(processing_interval, ch_client):
     while True:
         if accumulated_trades:  # Check if there are trades to process
-            await process_trade_data(accumulated_trades, ch_client, exchange='binance_us_test')  # ###PAUL TODO: don't specify exchange for collection here. 
+            await process_trade_data(accumulated_trades, ch_client, exchange='binance_us')  # ###PAUL TODO: don't specify exchange for collection here. 
             accumulated_trades.clear()  # Clear the list after processing
         await asyncio.sleep(processing_interval)
 
