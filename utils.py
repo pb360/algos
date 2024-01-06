@@ -439,93 +439,163 @@ def find_runs(x):
         return run_values, run_starts, run_lengths
 
 
-def check_prices_for_gaps(prices):
-    """
+# def check_prices_for_gaps(prices):
+#     """
+#     """
+
+#     freq = 'min'
+#     # prices.drop(prices.index[2:140], inplace=True)
+#     #
+#     # ### ^^^^^^^^ function input definitions ^^^^^^^
+#     #
+
+#     # get start and end of prices
+#     start_pd_dti = prices.index[0]
+#     end_pd_dti = prices.index[-1]
+
+#     # make DatetimeIndex containing every period in interval via pandas
+#     continuous_price_index = pd.date_range(start=start_pd_dti, end=end_pd_dti, freq=freq)
+
+#     # # if the price index is not identical to the continuous price index....
+#     # if not continuous_price_index.equals(prices.index):
+
+#     # get a mask where True values are a missing index in prices
+#     mask_in_index = continuous_price_index.isin(prices.index)
+
+#     vals_missing, start_idxs_missing, lens_missing = find_runs(mask_in_index)
+#     false_runs_mask = vals_missing == False
+#     long_runs_mask = lens_missing > 60
+#     long_missing_runs_mask = np.logical_and(false_runs_mask, long_runs_mask)
+#     if long_missing_runs_mask.sum() > 0:
+#         print(f"- RUNS OVER AN HOUR NOT IN IDX {long_missing_runs_mask.sum()} \n" * 3, flush=True)
+
+#     missing_times = continuous_price_index[~mask_in_index]  # inverse mask, True if idx in prices...
+#     empty_price_obvs = {'open': np.nan,
+#                         'high': np.nan,
+#                         'low': np.nan,
+#                         'close': np.nan,
+#                         'total_base_vol': 0,
+#                         'buyer_is_maker': 0,
+#                         'buyer_is_taker': 0,
+#                         'buy_base_vol': 0,
+#                         'sell_base_vol': 0,
+#                         'buy_quote_vol': 0,
+#                         'sell_quote_vol': 0,
+#                         'total_quote_vol': 0,
+#                         'buy_vwap': np.nan,
+#                         'sell_vwap': np.nan, }  # ###PAUL may want to build non hard coded solution integrated higher up?
+
+#     missing_data = pd.DataFrame(empty_price_obvs, index=missing_times)
+#     prices = pd.concat([prices, missing_data]).sort_index()
+
+#     prices.fillna(method='ffill', inplace=True)
+#     prices.fillna(method='bfill', inplace=True)
+#     prices.fillna(method='ffill', inplace=True)
+#     prices.sort_index(inplace=True)
+
+#     # now check for lack of trading volume for long periods of time
+#     no_vol_mask = prices['total_base_vol'] == 0
+
+#     vals_no_vol, start_idxs_no_vol, lens_no_vol = find_runs(no_vol_mask)
+#     no_vol_runs = vals_no_vol == True
+#     long_runs_mask = lens_no_vol > 60
+#     long_no_vol_runs_mask = np.logical_and(no_vol_runs, long_runs_mask)
+#     if long_no_vol_runs_mask.sum() > 0:
+#         print(f"- RUNS OVER AN HOUR WITH NO VOLUME {long_no_vol_runs_mask.sum()} \n" * 3, flush=True)
+
+#     # ### isolate info for long runs we don't want
+#     #
+#     # missing first
+#     start_idxs_missing = start_idxs_missing[long_missing_runs_mask]
+#     lens_missing = lens_missing[long_missing_runs_mask]
+#     iter_info = zip(start_idxs_missing, lens_missing)
+#     start_end_tuple_list_missing = []
+#     for start_idx, run_len in iter_info:
+#         start_dti = prices.index[start_idx - 1]
+#         end_dti = prices.index[start_idx + run_len + 1]
+#         start_end_tuple_list_missing.append((start_dti, end_dti))
+
+#     # no volume second
+#     start_idxs_no_vol = start_idxs_no_vol[long_no_vol_runs_mask]
+#     lens_no_vol = lens_no_vol[long_no_vol_runs_mask]
+#     iter_info = zip(start_idxs_no_vol, lens_no_vol)
+#     start_end_tuple_list_no_vol = []
+#     for start_idx, run_len in iter_info:
+#         start_dti = prices.index[start_idx - 1]
+#         end_dti = prices.index[start_idx + run_len + 1]
+#         start_end_tuple_list_no_vol.append((start_dti, end_dti))
+
+#     info_on_missing_price_data = \
+#         {
+#             'missing_info': \
+#                 {
+#                     'start_idxs_missing': start_idxs_missing,
+#                     'lens_missing': lens_missing,
+#                     'start_end_tuple_list_missing': start_end_tuple_list_missing,
+#                 },
+#             'no_vol_info': \
+#                 {
+
+#                     'start_idxs_no_vol': start_idxs_no_vol,
+#                     'lens_no_vol': lens_no_vol,
+#                     'start_end_tuple_list_no_vol': start_end_tuple_list_no_vol,
+#                 },
+
+#         }
+
+#     return info_on_missing_price_data
+    
+
+def check_df_for_missing_data_and_no_activity(df, freq='min', gap_len=60, col='total_base_vol', no_activity_val=0):
+    """ currently built for trading summary given how it fills in a datafame with predetermined observations... 
+
+    # ###PAUL TODO: support freq=None ---- return abnormal intervals where there is no data for long period comparitive to dataset  
+    # ###PAUL TODO: build support for pd.series (don't think i want to go into numpy support for this function )
     """
 
-    freq = 'min'
-    # prices.drop(prices.index[2:140], inplace=True)
-    #
-    # ### ^^^^^^^^ function input definitions ^^^^^^^
-    #
-
-    # get start and end of prices
-    start_pd_dti = prices.index[0]
-    end_pd_dti = prices.index[-1]
+    # get start and end of df
+    start_pd_dti = df.index[0]
+    end_pd_dti = df.index[-1]
 
     # make DatetimeIndex containing every period in interval via pandas
-    continuous_price_index = pd.date_range(start=start_pd_dti, end=end_pd_dti, freq=freq)
+    continuous_index = pd.date_range(start=start_pd_dti, end=end_pd_dti, freq=freq)
 
-    # # if the price index is not identical to the continuous price index....
-    # if not continuous_price_index.equals(prices.index):
-
-    # get a mask where True values are a missing index in prices
-    mask_in_index = continuous_price_index.isin(prices.index)
-
-    vals_missing, start_idxs_missing, lens_missing = find_runs(mask_in_index)
-    false_runs_mask = vals_missing == False
-    long_runs_mask = lens_missing > 60
-    long_missing_runs_mask = np.logical_and(false_runs_mask, long_runs_mask)
-    if long_missing_runs_mask.sum() > 0:
-        print(f"- RUNS OVER AN HOUR NOT IN IDX {long_missing_runs_mask.sum()} \n" * 3, flush=True)
-
-    missing_times = continuous_price_index[~mask_in_index]  # inverse mask, True if idx in prices...
-    empty_price_obvs = {'open': np.nan,
-                        'high': np.nan,
-                        'low': np.nan,
-                        'close': np.nan,
-                        'total_base_vol': 0,
-                        'buyer_is_maker': 0,
-                        'buyer_is_taker': 0,
-                        'buy_base_vol': 0,
-                        'sell_base_vol': 0,
-                        'buy_quote_vol': 0,
-                        'sell_quote_vol': 0,
-                        'total_quote_vol': 0,
-                        'buy_vwap': np.nan,
-                        'sell_vwap': np.nan, }  # ###PAUL may want to build non hard coded solution integrated higher up?
-
-    missing_data = pd.DataFrame(empty_price_obvs, index=missing_times)
-    prices = pd.concat([prices, missing_data]).sort_index()
-
-    prices.fillna(method='ffill', inplace=True)
-    prices.fillna(method='bfill', inplace=True)
-    prices.fillna(method='ffill', inplace=True)
-    prices.sort_index(inplace=True)
-
-    # now check for lack of trading volume for long periods of time
-    no_vol_mask = prices['total_base_vol'] == 0
-
-    vals_no_vol, start_idxs_no_vol, lens_no_vol = find_runs(no_vol_mask)
-    no_vol_runs = vals_no_vol == True
-    long_runs_mask = lens_no_vol > 60
-    long_no_vol_runs_mask = np.logical_and(no_vol_runs, long_runs_mask)
-    if long_no_vol_runs_mask.sum() > 0:
-        print(f"- RUNS OVER AN HOUR WITH NO VOLUME {long_no_vol_runs_mask.sum()} \n" * 3, flush=True)
-
-    # ### isolate info for long runs we don't want
-    #
-    # missing first
-    start_idxs_missing = start_idxs_missing[long_missing_runs_mask]
+    # find gaps longer than `gap_len`
+    data_in_continuous_series = continuous_index.isin(df.index)
+    vals_missing, start_idxs_for_runs, lens_missing = find_runs(data_in_continuous_series)
+    false_runs_mask = vals_missing == False  # False, means that its not in the continuous price index, i.e. missing
+    missing_long_run_mask = lens_missing > gap_len
+    long_missing_runs_mask = np.logical_and(false_runs_mask, missing_long_run_mask)
+    start_idxs_missing = start_idxs_for_runs[long_missing_runs_mask]
     lens_missing = lens_missing[long_missing_runs_mask]
-    iter_info = zip(start_idxs_missing, lens_missing)
+
+    # get start and end of peiords where data is missing
     start_end_tuple_list_missing = []
-    for start_idx, run_len in iter_info:
-        start_dti = prices.index[start_idx - 1]
-        end_dti = prices.index[start_idx + run_len + 1]
+    for start_idx, run_len in zip(start_idxs_missing, lens_missing):
+        start_dti = df.index[start_idx - 1]
+        end_dti = df.index[start_idx + run_len + 1]
         start_end_tuple_list_missing.append((start_dti, end_dti))
 
-    # no volume second
-    start_idxs_no_vol = start_idxs_no_vol[long_no_vol_runs_mask]
-    lens_no_vol = lens_no_vol[long_no_vol_runs_mask]
-    iter_info = zip(start_idxs_no_vol, lens_no_vol)
+    # no activity periods ---- EX: looking for no volume on a trading summmary 
+    no_activity_series = df[col] == 0
+    no_activity_series = no_activity_series.reindex(continuous_index, fill_value=no_activity_val)
+    # ###PAUL TODO: in the case that the df is not continuous the below line will add indicies from the df not in the continuous index
+    # no_activity_series = reindexed_series.reindex(df.index.union(continuous_index))
+    run_values, start_idxs_for_runs, run_lens = find_runs(no_activity_series)
+    no_vol_runs = run_values == True
+    no_activity_long_run_mask = run_lens > gap_len
+    long_no_vol_runs_mask = np.logical_and(no_vol_runs, no_activity_long_run_mask)
+    no_activity_run_start_idxs = start_idxs_for_runs[long_no_vol_runs_mask]
+    no_activity_run_lens = run_lens[long_no_vol_runs_mask]
+
+    # get (start, end) datetimeindex's for no activity run periods. 
     start_end_tuple_list_no_vol = []
-    for start_idx, run_len in iter_info:
-        start_dti = prices.index[start_idx - 1]
-        end_dti = prices.index[start_idx + run_len + 1]
+    for start_idx, run_len in zip(no_activity_run_start_idxs, no_activity_run_lens):
+        start_dti = df.index[start_idx - 1]
+        end_dti = df.index[start_idx + run_len + 1]
         start_end_tuple_list_no_vol.append((start_dti, end_dti))
 
-    info_on_missing_price_data = \
+    missing_and_no_activity_info = \
         {
             'missing_info': \
                 {
@@ -533,17 +603,21 @@ def check_prices_for_gaps(prices):
                     'lens_missing': lens_missing,
                     'start_end_tuple_list_missing': start_end_tuple_list_missing,
                 },
-            'no_vol_info': \
+            'no_activity_info': \
                 {
-
-                    'start_idxs_no_vol': start_idxs_no_vol,
-                    'lens_no_vol': lens_no_vol,
+                    'no_activity_run_start_idxs': no_activity_run_start_idxs,
+                    'no_activity_run_lens': no_activity_run_lens,
                     'start_end_tuple_list_no_vol': start_end_tuple_list_no_vol,
                 },
-
         }
 
-    return info_on_missing_price_data
+    # # ###PAUL TODO:  printouts removed from above, consider verbose option or simple deletion 
+    # if long_missing_runs_mask.sum() > 0:
+    #     print(f"- RUNS OVER AN HOUR NOT IN IDX {long_missing_runs_mask.sum()} \n" * 3, flush=True)
+    # if long_no_vol_runs_mask.sum() > 0:
+    #     print(f"- RUNS OVER AN HOUR WITH NO VOLUME {long_no_vol_runs_mask.sum()} \n" * 3, flush=True)
+
+    return missing_and_no_activity_info
 
 
 def get_trades_data(exchange, symbol, start_date=None, end_date=None):
