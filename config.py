@@ -51,199 +51,54 @@ dirs = {  # ###PAUL TODO: once depriciated `dirs` are removed consider what can 
 # ### universe ---- what is collected, tracked, and traded via each exchange
 #
 #
-universe = dict()
 
-universe_binance = {'exchange': 'binance',
+universe = { 
+    'trade_collection_historical': {
+        # SOURCE: https://data.binance.vision/?prefix=data/spot/BTCUSDT
+        'binance': [{'symbol': 'BTC/USDT',    'start_date': (2021, 8, 14), 'end_date': None},
+                    {'symbol': 'ETH/USDT',    'start_date': (2019, 1, 27), 'end_date': None},
+                    {'symbol': 'LINK/USDT',   'start_date': (2019, 1, 16), 'end_date': None},
+                    {'symbol': 'KDA/USDT',    'start_date': (2022, 3, 11), 'end_date': None},
+                    {'symbol': 'ROSE/USDT',   'start_date': (2020, 11, 19), 'end_date': None},
+                    {'symbol': 'ICP/USDT',    'start_date': (2021, 6, 10), 'end_date': None},
+                    {'symbol': 'AVAX/USDT',   'start_date': (2021, 6, 10), 'end_date': None},
+                    {'symbol': 'SOL/USDT',    'start_date': (2020, 8, 11), 'end_date': None},
+                    {'symbol': 'BNB/USDT',    'start_date': (2017, 11, 6), 'end_date': None},
+                    {'symbol': 'BNB/USDT',    'start_date': (2019, 7, 5), 'end_date': None},
+                    {'symbol': 'GRT/USDT',    'start_date': (2020, 12, 17), 'end_date': None},
+                    ],
 
-                    # websocket communication for exchange... this is how requests are sent
-                    'pair_collection_list': ['adausdt@trade', 'adabtc@trade',
-                                             'ampusdt@trade', 'ampbtc@trade',
-                                             'api3usdt@trade', 'api3btc@trade',
-                                             'batusdt@trade', 'batbtc@trade',
-                                             'bnbusdt@trade', 'bnbbtc@trade',
-                                             'btcusdt@trade',
-                                             'btctusd@trade',
-                                             'dogeusdt@trade', 'dogebtc@trade',
-                                             'ethusdt@trade', 'ethbtc@trade',
-                                             'fluxusdt@trade', 'fluxbtc@trade',
-                                             'hbarusdt@trade', 'hbarbtc@trade',
-                                             'kdausdt@trade', 'kdabtc@trade',
-                                             'linkusdt@trade', 'linkbtc@trade',
-                                             'ltcusdt@trade', 'ltcbtc@trade',
-                                             'usdcusdt@trade',
-                                             'vidtbusd@trade', 'vitdbtc@trade',
-                                             'xlmusdt@trade', 'xlmbtc@trade',
-                                             'xrpusdt@trade', 'xrpbtc@trade',
-                                             'xtzusdt@trade', 'xtzbtc@trade', 'xtzeth@trade',
-                                             ],
+        # SOURCE: https://www.binance.us/institutions/market-history
+        'binance_us':[
+            {'symbol': 'BTC/USD',     'start_date': (2019, 9, 17), 'end_date': (2023, 7, 15)},   #  on binance_us, "USD" pairs ended (2023, 7, 15) 
+            {'symbol': 'ETH/USD',     'start_date': (2019, 9, 17), 'end_date': (2023, 7, 15)},   
+            {'symbol': 'LINK/USD',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 15)}, 
+            {'symbol': 'KDA/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+            {'symbol': 'ROSE/USD',   'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+            {'symbol': 'ICP/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+            {'symbol': 'AVAX/USD',   'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+            {'symbol': 'SOL/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+            {'symbol': 'BNB/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+            {'symbol': 'GRT/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
 
-                    # trade communication for exchange... this string is what is sent for trade requests
-                    'symbols_tracked': ['ADAUSDT', 'ADABTC',
-                                        'AMPUSDT', 'AMPBTC',
-                                        'API3USDT', 'API3BTC',
-                                        'BNBUSDT', 'BNBBTC',
-                                        'BATUSDT', 'BATBTC',
-                                        'BTCUSDT', 'BTCTUSD',
-                                        'DOGEUSDT', 'DOGEBTC',
-                                        'ETHUSDT', 'ETHBTC',
-                                        'FLUXUSDT', 'FLUXBTC',
-                                        'HBARUSDT', 'HBARBTC',
-                                        'KDAUSDT', 'KDABTC',
-                                        'LINKUSDT', 'LINKBTC',
-                                        'LTCUSDT', 'LTCBTC',
-                                        'USDCUSDT',
-                                        'VIDTBUSD', 'VIDTBTC',
-                                        'XLMUSDT', 'XLMBTC',
-                                        'XRPUSDT', 'XRPBTC',
-                                        'XTZUSDT', 'XTZBTC', 'XTZETH',
-                                        ],
+            {'symbol': 'BTC/USDT',    'start_date': (2019, 9, 17), 'end_date': None},
+            {'symbol': 'ETH/USDT',    'start_date': (2019, 9, 17), 'end_date': None},
+            {'symbol': 'LINK/USDT',    'start_date': (2019, 9, 17), 'end_date': None},
+            {'symbol': 'KDA/USDT',    'start_date': (2019, 9, 17),  'end_date': None},
+            {'symbol': 'ROSE/USDT',   'start_date': (2019, 9, 17),  'end_date': None},
+            {'symbol': 'ICP/USDT',    'start_date': (2019, 9, 17),  'end_date': None},
+            {'symbol': 'AVAX/USDT',   'start_date': (2019, 9, 17),  'end_date': None},
+            {'symbol': 'SOL/USDT',    'start_date': (2019, 9, 17),  'end_date': None},
+            {'symbol': 'BNB/USDT',    'start_date': (2019, 9, 17),  'end_date': None},
+            {'symbol': 'GRT/USDT',    'start_date': (2019, 9, 17),  'end_date': None},
+            ]  
+        },
 
-                    # how to convert the pair in exchange format to universal
-                    'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDT', 'ADABTC': 'ADA-BTC',
-                                                   'AMPUSDT': 'AMP-USDT', 'AMPBTC': 'AMP-BTC',
-                                                   'API3USDT': 'API3-USDT', 'API3BTC': 'API3-BTC',
-                                                   'BNBUSDT': 'BNB-USDT', 'BNBBTC': 'BNB-BTC',
-                                                   'BATUSDT': 'BAT-USDT', 'BATBTC': 'BAT-BTC',
-                                                   'BTCUSDT': 'BTC-USDT',  # this doesnt exist either 'BTCBTC',
-                                                   'BTCTUSD': 'BTC-TUSD',
-                                                   'DOGEUSDT': 'DOGE-USDT', 'DOGEBTC': 'DOGE-BTC',
-                                                   'ETHUSDT': 'ETH-USDT', 'ETHBTC': 'ETH-BTC',
-                                                   'FLUXUSDT': 'FLUX-USDT', 'FLUXBTC': 'FLUX-BTC',
-                                                   'HBARUSDT': 'HBAR-USDT', 'HBARBTC': 'HBAR-BTC',
-                                                   'KDAUSDT': 'KDA-USDT', 'KDABTC': 'KDA-BTC',
-                                                   'LINKUSDT': 'LINK-USDT', 'LINKBTC': 'LINK-BTC',
-                                                   'LTCUSDT': 'LTC-USDT', 'LTCBTC': 'LTC-BTC',
-                                                   'USDCUSDT': 'USDC-USDT',
-                                                   'VIDTBUSD': 'VIDT-BUSD', 'VIDTBTC': 'VIDT-BTC',
-                                                   'XLMUSDT': 'XLM-USDT', 'XLMBTC': 'XLM-BTC',
-                                                   'XRPUSDT': 'XRP-USDT', 'XRPBTC': 'XRP-BTC',
-                                                   'XTZUSDT': 'XTZ-USDT', 'XTZBTC': 'XTZ-BTC',
-                                                   'XTZETH': 'XTZ-ETH',
-                                                   },
-                                     },
-                    }
-universe_binanceus = {'exchange': 'binanceus',
+    'trade_collection_live': {'binance_us': ['BTC/USDT', ] }, 
 
-                      # how they are fed into the websocket function (as is)
-                      'pair_collection_list': ['adausdt@trade', 'adabtc@trade', 'adausd@trade',
-                                               'ampusd@trade',
-                                               'api3usdt@trade',
-                                               'batusd@trade',
-                                               'bnbusdt@trade', 'bnbbtc@trade', 'bnbusd@trade',
-                                               'btcusdt@trade', 'btcbtc@trade', 'btcusd@trade',
-                                               'dogeusdt@trade', 'dogebtc@trade', 'dogeusd@trade',
-                                               'ethusdt@trade', 'ethbtc@trade', 'ethusd@trade',
-                                               'fluxusd@trade',
-                                               'hbarusd@trade',
-                                               'linkusdt@trade', 'linkbtc@trade', 'linkusd@trade',
-                                               'ltcusdt@trade', 'ltcbtc@trade', 'ltcusd@trade',
-                                               'usdcusdt@trade',
-                                               'xlmusdt@trade', 'xlmbtc@trade', 'xlmusd@trade',
-                                               'xtzbtc@trade', 'xtzusd@trade',
-                                               ],
+    'orderbook_collection': {'binance_us': ['KDA-USDT']}  
+    }
 
-                      # trade communication for exchange... this string is what is sent for trade requests
-                      'symbols_tracked': ['ADAUSDT', 'ADABTC', 'ADAUSD',
-                                          'AMPUSD',
-                                          'API3USDT',
-                                          'BATUSD',
-                                          'BNBUSDT', 'BNBBTC', 'BNBUSD',
-                                          'BTCUSDT', 'BTCUSD',
-                                          'DOGEUSDT', 'DOGEUSD',
-                                          'ETHUSDT', 'ETHBTC', 'ETHUSD',
-                                          'FLUXUSD',
-                                          'HBARUSD',
-                                          'LINKUSDT', 'LINKBTC', 'LINKUSD',
-                                          'LTCUSDT', 'LTCBTC', 'LTCUSD',
-                                          'USDCUSDT',
-                                          'XLMUSDT', 'XLMUSD',
-                                          'XTZBTC', 'XTZUSD',
-                                          ],
-
-                      # how to convert the pair in exchange format to universal
-                      'convert_dict': {'universal': {'ADAUSDT': 'ADA-USDTether', 'ADABTC': 'ADA-BTC',
-                                                     'ADAUSD': 'ADA-USDT',
-                                                     'AMPUSD': 'AMP-USDT',
-                                                     'API3USDT': 'API3-USDT',
-                                                     'BATUSD': 'BAT-USDT',
-                                                     'BNBUSDT': 'BNB-USDTether', 'BNBBTC': 'BNB-BTC',
-                                                     'BNBUSD': 'BNB-USDT',
-                                                     'BTCUSDT': 'BTC-USDTether', 'BTCUSD': 'BTC-USDT',
-                                                     'DOGEUSDT': 'DOGE-USDTether', 'DOGEUSD': 'DOGE-USDT',
-                                                     'ETHUSDT': 'ETH-USDTether', 'ETHBTC': 'ETH-BTC',
-                                                     'ETHUSD': 'ETH-USDT',
-                                                     'FLUXUSD': 'FLUX-USDT',
-                                                     'HBARUSD': 'HBAR-USDT',
-                                                     'LINKUSDT': 'LINK-USDTether', 'LINKBTC': 'LINK-BTC',
-                                                     'LINKUSD': 'LINK-USDT',
-                                                     'LTCUSDT': 'LTC-USDTether', 'LTCBTC': 'LTC-BTC',
-                                                     'LTCUSD': 'LTC-USDT',
-                                                     'USDCUSDT': 'USDC-USDT',
-                                                     'XLMUSDT': 'XLM-USDTether', 'XLMUSD': 'XLM-USDT',
-                                                     'XTZBTC': 'XTZ-BTC', 'XTZUSD': 'XTZ-USDT',
-                                                     },
-                                       },
-                      }
-universe_kucoin = {'exchange': 'kucoin',
-
-                   # how they are fed into the websocket function (as is)
-                   # identical list as  pair_collection_list  above (for kucoin unlike binance)
-                   'pair_collection_list': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
-                                            'KDA-USDT', 'LINK-USDT', 'LUNC-USDT', 'LTC-USDT', 'NOIA-USDT', 'QRDO-USDT',
-                                            'REQ-USDT',
-                                            'RSR-USDT', 'TEL-USDT', 'VRA-USDT', 'VIDT-USDT',
-                                            'XLM-USDT', 'XMR-USDT', 'XPR-USDT',
-                                            'XRP-USDT', 'XTZ-USDT',
-                                            ],
-
-                   # ###PAUL should be able to get rid of this by using list(convert_dict.keys())
-                   # trade communication for exchange... this string is what is sent for trade requests
-                   'symbols_tracked': ['BTC-USDT', 'DAG-USDT', 'ETH-USDT', 'FIL-USDT', 'ICP-USDT', 'KAVA-USDT',
-                                       'KDA-USDT', 'LINK-USDT', 'LTC-USDT', 'LUNC-USDT', 'NOIA-USDT', 'QRDO-USDT',
-                                       'REQ-USDT', 'RSR-USDT',
-                                       'TEL-USDT', 'VRA-USDT', 'VIDT-USDT',
-                                       'XLM-USDT', 'XMR-USDT', 'XPR-USDT', 'XRP-USDT',
-                                       'XTZ-USDT',
-                                       ],
-
-                   # how to convert the pair in exchange format to universal
-                   'convert_dict': {'universal': {'BTC-USDT': 'BTC-USDT', 'DAG-USDT': 'DAG-USDT',
-                                                  'ETH-USDT': 'ETH-USDT', 'FIL-USDT': 'FIL-USDT',
-                                                  'ICP-USDT': 'ICP-USDT', 'KAVA-USDT': 'KAVA-USDT',
-                                                  'KDA-USDT': 'KDA-USDT', 'LINK-USDT': 'LINK-USDT',
-                                                  'LUNC-USDT': 'LUNC-USDT',
-                                                  'LTC-USDT': 'LTC-USDT', 'NOIA-USDT': 'NOIA-USDT',
-                                                  'QRDO-USDT': 'QRDO-USDT', 'REQ-USDT': 'REQ-USDT',
-                                                  'RSR-USDT': 'RSR-USDT',
-                                                  'TEL-USDT': 'TEL-USDT', 'VRA-USDT': 'VRA-USDT',
-                                                  'VIDT-USDT': 'VIDT-USDT',
-                                                  'XLM-USDT': 'XLM-USDT', 'XMR-USDT': 'XMR-USDT',
-                                                  'XPR-USDT': 'XPR-USDT', 'XRP-USDT': 'XRP-USDT',
-                                                  'XTZ-USDT': 'XTZ-USDT',
-                                                  }
-                                    },
-
-                   }
-
-# ### make the universal universe dict entry
-# ### the value of all these dictionaries set to deep copies for their relative exchanges... reverse_dict generates
-# ### the reverse dictionary flipping keys and values... this minimizes errors as only 1 conversion dict per exchange
-#
-#
-universal = {'from_universal': {'binance': deepcopy(reverse_dict(universe_binance['convert_dict']['universal'])),
-                                'binanceus': deepcopy(reverse_dict(universe_binanceus['convert_dict']['universal'])),
-                                'kucoin': deepcopy(reverse_dict(universe_kucoin['convert_dict']['universal'])),
-                                },
-             'to_universal': {'binance': deepcopy(universe_binance['convert_dict']['universal']),
-                              'binanceus': deepcopy(universe_binanceus['convert_dict']['universal']),
-                              'kucoin': deepcopy(universe_kucoin['convert_dict']['universal']),
-                              },
-             }
-
-universe['universal'] = universal
-universe['binance'] = universe_binance
-universe['binanceus'] = universe_binanceus
-universe['kucoin'] = universe_kucoin
 
 # ### data format ---- for pretty much everything in the repo
 #

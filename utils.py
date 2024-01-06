@@ -546,7 +546,7 @@ def check_prices_for_gaps(prices):
     return info_on_missing_price_data
 
 
-def get_trades_data(exchange, symbol, start_date=None, end_date=None, source='amberdata'):
+def get_trades_data(exchange, symbol, start_date=None, end_date=None):
     """ get trades data from various intenral db sources...
     need a start_date... maybe fix this later...
     input:
@@ -571,39 +571,17 @@ def get_trades_data(exchange, symbol, start_date=None, end_date=None, source='am
         query_date_str_1 = f"WITH toDateTime('{end_date_string}') as enddate"
         query_date_str_2 = """AND timestamp <= enddate"""
 
-    if source == 'amberdata':
-        # preprocessing on symbol, amber data format is -->  f"btc_usdt"   vs   the EAORS -->  f"BTC-USDT"
-        symbol = symbol.lower().replace('-', '_')
 
-        query = f"""
-        {query_date_str_1}
-        SELECT * 
-        FROM amberdata.Trades 
-        WHERE 
-            exchange = '{exchange}'
-            AND instrument='{symbol}'
-            {query_date_str_2}
-        ORDER BY timestamp
-        """
-
-    elif source == "EAORS":
-        # preprocessing on symbol, amber data format is -->  f"btc_usdt"   vs   the EAORS -->  f"BTC-USDT"
-        symbol = symbol.upper().replace('_', '-')
-
-        query = f"""
-        {query_date_str_1}
-        SELECT *
-        FROM algos_db.Trades
-        WHERE
-            exchange = '{exchange}'
-            AND symbol='{symbol}'
-            {query_date_str_2}
-        ORDER BY timestamp;
-        """
-
-    else:
-        print(f"source {source} ---- NOT SUPPORTED")
-        raise ValueError
+    query = f"""
+    {query_date_str_1}
+    SELECT *
+    FROM algos_db.Trades
+    WHERE
+        exchange = '{exchange}'
+        AND symbol='{symbol}'
+        {query_date_str_2}
+    ORDER BY timestamp;
+    """
 
     # print(f"{query}")
     trades = ch_client.query_dataframe(query)
@@ -1001,15 +979,14 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
         raise ValueError  # ###PAUL TODO:  don't want to support going forever forward, need to reconclie this view with date='live' option... i like live 
     if end_date is None:
         pass
-    if start_date is None and end_date is None:
+
+    if date is None and start_date is None and end_date is None:
         date = 'live'
     else:
-        # ### build an array of dates to get trades for
-        #
         start_date = convert_date_format(start_date, output_type='pandas')  # outputs a Timestanp
-
     if end_date is not None:
         end_date = convert_date_format(end_date, output_type='pandas')  # outputs a Timestanp
+
     else:  # if end date is none we want thru live ---- add a minute past now to ensure all minute prices grabbed
         # ###PAUL TODO: check if dev2 / eu-dev are in UTC time
         now = time.time() + 60
@@ -1017,18 +994,7 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
 
     date_range_arr = pd.date_range(start=start_date, end=end_date, freq=freq)
 
-    # need a pandas DTI version to do concatenation as is done below
-    start_date_pd_dti = pd.DatetimeIndex([start_date])
-    end_date_pd_dti = pd.DatetimeIndex([end_date])
-
-    # add to the beginning and end of the date range which is really just dates to split intervals (doesnt include ends)
-    if date != 'live':
-        if date_range_arr.shape[0] == 0 or start_date_pd_dti != date_range_arr[0]:
-            date_range_arr = np.concatenate([start_date_pd_dti, date_range_arr])
-        if date_range_arr.shape[0] == 0 or end_date_pd_dti != date_range_arr[-1]:
-            date_range_arr = np.concatenate([date_range_arr, end_date_pd_dti])
-
-    # take off the first date due to how the for loop works on a window of two dates
+    # setup iter start and end date for loop 
     iter_start_date = date_range_arr[0]
     date_range_arr = date_range_arr[1:]
 
