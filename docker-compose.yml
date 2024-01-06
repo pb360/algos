@@ -9,9 +9,14 @@ x-base-config: &base
 services:
   data_scrape:
     <<: *base
-    entrypoint: /bin/bash  # debugging line 
-    tty: true  # debugging line 
-    # command: python3.10 -u data_trade_scraper.py  # --exchange binance # want exchange flag for multiple
+    restart: always
+    command: python3.10 -u data_trade_scraper.py 
+    # for the demand above  --exchange binance # want exchange flag for multiple
+
+    # entrypoint: /bin/bash  # debugging line 
+    # tty: true  # debugging line 
+
+
 
   # data_update_trading_summary:
   #   <<: *base
@@ -30,7 +35,7 @@ services:
   # #
   # filebeat:
   #   image: elastic/filebeat:8.2.2
-  #   volumes:
+  #   volumes:d
   #     - /var/run/docker.sock:/var/run/docker.sock
   #     - /var/lib/docker:/var/lib/docker
   #     - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
