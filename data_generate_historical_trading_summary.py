@@ -70,7 +70,7 @@ def query_trades_each_day_make_trading_summary_push_to_clickhouse(exchange,
 
                     missing_dates_filled.append((iter_start_date, iter_end_date))
 
-                trading_summary = convert_trades_df_to_trading_summary(trades, exchange_format='EAORS')
+                trading_summary = convert_trades_df_to_trading_summary(trades)
                 trading_summary = fill_trading_summary_interpolating_missing_minutes(trading_summary)
 
                 push_trading_summary_to_clickhouse(trading_summary, exchange, pair)

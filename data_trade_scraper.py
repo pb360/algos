@@ -82,3 +82,25 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+    # # ### NOTE: to run in a notebook instead of using the __main__ convention the below structure is needed (at the top level after definitions) 
+    # # ##
+    # # #
+    # # List to store accumulated trades
+    # accumulated_trades = []
+
+    # # Start trade collection tasks for each exchange
+    # collection_tasks = []
+    # for exchange, symbols in exchange_symbols.items():
+    #     # Create an exchange client instance for each exchange
+    #     exchange_client = create_exchange_client(exchange)  # Replace with actual client creation logic
+    #     task = asyncio.create_task(collect_trades(exchange_client, exchange, symbols, accumulated_trades))
+    #     collection_tasks.append(task)
+
+    # # Start processing task
+    # processing_interval = 10  # Process trades every 10 seconds
+    # processing_task = asyncio.create_task(process_trades_periodically(processing_interval, ch_client, accumulated_trades))
+
+    # # Run the event loop
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(asyncio.gather(*collection_tasks, processing_task))

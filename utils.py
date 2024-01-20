@@ -11,7 +11,7 @@ time.tzset()
 import sys
 
 sys.path.insert(0, '..')  # ###TODO RUN FROM TOP DIR CHECK       for local imports from the top directory
-sys.path.insert(0, '../..')  # ###TODO RUN FROM TOP DIR CHECK    quick fix, it works...
+sys.path.insert(0, '../..')  # ###TODO RUN FROM TOP DIR CHECK    quick fix, it works...  DELETE LATER DELETE LATER 
 
 from clickhouse_driver import Client as CH_Client
 import datetime
@@ -300,7 +300,7 @@ def get_date_list(start_date, end_date, output_type='datetime.datetime', step_si
 
 
 # ###PAUL TODO: arg, exchange_format, should be depricated. Everything handled via CCXT 
-def convert_trades_df_to_trading_summary(trades, exchange_format='algos'):
+def convert_trades_df_to_trading_summary(trades):
     """reads CSV of trades. converts to prices in some interval
 
     input :
@@ -308,80 +308,44 @@ def convert_trades_df_to_trading_summary(trades, exchange_format='algos'):
         exchange (str): helps tell the format
     """
 
-    if exchange_format == 'algos':
-        """ 
-        logic for conversion of which side the trade was on... this is the link for the binance documentation.
-        https://developers.binance.com/docs/binance-trading-api/spot#recent-trades-list
-        going off this and the line ```"False if trade["m"] else True,``` in  `algos_db/src/data/exchanges/binance_data`
-        if side==True in the table algos_db.Trades the seller is the price maker for the trade
-        """
+    """ 
+    logic for conversion of which side the trade was on... this is the link for the binance documentation.
+    https://developers.binance.com/docs/binance-trading-api/spot#recent-trades-list
+    going off this and the line ```"False if trade["m"] else True,``` in  `algos_db/src/data/exchanges/binance_data`
+    if side==True in the table algos_db.Trades the seller is the price maker for the trade
+    """
 
-        try:
-            trades.set_index('timestamp', inplace=True)
-        except KeyError:
-            if trades.index.name == 'timestamp':
-                pass
-            else:
-                raise KeyError
+    try:
+        trades.set_index('timestamp', inplace=True)
+    except KeyError:
+        if trades.index.name == 'timestamp':
+            pass
+        else:
+            raise KeyError
 
-        opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
-        highs = trades['price'].groupby(pd.Grouper(freq='min')).max()
-        lows = trades['price'].groupby(pd.Grouper(freq='min')).min()
-        closes = trades['price'].groupby(pd.Grouper(freq='min')).last()
+    opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
+    highs = trades['price'].groupby(pd.Grouper(freq='min')).max()
+    lows = trades['price'].groupby(pd.Grouper(freq='min')).min()
+    closes = trades['price'].groupby(pd.Grouper(freq='min')).last()
 
-        # override name to be desired col name, currently is "price"
-        opens.name = 'open';
-        highs.name = 'high';
-        lows.name = 'low';
-        closes.name = 'close';
+    # override name to be desired col name, currently is "price"
+    opens.name = 'open';
+    highs.name = 'high';
+    lows.name = 'low';
+    closes.name = 'close';
 
-        ohlc_df = pd.concat([opens, highs, lows, closes], axis=1)
+    ohlc_df = pd.concat([opens, highs, lows, closes], axis=1)
 
-        trades['buyer_is_taker'] = trades['side'].astype('int')
-        trades['buyer_is_maker'] = trades['buyer_is_taker'].map({0: 1, 1: 0})
-        trades['buy_base_vol'] = trades['amount'] * trades['buyer_is_maker']
-        trades['sell_base_vol'] = trades['amount'] * trades['buyer_is_taker']
-        trades['buy_quote_vol'] = trades['buy_base_vol'] * trades['price']
-        trades['sell_quote_vol'] = trades['sell_base_vol'] * trades['price']
-        trades['total_quote_vol'] = trades['buy_quote_vol'] + trades['sell_quote_vol']
-        trades.rename(mapper={'amount': 'total_base_vol'}, axis='columns', inplace=True)
+    trades['buyer_is_taker'] = trades['side'].astype('int')
+    trades['buyer_is_maker'] = trades['buyer_is_taker'].map({0: 1, 1: 0})
+    trades['buy_base_vol'] = trades['amount'] * trades['buyer_is_maker']
+    trades['sell_base_vol'] = trades['amount'] * trades['buyer_is_taker']
+    trades['buy_quote_vol'] = trades['buy_base_vol'] * trades['price']
+    trades['sell_quote_vol'] = trades['sell_base_vol'] * trades['price']
+    trades['total_quote_vol'] = trades['buy_quote_vol'] + trades['sell_quote_vol']
+    trades.rename(mapper={'amount': 'total_base_vol'}, axis='columns', inplace=True)
 
-        trades = trades.drop(columns=['exchange', 'symbol', 'price', 'side', 'id'])
-
-    if exchange_format == 'amberdata':  # this is for amberdata so amberdata.Trades
-        try:
-            trades.set_index('timestamp', inplace=True)
-        except KeyError:
-            if trades.index.name == 'timestamp':
-                pass
-            else:
-                raise KeyError
-
-        opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
-        highs = trades['price'].groupby(pd.Grouper(freq='min')).max()
-        lows = trades['price'].groupby(pd.Grouper(freq='min')).min()
-        closes = trades['price'].groupby(pd.Grouper(freq='min')).last()
-
-        # override name to be desired col name, currently is "price"
-        opens.name = 'open'
-        highs.name = 'high'
-        lows.name = 'low'
-        closes.name = 'close'
-
-        ohlc_df = pd.concat([opens, highs, lows, closes], axis=1)
-
-        trades['buyer_is_maker'] = trades['isBid'].astype('int')
-        trades['buyer_is_taker'] = trades['buyer_is_maker'].map({0: 1, 1: 0})
-        trades['buy_base_vol'] = trades['volume'] * trades['buyer_is_maker']
-        trades['sell_base_vol'] = trades['volume'] * trades['buyer_is_taker']
-        trades['buy_quote_vol'] = trades['buy_base_vol'] * trades['price']
-        trades['sell_quote_vol'] = trades['sell_base_vol'] * trades['price']
-        trades['total_quote_vol'] = trades['buy_quote_vol'] + trades['sell_quote_vol']
-        trades.rename(mapper={'volume': 'total_base_vol'}, axis='columns', inplace=True)
-
-        trades.drop(columns=['timestampNanoseconds', 'exchange', 'instrument', 'isBid', 'tradeId',
-                             'created_ts', 'price'],
-                    inplace=True)
+    trades = trades.drop(columns=['exchange', 'symbol', 'price', 'side', 'id'])
 
     # Add one minute offset... otherwise summary comes for the beginning of the minute
     trades.index += Minute(1)
@@ -1037,8 +1001,7 @@ def fill_trading_summary_interpolating_missing_minutes(trading_summary):
     return trading_summary
 
 
-def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, start_date=None, end_date=None, freq='W',
-                                 source='amberdata'):
+def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, start_date=None, end_date=None, freq='W'):
     """ make and get trading summary for long period of time
 
     only useful when adding new assets as trades table can not be queried over long
@@ -1085,13 +1048,17 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
         trades = get_trades_data(exchange=exchange,
                                  symbol=symbol,
                                  start_date=iter_start_date,
-                                 end_date=iter_end_date,
-                                 source=source)
+                                 end_date=iter_end_date,)
 
-        if trades == 0 or trades.shape[0] == 0:  # if the above returns zero there are no trades for interval collected
+        
+        import pdb 
+        pdb.set_trace() 
+
+        if not isinstance(trades, pd.DataFrame) or trades.empty:
+            # This handles both cases:  when trades is 0     or    its empty
             continue
         else:
-            trading_summary = convert_trades_df_to_trading_summary(trades, exchange_format=source)
+            trading_summary = convert_trades_df_to_trading_summary(trades)
             df_list.append(trading_summary)
             iter_start_date = iter_end_date
 
@@ -1318,11 +1285,10 @@ def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='
                     AND exchange = '{exchange}';"""
     last_trading_summary_datetime = ch_client.execute(query)[0][0] - timedelta(minutes=60)  # ###PAUL_del_later ---- the time delta is not needed but we use it to ensure overwrite in push is working correctly
 
-    trades_df = get_trades_data(exchange=exchange, symbol=symbol, start_date=last_trading_summary_datetime,
-                                end_date=None, source='EAORS')
+    trades_df = get_trades_data(exchange=exchange, symbol=symbol, start_date=last_trading_summary_datetime, end_date=None)
 
     if isinstance(trades_df, pd.DataFrame):
-        new_trading_summary_info = convert_trades_df_to_trading_summary(trades_df, exchange_format='EAORS')
+        new_trading_summary_info = convert_trades_df_to_trading_summary(trades_df)
         new_trading_summary_info = new_trading_summary_info[new_trading_summary_info.index > last_trading_summary_datetime]
     elif trades_df == 0:
         return None
