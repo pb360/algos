@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import Minute
 import pickle
+import pytz
 import re
 import requests
 from typing import Union
@@ -336,7 +337,6 @@ def convert_trades_df_to_trading_summary(trades):
 
     ohlc_df = pd.concat([opens, highs, lows, closes], axis=1)
 
-    trades['buyer_is_taker'] = trades['side'].astype('int')
     trades['buyer_is_maker'] = trades['buyer_is_taker'].map({0: 1, 1: 0})
     trades['buy_base_vol'] = trades['amount'] * trades['buyer_is_maker']
     trades['sell_base_vol'] = trades['amount'] * trades['buyer_is_taker']
@@ -345,7 +345,7 @@ def convert_trades_df_to_trading_summary(trades):
     trades['total_quote_vol'] = trades['buy_quote_vol'] + trades['sell_quote_vol']
     trades.rename(mapper={'amount': 'total_base_vol'}, axis='columns', inplace=True)
 
-    trades = trades.drop(columns=['exchange', 'symbol', 'price', 'side', 'id'])
+    trades = trades.drop(columns=['exchange', 'symbol', 'price', 'id'])
 
     # Add one minute offset... otherwise summary comes for the beginning of the minute
     trades.index += Minute(1)
@@ -1050,10 +1050,6 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
                                  start_date=iter_start_date,
                                  end_date=iter_end_date,)
 
-        
-        import pdb 
-        pdb.set_trace() 
-
         if not isinstance(trades, pd.DataFrame) or trades.empty:
             # This handles both cases:  when trades is 0     or    its empty
             continue
@@ -1208,6 +1204,7 @@ def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwr
               f" grouped by  [timestamp, exchange, symbol]")
     trading_summary = trading_summary.drop(idxs_to_drop)
 
+    trading_summary['time_created'] = datetime.datetime.now(pytz.UTC)
     num_rows_entered = ch_client.execute("INSERT INTO algos_db.TradingSummary VALUES",
                                          trading_summary.reset_index().to_dict('records'))
 
@@ -1605,8 +1602,7 @@ def insert_trades(ccxt_trades):
             'takerOrMaker': None,
             'timestamp': 1701967903789,
             'type': None}
-        # ###PAUL TODO: figure out optimal way to work formatting into config. i think the current way is sufficient
-        # ###PAUL TODO: but then need to consider how to handle sql format, this is a later documentation issue, just get it all up 
+        # ###PAUL TODO: figure out optimal way to work formatting into config. 
     """
 
     if type(ccxt_trades) == pd.DataFrame: 
