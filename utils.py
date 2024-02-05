@@ -584,42 +584,55 @@ def check_df_for_missing_data_and_no_activity(df, freq='min', gap_len=60, col='t
     return missing_and_no_activity_info
 
 
-def get_trades_data(exchange, symbol, start_date=None, end_date=None):
+def get_trades_data(exchange, symbol, date=None, start_date=None, end_date=None, ch_client=None):
     """ get trades data from various intenral db sources...
     need a start_date... maybe fix this later...
     input:
     """
 
-    ch_client = init_ch_client()
+    if ch_client is None: 
+        ch_client = init_ch_client()
 
-    # note in all cases -- not inclusive on the end in order to have no overlap of trades gathered when rolling
-    if end_date is not None and start_date is not None:
-        end_date_string = convert_date_format(end_date, output_type='string')
-        start_date_string = convert_date_format(start_date, output_type='string')
-        query_date_str_1 = f"""WITH 
-                                   toDateTime('{start_date_string}') as startdate,
-                                   toDateTime('{end_date_string}') as enddate"""
-        query_date_str_2 = """AND timestamp > startdate
-                              AND timestamp <= enddate"""
-    elif end_date is None and start_date is not None:
-        start_date_string = convert_date_format(start_date, output_type='string')
-        query_date_str_1 = f"WITH toDateTime('{start_date_string}') as startdate"
-        query_date_str_2 = """AND timestamp > startdate"""
-    elif end_date is not None and start_date is None:
-        query_date_str_1 = f"WITH toDateTime('{end_date_string}') as enddate"
-        query_date_str_2 = """AND timestamp <= enddate"""
+    if date is not None:  # only getting trades for one day  
+        
+        date_str = convert_date_format(date, 'string')
+        query = f"""
+                SELECT *
+                FROM algos_db.Trades
+                WHERE
+                    exchange = '{exchange}'
+                    AND symbol = '{symbol}'
+                    AND toDate(timestamp) = toDate('{date_str}')
+                ORDER BY timestamp;
+                """
+    else: 
+        # note in all cases -- not inclusive on the end in order to have no overlap of trades gathered when rolling
+        if end_date is not None and start_date is not None:
+            end_date_string = convert_date_format(end_date, output_type='string')
+            start_date_string = convert_date_format(start_date, output_type='string')
+            query_date_str_1 = f"""WITH 
+                                    toDateTime('{start_date_string}') as startdate,
+                                    toDateTime('{end_date_string}') as enddate"""
+            query_date_str_2 = """AND timestamp > startdate
+                                AND timestamp <= enddate"""
+        elif end_date is None and start_date is not None:
+            start_date_string = convert_date_format(start_date, output_type='string')
+            query_date_str_1 = f"WITH toDateTime('{start_date_string}') as startdate"
+            query_date_str_2 = """AND timestamp > startdate"""
+        elif end_date is not None and start_date is None:
+            query_date_str_1 = f"WITH toDateTime('{end_date_string}') as enddate"
+            query_date_str_2 = """AND timestamp <= enddate"""
 
-
-    query = f"""
-    {query_date_str_1}
-    SELECT *
-    FROM algos_db.Trades
-    WHERE
-        exchange = '{exchange}'
-        AND symbol='{symbol}'
-        {query_date_str_2}
-    ORDER BY timestamp;
-    """
+        query = f"""
+        {query_date_str_1}
+        SELECT *
+        FROM algos_db.Trades
+        WHERE
+            exchange = '{exchange}'
+            AND symbol='{symbol}'
+            {query_date_str_2}
+        ORDER BY timestamp;
+        """
 
     # print(f"{query}")
     trades = ch_client.query_dataframe(query)
@@ -764,7 +777,6 @@ def get_data_file_path(data_type, pair, date='live', port=None, signal=None, exc
     # >  /  <data_type>  /
     #                                              ^^^ orders (open
     # # ### if not exactly passed as a tuple of form ("2021", "01", "31") attempt conversion
-    # if ~isinstance(date, tuple):
     #     date = convert_date_format(date=date, output_type='tuple_to_day')
 
     elif date == 'path':  # just gets the pair's folder.. will direct to folder of dates for data type
@@ -875,7 +887,6 @@ def check_if_file_make_dirs_then_write_append_line(file_path, new_line, header=N
 #     # signal_df['port_val'] = framework_results['port_value_ts']
 #     # signal_df['signal_not_smoothed'] = framework_results['preds']
 #     # signal_df.to_pickle(f"{framework_results_dir_path}preformance_df.pickle")
-#     #
 #     # # ### saving transactions in convenient df form
 #     # #
 #     # transacts_df = pd.DataFrame.from_records(framework_results['transacts_list'], index='datetime')
@@ -1001,7 +1012,85 @@ def fill_trading_summary_interpolating_missing_minutes(trading_summary):
     return trading_summary
 
 
-def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, start_date=None, end_date=None, freq='W'):
+def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwrite_mode='python_side', output='quiet', ch_client=None):
+    """ ###PAUL TODO: in push_trading_summary_to_clickhouse() make sure that duplicate rows aren't being pushed
+    (probably best to make a parameter overwrite defaulted to True) to ensure the new row has
+    a unique ['timestamp ticker, exchange] combo
+    """
+    if ch_client is None: 
+        ch_client = init_ch_client()
+
+    table = 'algos_db.TradingSummary' # ###PAUL TODO: eventually want to use the new overwrite hook for
+    # TODO: trades and signals too, will need to handle unique identifiers for each table...
+    # TODO:
+    trading_summary = fill_trading_summary(trading_summary=trading_summary)
+    check_minute_integrity(dataframe=trading_summary)
+
+    trading_summary['exchange'] = exchange
+    trading_summary['symbol'] = symbol
+    trading_summary.index.name = 'timestamp'
+
+    trading_summary = trading_summary.astype({'buyer_is_maker': int, 'buyer_is_taker': int})
+
+    existing_dates = from_table_get_existing_dates_in_series(ch_client,
+                                                             table=table,
+                                                             exchange=exchange,
+                                                             symbol=symbol,
+                                                             series=trading_summary, )
+
+    if overwrite_mode == 'python_side':
+        idxs_to_drop = []
+        for idx in trading_summary.index:
+            if idx.to_pydatetime() in existing_dates:
+                idxs_to_drop.append(idx)
+    if overwrite_mode == 'in_clickhouse':
+        delete_observations(exchange=exchange, symbol=symbol, datetimes=existing_dates, table=table)
+
+    if output == 'verbose':
+        print(f"there were {len(idxs_to_drop)} duplicates prevented from being entered ---- "
+              f" grouped by  [timestamp, exchange, symbol]")
+    trading_summary = trading_summary.drop(idxs_to_drop)
+
+    trading_summary['time_created'] = datetime.datetime.now(pytz.UTC)
+    num_rows_entered = ch_client.execute("INSERT INTO algos_db.TradingSummary VALUES",
+                                         trading_summary.reset_index().to_dict('records'))
+
+    return num_rows_entered
+
+
+def make_day_of_trading_summary_push_to_db(exchange, symbol, date, overwrite_mode='python_side', ch_client=None): 
+    """
+    """
+    
+    if ch_client is None: 
+        ch_client = init_ch_client()
+
+    trades = get_trades_data(exchange=exchange, symbol=symbol, date=date)
+
+    if not isinstance(trades, pd.DataFrame) or trades.empty:
+            print(f""" there were no trades for exchange: {exchange} -- symbol: {symbol} -- on date: {date} """)
+            raise Warning
+            return 0 
+        
+    trading_summary = convert_trades_df_to_trading_summary(trades)
+
+    push_trading_summary_to_clickhouse(trading_summary=trading_summary,
+                                        exchange=exchange, 
+                                        symbol=symbol, 
+                                        overwrite_mode=overwrite_mode, 
+                                        ch_client=ch_client)
+
+    return trading_summary
+
+
+def make_trading_summary_from_trades_in_batches(exchange, 
+                                                symbol, 
+                                                date=None, 
+                                                start_date=None, 
+                                                end_date=None, 
+                                                freq='W', 
+                                                overwrite_mode='python_side', 
+                                                ch_client=None):
     """ make and get trading summary for long period of time
 
     only useful when adding new assets as trades table can not be queried over long
@@ -1014,16 +1103,11 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
 
     if end_date is not None and start_date is None:
         raise ValueError  # ###PAUL TODO:  don't want to support going forever forward, need to reconclie this view with date='live' option... i like live 
-    if end_date is None:
-        pass
-
-    if date is None and start_date is None and end_date is None:
-        date = 'live'
-    else:
+    
+    if start_date is not None:
         start_date = convert_date_format(start_date, output_type='pandas')  # outputs a Timestanp
     if end_date is not None:
         end_date = convert_date_format(end_date, output_type='pandas')  # outputs a Timestanp
-
     else:  # if end date is none we want thru live ---- add a minute past now to ensure all minute prices grabbed
         # ###PAUL TODO: check if dev2 / eu-dev are in UTC time
         now = time.time() + 60
@@ -1042,7 +1126,8 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
         iter_end_date = date
         if iter_count % 10 == 0:
             print(
-                f" iter: {iter_count + 1} of {num_iterations} ---- start: {iter_start_date}  --  end: {iter_end_date}",
+                f"""    make trading_summary for {symbol} on {exchange} ----
+                iter: {iter_count + 1} of {num_iterations} ---- start: {iter_start_date}  --  end: {iter_end_date}""",
                 flush=True)
 
         trades = get_trades_data(exchange=exchange,
@@ -1074,7 +1159,11 @@ def make_trading_summary_from_trades_in_batches(exchange, symbol, date=None, sta
         print(f"no data for request to make a summary of trading ")
         return 0  # no data for
 
-    push_trading_summary_to_clickhouse(all_trading_summary, exchange=exchange, symbol=symbol)
+    push_trading_summary_to_clickhouse(trading_summary=all_trading_summary, 
+                                       exchange=exchange, 
+                                       symbol=symbol, 
+                                       overwrite_mode=overwrite_mode,
+                                       ch_client=ch_client)
 
     return all_trading_summary
 
@@ -1165,52 +1254,6 @@ def delete_observations(ch_client, table, exchange, symbol, datetimes, ):
     ch_client.execute(delete_query)
 
 
-def push_trading_summary_to_clickhouse(trading_summary, exchange, symbol, overwrite_mode='python_side', output='quiet'):
-    """ ###PAUL TODO: in push_trading_summary_to_clickhouse() make sure that duplicate rows aren't being pushed
-    (probably best to make a parameter overwrite defaulted to True) to ensure the new row has
-    a unique ['timestamp ticker, exchange] combo
-    """
-
-    table = 'algos_db.TradingSummary' # ###PAUL TODO: eventually want to use the new overwrite hook for
-    # TODO: trades and signals too, will need to handle unique identifiers for each table...
-    # TODO:
-    trading_summary = fill_trading_summary(trading_summary=trading_summary)
-    check_minute_integrity(dataframe=trading_summary)
-
-    trading_summary['exchange'] = exchange
-    trading_summary['symbol'] = symbol
-    trading_summary.index.name = 'timestamp'
-
-    trading_summary = trading_summary.astype({'buyer_is_maker': int, 'buyer_is_taker': int})
-
-    ch_client = init_ch_client()
-
-    existing_dates = from_table_get_existing_dates_in_series(ch_client,
-                                                             table=table,
-                                                             exchange=exchange,
-                                                             symbol=symbol,
-                                                             series=trading_summary, )
-
-    if overwrite_mode == 'python_side':
-        idxs_to_drop = []
-        for idx in trading_summary.index:
-            if idx.to_pydatetime() in existing_dates:
-                idxs_to_drop.append(idx)
-    if overwrite_mode == 'in_clickhouse':
-        delete_observations(exchange=exchange, symbol=symbol, datetimes=existing_dates, table=table)
-
-    if output == 'verbose':
-        print(f"there were {len(idxs_to_drop)} duplicates prevented from being entered ---- "
-              f" grouped by  [timestamp, exchange, symbol]")
-    trading_summary = trading_summary.drop(idxs_to_drop)
-
-    trading_summary['time_created'] = datetime.datetime.now(pytz.UTC)
-    num_rows_entered = ch_client.execute("INSERT INTO algos_db.TradingSummary VALUES",
-                                         trading_summary.reset_index().to_dict('records'))
-
-    return num_rows_entered
-
-
 def get_binance_data_zip_file(save_path, market, data_type, symbol, year, month, day=None, interval=None, unzip=True):
     """downloads the zip file for binance data based on given input
     """
@@ -1270,11 +1313,12 @@ def get_binance_data_zip_file(save_path, market, data_type, symbol, year, month,
     return zip_filepath
 
 
-def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='quiet'):
+def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='quiet', overwrite_mode='python_side', ch_client=None):
     """ gets the last time in the trading summary table and then makes the trading summary table up to the current point
     # ###PAUL TODO: remove default values from this... I dont like that they are here. It seems like it could lead to issues
     """
-    ch_client = init_ch_client()
+    if ch_client is None: 
+        ch_client = init_ch_client()
 
     query = f""" SELECT MAX(timestamp)
                  FROM algos_db.TradingSummary
@@ -1291,7 +1335,12 @@ def update_trading_summary_table(exchange='binance', symbol='BTC-USDT', output='
         return None
 
     if new_trading_summary_info.shape[0] != 0:
-        push_trading_summary_to_clickhouse(new_trading_summary_info, exchange=exchange, symbol=symbol, output='quiet')
+        push_trading_summary_to_clickhouse(trading_summary=new_trading_summary_info, 
+                                           exchange=exchange, 
+                                           symbol=symbol, 
+                                           overwrite_mode=overwrite_mode, 
+                                           output='quiet',
+                                           ch_client=ch_client,)
 
 
 def get_query_date_strings(start_date, end_date):
@@ -1621,3 +1670,26 @@ def insert_trades(ccxt_trades):
 
     data_tuples = [tuple(d[col] for col in columns_order) for d in data_dicts]
 
+
+def check_db_trading_summary_for_duplicates_delete_for_exchange_and_symbol_if_any(exchange, symbol, ch_client): 
+    trading_summary = query_trading_summary(exchange=exchange,
+                                            symbol=symbol,
+                                            start_date=None,
+                                            end_date=None,
+                                            columns='all',
+                                            ch_client=ch_client)
+    
+    num_duplicates = trading_summary.index.duplicated().sum()
+    
+    if num_duplicates > 0: 
+        query = f"""ALTER TABLE algos_db.TradingSummary
+                    DELETE WHERE exchange = '{exchange}' AND symbol = '{symbol}'
+                 """
+        ch_client.execute(query) 
+
+        return True
+
+    else: 
+        return False
+
+        
