@@ -69,8 +69,21 @@ def init_ch_client(send_receive_timeout=120*60, max_execution_time=120*60):
     
     return ch_client
     
+def init_ccxt_standard(exchange='binance_us'):
+    if exchange == 'binance_us': 
+        from ccxt import binanceus as ccxt_standard_binance 
+        ccxt_standard = ccxt_standard_binance({
+            'apiKey': get_secret('BINANCE_DATA_1_PUBLIC'),
+            'secret': get_secret('BINANCE_DATA_1_PRIVATE'),
+            })
+    else:
+        print(f"exchange: {exchange} not supported!!!" * 2)
+
+    return ccxt_standard
+    
+
 # ###PAUL TODO: do this, and replace (probably want it here over bot_utils.py)
-def init_ccxt_client():
+def init_ccxt_async():
 
     ccxt_client = None 
     return ccxt_client
@@ -324,7 +337,11 @@ def convert_trades_df_to_trading_summary(trades):
         else:
             raise KeyError
 
-    opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
+    try:
+        opens = trades['price'].groupby(pd.Grouper(freq='min')).first()
+    except:
+        import pdb; 
+        pdb.set_trace() 
     highs = trades['price'].groupby(pd.Grouper(freq='min')).max()
     lows = trades['price'].groupby(pd.Grouper(freq='min')).min()
     closes = trades['price'].groupby(pd.Grouper(freq='min')).last()
@@ -359,9 +376,9 @@ def convert_trades_df_to_trading_summary(trades):
     trading_summary['vwap'] = trading_summary['total_quote_vol'] / trading_summary['total_base_vol']
 
     # fill in VWAP NaN's due to volume being 0 in a second...
-    trading_summary.fillna(method='ffill', inplace=True)
-    trading_summary.fillna(method='bfill', inplace=True)
-    trading_summary.fillna(method='ffill', inplace=True)
+    trading_summary.ffill(inplace=True)
+    trading_summary.bfill(inplace=True)
+    trading_summary.ffill(inplace=True)
 
     return trading_summary
 
@@ -984,8 +1001,8 @@ def fill_trading_summary(trading_summary, out_cols=None):
     trading_summary = fill_missing_minutes(dataframe=trading_summary)  # add missing observations to trading summary
     trading_summary[zero_cols] = trading_summary[zero_cols].fillna(0)
     trading_summary[interpolate_cols] = trading_summary[interpolate_cols].interpolate()
-    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].fillna(method='ffill')
-    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].fillna(method='bfill')
+    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].ffill()
+    trading_summary[interpolate_cols] = trading_summary[interpolate_cols].bfill()
 
     return trading_summary
 
@@ -1692,4 +1709,162 @@ def check_db_trading_summary_for_duplicates_delete_for_exchange_and_symbol_if_an
     else: 
         return False
 
+
+def get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair, date_tuple, exchange, ccxt_client=None):
+    # Function logic here...
+    # Replace synchronous download_file with async version and other async operations  
+
+    
+    ccxt_standard = init_ccxt_standard(exchange=exchange)
+    
+    markets = ccxt_standard.load_markets()
+
+    print(f"{exchange} -- {ccxt_pair} -- {date_tuple} ---- starting download, convert, and write to db process")
+    exchange_pair = markets[ccxt_pair]['id']
+    
+    date_str = convert_date_format(date_tuple, "string")
+    exchange_pair = exchange_pair.upper()
+    file_prefix = f"{exchange_pair}"
+    filename = f"{file_prefix}-trades-{date_str}.zip"
+    zip_filename = f"{filename}"  # The name you want to save the file as
+    csv_filename = filename.replace(".zip", ".csv")
+
+    save_path = f"{data_dir}temp_trades_storage/trade_csvs/"
+    check_if_dir_exists_and_make(dir=save_path)
+
+    # Full paths for the zip and csv files
+    zip_filepath = os.path.join(save_path, zip_filename)
+    csv_filepath = os.path.join(save_path, csv_filename)
+
+
+    url = get_download_url(exchange=exchange, exchange_pair=exchange_pair, filename=filename)
+
+    # download and extract 
+    download_file(session, url, zip_filepath)
+
+    # try to open it, early data often has bad zips 
+    try: 
+        with zipfile.ZipFile(zip_filepath, "r") as zip_ref:
+            zip_ref.extractall(save_path)
+    except BadZipFile: 
+        print(f"BadZipFile on {date_tuple} \n"*5)
+        os.remove(zip_filepath)
+        return None 
+
+    # maybe combine these two 
+    trades_df = read_trades_from_exchange_specific_format_csv_convert_to_algos(exchange=exchange, 
+                                                                               csv_filepath=csv_filepath, 
+                                                                               ccxt_pair=ccxt_pair)
+    
+    delete_query = f"""ALTER TABLE algos_db.Trades 
+    DELETE WHERE
+        exchange = '{exchange}'
+        AND symbol = '{ccxt_pair}'
+        AND toStartOfDay(timestamp) = toDateTime('{date_str}')"""
+
+    ch_client = init_ch_client()
+
+    ch_client.execute(delete_query)
+    ch_client.execute(
+        "INSERT INTO algos_db.Trades VALUES", trades_df.to_dict("records")
+    )
+
+    os.remove(zip_filepath)
+    os.remove(csv_filepath)
+
+    return trades_df
+
+    # Function logic here...
+    # Replace synchronous download_file with async version and other async operations
+    pass
+
         
+def check_continuity_of_trades_convert_to_summary_rewrite_missing_data(exchange_symbol_tuple, ch_client):
+    """data quality checking and automatic improvement function for 
+    
+    ONLY SUPPORTS BINANCE (as binance is the only one with historical data) 
+    
+    TODO: add support for binance us 
+    """
+
+    exchange, symbol = exchange_symbol_tuple
+    
+    
+    deleted_trading_summary = check_db_trading_summary_for_duplicates_delete_for_exchange_and_symbol_if_any(exchange=exchange, 
+                                                                                                            symbol=symbol, 
+                                                                                                            ch_client=ch_client) 
+    
+    # get the minimum dates from trades ande trading_summary for the given exchange / symbol  
+    min_trades_timestamp = ch_client.query_dataframe(f"""SELECT MIN(timestamp)
+                                                          FROM algos_db.Trades
+                                                          WHERE exchange = '{exchange}'
+                                                          AND symbol = '{symbol}' 
+                                                          """)
+    min_trades_timestamp = min_trades_timestamp['min_timestamp_'][0] 
+    trades_start_tuple_to_day = convert_date_format(min_trades_timestamp, 'tuple_to_day')
+    
+    epoch_time = datetime.datetime.fromtimestamp(0)
+    
+    if deleted_trading_summary == True:
+        min_summary_timestamp = epoch_time
+        same_day = False
+    
+    else:
+        min_summary_timestamp = ch_client.query_dataframe(f"""SELECT MIN(timestamp)
+                                                              FROM algos_db.TradingSummary
+                                                              WHERE exchange = '{exchange}'
+                                                              AND symbol = '{symbol}' 
+                                                              """)
+
+        min_summary_timestamp = min_summary_timestamp['min_timestamp_'][0] 
+        
+        same_day = (min_trades_timestamp.year == min_summary_timestamp.year) \
+                    and (min_trades_timestamp.month == min_summary_timestamp.month) \
+                    and (min_trades_timestamp.day == min_summary_timestamp.day)
+        
+            
+    if deleted_trading_summary == True or epoch_time == min_summary_timestamp or same_day == False:
+        # for flow of code, this gets trashed and requeried in the while loop 
+        trading_summary = make_trading_summary_from_trades_in_batches(exchange=exchange,
+                                                                        symbol=symbol, 
+                                                                        start_date=trades_start_tuple_to_day,
+                                                                        end_date=None,  # goes to the current day. 
+                                                                        freq='D')
+    
+    last_run_missing = None
+    list_of_dates = []   # set to empty list because if we get an empty list after running everything, then we are good to go, all data is clean 
+    
+    i=0
+    while last_run_missing != list_of_dates: 
+        i += 1
+        print(i) 
+        last_run_missing = list_of_dates 
+        
+        trading_summary = query_trading_summary(exchange=exchange,
+                                                symbol=symbol,
+                                                start_date=min_trades_timestamp,
+                                                end_date=None,
+                                                columns='all',
+                                                ch_client=ch_client)
+    
+        print(f"STARTING continunity and conversion process  ----  {exchange}  --  {symbol} \n"*1)
+        
+        missing_and_no_activity_info = \
+            check_df_for_missing_data_and_no_activity(df=trading_summary, freq='min', gap_len=60, col='total_base_vol')
+        
+        set_of_date_tuples = set() 
+        
+        for start, end in missing_and_no_activity_info['no_activity_info']['start_end_tuple_list_no_vol']:
+            print(f"start: {start} ---- end: {end}")
+            date_range = pd.date_range(start=start, end=end, freq='min')
+            date_range = date_range.normalize().unique()  # rounds everything to day, take only unique values 
+            for date in date_range:
+                date = convert_date_format(date, 'tuple_to_day')
+                set_of_date_tuples.add(date) 
+        list_of_dates = sorted(list(set_of_date_tuples))
+    
+        for date in list_of_dates: 
+            get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair=symbol, date_tuple=date, exchange=exchange)
+            make_day_of_trading_summary_push_to_db(exchange, symbol, date, overwrite_mode='python_side', ch_client=ch_client)
+            
+    return None 

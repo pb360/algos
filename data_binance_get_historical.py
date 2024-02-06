@@ -9,7 +9,11 @@ from algos.utils import (
     get_secret,
     init_ch_client,
     convert_date_format,
-    check_if_dir_exists_and_make,)
+    check_if_dir_exists_and_make, 
+    query_trading_summary,
+    check_df_for_missing_data_and_no_activity, 
+    make_day_of_trading_summary_push_to_db,
+    make_trading_summary_from_trades_in_batches,  )
 from ccxt import binanceus as binanceus_nonpro 
 import concurrent.futures
 import datetime
@@ -303,37 +307,155 @@ def edit_start_date_of_trades_to_download(trades_to_download):
 
     return None 
 
+
+# ###PAUL TODO: add verification for unique trading IDs 
+def check_db_trading_summary_for_duplicates_delete_for_exchange_and_symbol_if_any(exchange, symbol, ch_client): 
+    trading_summary = query_trading_summary(exchange=exchange,
+                                            symbol=symbol,
+                                            start_date=None,
+                                            end_date=None,
+                                            columns='all',
+                                            ch_client=ch_client)
+    
+    num_duplicates = trading_summary.index.duplicated().sum()
+    
+    if num_duplicates > 0: 
+        query = f"""ALTER TABLE algos_db.TradingSummary
+                    DELETE WHERE exchange = '{exchange}' AND symbol = '{symbol}'
+                 """
+        ch_client.execute(query) 
+
+        return True
+
+    else: 
+        return False
+
+        
+def check_continuity_of_trades_convert_to_summary_rewrite_missing_data(exchange_symbol_tuple, ch_client=None):
+    """utility function that  
+    
+    ONLY SUPPORTS BINANCE (as binance is the only one with historical data) 1
+    """
+
+    if ch_client is None: 
+        ch_client = init_ch_client() 
+
+    exchange, symbol = exchange_symbol_tuple
+    
+    
+    deleted_trading_summary = check_db_trading_summary_for_duplicates_delete_for_exchange_and_symbol_if_any(exchange=exchange, 
+                                                                                                            symbol=symbol, 
+                                                                                                            ch_client=ch_client) 
+    
+    # get the minimum dates from trades ande trading_summary for the given exchange / symbol  
+    min_trades_timestamp = ch_client.query_dataframe(f"""SELECT MIN(timestamp)
+                                                          FROM algos_db.Trades
+                                                          WHERE exchange = '{exchange}'
+                                                          AND symbol = '{symbol}' 
+                                                          """)
+    min_trades_timestamp = min_trades_timestamp['min_timestamp_'][0] 
+    trades_start_tuple_to_day = convert_date_format(min_trades_timestamp, 'tuple_to_day')
+    
+    epoch_time = datetime.datetime.fromtimestamp(0)
+    
+    if deleted_trading_summary == True:
+        min_summary_timestamp = epoch_time
+        same_day = False
+    
+    else:
+        min_summary_timestamp = ch_client.query_dataframe(f"""SELECT MIN(timestamp)
+                                                              FROM algos_db.TradingSummary
+                                                              WHERE exchange = '{exchange}'
+                                                              AND symbol = '{symbol}' 
+                                                              """)
+
+        min_summary_timestamp = min_summary_timestamp['min_timestamp_'][0] 
+        
+        same_day = (min_trades_timestamp.year == min_summary_timestamp.year) \
+                    and (min_trades_timestamp.month == min_summary_timestamp.month) \
+                    and (min_trades_timestamp.day == min_summary_timestamp.day)
+        
+            
+    if deleted_trading_summary == True or epoch_time == min_summary_timestamp or same_day == False:
+        # for flow of code, this gets trashed and requeried in the while loop 
+        trading_summary = make_trading_summary_from_trades_in_batches(exchange=exchange,
+                                                                        symbol=symbol, 
+                                                                        start_date=trades_start_tuple_to_day,
+                                                                        end_date=None,  # goes to the current day. 
+                                                                        freq='D')
+    
+
+
+    last_run_missing = None
+    list_of_dates = []   # set to empty list because if we get an empty list after running everything, then we are good to go, all data is clean 
+    
+    i=0
+    while last_run_missing != list_of_dates: 
+        i += 1
+        print(i) 
+        last_run_missing = list_of_dates 
+        
+        trading_summary = query_trading_summary(exchange=exchange,
+                                                symbol=symbol,
+                                                start_date=min_trades_timestamp,
+                                                end_date=None,
+                                                columns='all',
+                                                ch_client=ch_client)
+    
+        print(f"STARTING continunity and conversion process  ----  {exchange}  --  {symbol} \n"*1)
+        
+        missing_and_no_activity_info = \
+            check_df_for_missing_data_and_no_activity(df=trading_summary, freq='min', gap_len=60, col='total_base_vol')
+        
+        set_of_date_tuples = set() 
+        
+        for start, end in missing_and_no_activity_info['no_activity_info']['start_end_tuple_list_no_vol']:
+            print(f"start: {start} ---- end: {end}")
+            date_range = pd.date_range(start=start, end=end, freq='min')
+            date_range = date_range.normalize().unique()  # rounds everything to day, take only unique values 
+            for date in date_range:
+                date = convert_date_format(date, 'tuple_to_day')
+                set_of_date_tuples.add(date) 
+        list_of_dates = sorted(list(set_of_date_tuples))
+    
+        for date in list_of_dates: 
+            get_spot_trades_convert_to_algos_delete_temp_csv_n_zip(ccxt_pair=symbol, date_tuple=date, exchange=exchange)
+            make_day_of_trading_summary_push_to_db(exchange, symbol, date, overwrite_mode='python_side', ch_client=ch_client)
+            
+    return None 
+
+
 if __name__ == "__main__":
     # # ### START:  SINGLE TICKER DEPTH FIRST VERSION ---- really for BTC mainly as it has so much data 
     # # ##          SINGLE TICKER DEPTH FIRST VERSION 
     # # #           SINGLE TICKER DEPTH FIRST VERSION 
-    # parser = argparse.ArgumentParser(description='process input parameters')
+    parser = argparse.ArgumentParser(description='process input parameters')
 
-    # # Define arguments
-    # parser.add_argument('--exchange', type=str, required=True, help='Exchange name (e.g., binance, binance_us)')
-    # parser.add_argument('--ccxt_pair', type=str, required=True, help='Currency pair (e.g., BTCUSDT, BTCUSD)')
-    # parser.add_argument('--start_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='Start date in YYYY-MM-DD format')
-    # parser.add_argument('--end_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='End date in YYYY-MM-DD format')
+    # Define arguments
+    parser.add_argument('--exchange', type=str, required=True, help='Exchange name (e.g., binance, binance_us)')
+    parser.add_argument('--ccxt_pair', type=str, required=True, help='Currency pair (e.g., BTCUSDT, BTCUSD)')
+    parser.add_argument('--start_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='Start date in YYYY-MM-DD format')
+    parser.add_argument('--end_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='End date in YYYY-MM-DD format')
 
-    # # Parse arguments
-    # args = parser.parse_args()
+    # Parse arguments
+    args = parser.parse_args()
 
-    # # Use arguments
-    # exchange = args.exchange
-    # ccxt_pair = args.ccxt_pair
-    # start_date = args.start_date
-    # end_date = args.end_date
+    # Use arguments
+    exchange = args.exchange
+    ccxt_pair = args.ccxt_pair
+    start_date = args.start_date
+    end_date = args.end_date
 
-    # # download_binance_trades(
-    # download_binance_trades_multithreaded(
-    #     exchange=exchange, 
-    #     ccxt_pair=ccxt_pair,
-    #     start_date=start_date,
-    #     end_date=end_date,
-    #     output="verbose",
-    #     pickle_failed_days=True,
-    #     n_workers=18,
-    # )
+    # download_binance_trades(
+    download_binance_trades_multithreaded(
+        exchange=exchange, 
+        ccxt_pair=ccxt_pair,
+        start_date=start_date,
+        end_date=end_date,
+        output="verbose",
+        pickle_failed_days=True,
+        n_workers=18,
+    )
 
     # # #         SINGLE TICKER DEPTH FIRST VERSION 
     # # ##        SINGLE TICKER DEPTH FIRST VERSION 
