@@ -564,98 +564,96 @@ desired_features_dict = {
 
 if machine_name == 'blackbox':
     active_services = \
-        {
-            # not sure if this is how trading summary managment should be done i.e. each desired asset is at
-            # params['active_services']['trading_summaries'][<exchange>][<pair>]  # note this is by pair not symbol
-            'trading_summaries': {'processing_interval': 10,  # number of seconds interval length to collect trades then push to table 
-                                  # ###PAUL TODO: consider processing trades at the end
-                                  'binance_us': ['BTC/USDT', 'KDA/USDT', 'ETH/USDT',  'LINK/USDT', 'ROSE/USDT', 'ICP/USDT', 'AVAX/USDT', 'SOL/USDT', 'BNB/USDT', 'DOGE/USDT', 'GRT/USDT', ],
-                                  'kraken': ['BTC/USDT', 'ETH/USDT', 'LINK/USDT',             'AVAX/USDT', 'SOL/USDT', 'DOGE/USDT', 
-                                             'BTC/USD',  'ETH/USD',  'LINK/USD',  'ICP/USD',  'AVAX/USD',  'SOL/USD',  'DOGE/USD',  'GRT/USD', ],
-                                  # ###PAUL TODO: add KDA  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                  # 'kucoin': ['BTC-USDT', ],
-                                  # running with binance causes an issue becasue no live collection for this.. 
-                                  },
-            'signals': {'prod_1____BTC_USDT_trades_only_data':
-                            {'signal_name': 'prod_1____BTC_USDT_trades_only_data',
-                             'exchange': 'binance',
-                             'pairs': ['BTC-TUSD'],
-                             # intended to replace symbol, as signals will have more than one pair soon
-                             'symbol': 'BTC-USDT',  # TODO: depricate this for `pairs` shown above
-                             'mins_between_signal_updates': 2,
-                             'signal_make_delay': 10,  # seconds
-                             # TODO: the pipeline where this input, `desired_features_dict` writes code to `make_feature_set_printed_fn`
-                             'desired_features_dict': desired_features_dict,
-                             },
-                        'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18':
-                            {'signal_name': 'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18',
-                             # 'exchange': 'binance',    # handled
-                             # 'pairs': ['BTC-TUSD'],
-                             # intended to replace symbol, as signals will have more than one pair soon
-                             'symbol': 'BTC-USDT',  # TODO: depricate this for `pairs` shown above
-                             'mins_between_signal_updates': 2,
-                             'signal_make_delay': 30,  # seconds
+        {'trade_collect': {'exchanges': {'binance_us': ['BTC/USDT', 'KDA/USDT', 'ETH/USDT',  'LINK/USDT', 'ROSE/USDT', 'ICP/USDT', 'AVAX/USDT', 'SOL/USDT', 'BNB/USDT', 'DOGE/USDT', 'GRT/USDT', ],
+                                         'kraken': ['BTC/USDT', 'ETH/USDT', 'LINK/USDT',             'AVAX/USDT', 'SOL/USDT', 'DOGE/USDT', 
+                                                    'BTC/USD',  'ETH/USD',  'LINK/USD',  'ICP/USD',  'AVAX/USD',  'SOL/USD',  'DOGE/USD',  'GRT/USD', ],
+                                        }, 
+                            
+                            'trade_process_interval': '1min',  # starts the cycle of trades to db, summary, to decision every minute 
+                            'trade_db_write_delay': 2,  # seconds after a UTC minute to write trades to DB  
+                            'summary_process_delay': 10,  # number of seconds interval length to collect trades then push to table 
+                            },
+                            
+        'signals': {'prod_1____BTC_USDT_trades_only_data':
+                        {'signal_name': 'prod_1____BTC_USDT_trades_only_data',
+                            'exchange': 'binance',
+                            'pairs': ['BTC-TUSD'],
+                            # intended to replace symbol, as signals will have more than one pair soon
+                            'symbol': 'BTC-USDT',  # TODO: depricate this for `pairs` shown above
+                            'mins_between_signal_updates': 2,
+                            'signal_make_delay': 10,  # seconds
+                            # TODO: the pipeline where this input, `desired_features_dict` writes code to `make_feature_set_printed_fn`
+                            'desired_features_dict': desired_features_dict,
+                            },
+                    'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18':
+                        {'signal_name': 'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18',
+                            # 'exchange': 'binance',    # handled
+                            # 'pairs': ['BTC-TUSD'],
+                            # intended to replace symbol, as signals will have more than one pair soon
+                            'symbol': 'BTC-USDT',  # TODO: depricate this for `pairs` shown above
+                            'mins_between_signal_updates': 2,
+                            'signal_make_delay': 30,  # seconds
 
-                             # TODO: the pipeline where this input, `desired_features_dict` writes code to `make_feature_set_printed_fn`
-                             'desired_features_dict': desired_features_dict,
+                            # TODO: the pipeline where this input, `desired_features_dict` writes code to `make_feature_set_printed_fn`
+                            'desired_features_dict': desired_features_dict,
 
-                             # TODO: `eaors_trades` relies on the same pair only appearing once, this is unrealistic as we may want the same pair from two exchanges.
-                             # seems like the best approach would be [exchange][pair] ... with the note that this would not support spot vs futures.
-                             # to future proof, it would be necessary to use ['eaors_trades']['spot/futures'][exchange][pair] then walk down that tree starting at `eaors_trades`
-                             'feature_params': {
+                            # TODO: `eaors_trades` relies on the same pair only appearing once, this is unrealistic as we may want the same pair from two exchanges.
+                            # seems like the best approach would be [exchange][pair] ... with the note that this would not support spot vs futures.
+                            # to future proof, it would be necessary to use ['eaors_trades']['spot/futures'][exchange][pair] then walk down that tree starting at `eaors_trades`
+                            'feature_params': {
 
-                                 'eaors_trades': {  # 'data_source' : {source_specific_processing_information},
-                                     'BTC-USDT': {'desired_features_dict': desired_features_dict,
-                                                  'exchange': 'binance',
-                                                  'start_date': (2018, 1, 1),
-                                                  'end_date': (2023, 7, 18),
-                                                  'alternative_data_pair': None,
-                                                  },
-                                     'BTC-TUSD': {'desired_features_dict': desired_features_dict,
-                                                  'exchange': 'binance',
-                                                  'start_date': (2018, 1, 1),
-                                                  'end_date': (2023, 7, 18),
-                                                  'alternative_data_pair': 'BTC-USDT',
-                                                  'alternative_data_exchange': 'binance',
-                                                  'alternative_start_date': (2018, 1, 1),
-                                                  'alternative_end_date': (2023, 2, 15),
-                                                  },
-                                     'ETH-USDT': {'desired_features_dict': desired_features_dict,
-                                                  'exchange': 'binance',
-                                                  'start_date': (2018, 1, 1),
-                                                  'end_date': (2023, 7, 18),
-                                                  'alternative_data_pair': None,
-                                                  },
-                                     'ETH-TUSD': {'desired_features_dict': desired_features_dict,
-                                                  'exchange': 'binance',
-                                                  'start_date': (2018, 1, 1),
-                                                  'end_date': (2023, 7, 18),
-                                                  'alternative_data_pair': None,
-                                                  'alternative_data_exchange': 'binance',
-                                                  'alternative_start_date': (2018, 1, 1),
-                                                  'alternative_end_date': (2023, 2, 15),
-                                                  },
-                                 },
+                                'eaors_trades': {  # 'data_source' : {source_specific_processing_information},
+                                    'BTC-USDT': {'desired_features_dict': desired_features_dict,
+                                                'exchange': 'binance',
+                                                'start_date': (2018, 1, 1),
+                                                'end_date': (2023, 7, 18),
+                                                'alternative_data_pair': None,
+                                                },
+                                    'BTC-TUSD': {'desired_features_dict': desired_features_dict,
+                                                'exchange': 'binance',
+                                                'start_date': (2018, 1, 1),
+                                                'end_date': (2023, 7, 18),
+                                                'alternative_data_pair': 'BTC-USDT',
+                                                'alternative_data_exchange': 'binance',
+                                                'alternative_start_date': (2018, 1, 1),
+                                                'alternative_end_date': (2023, 2, 15),
+                                                },
+                                    'ETH-USDT': {'desired_features_dict': desired_features_dict,
+                                                'exchange': 'binance',
+                                                'start_date': (2018, 1, 1),
+                                                'end_date': (2023, 7, 18),
+                                                'alternative_data_pair': None,
+                                                },
+                                    'ETH-TUSD': {'desired_features_dict': desired_features_dict,
+                                                'exchange': 'binance',
+                                                'start_date': (2018, 1, 1),
+                                                'end_date': (2023, 7, 18),
+                                                'alternative_data_pair': None,
+                                                'alternative_data_exchange': 'binance',
+                                                'alternative_start_date': (2018, 1, 1),
+                                                'alternative_end_date': (2023, 2, 15),
+                                                },
+                                },
 
-                                 # 'eaors_orderbook': {},
-                                 # 'l_map': {},
-                                 # 'sp500': {},
-                                 # 'commodities': {},
-                                 # 'forex': {'DXY': {'desired_features_dict': desired_features_dict},  # could be nearly identical to EAORS trade pipeline
+                                # 'eaors_orderbook': {},
+                                # 'l_map': {},
+                                # 'sp500': {},
+                                # 'commodities': {},
+                                # 'forex': {'DXY': {'desired_features_dict': desired_features_dict},  # could be nearly identical to EAORS trade pipeline
 
-                                 'utc_time': True,
+                                'utc_time': True,
 
-                                 # ###PAUL TODO: consider refactoring sources to feature_params['sources'][source]
-                                 #
-                                 # }                  dictionary started above, but not used for now
-                                 # would also include a dictionary for preprocessing sepratley....
-                                 # 'preprocessing': {
-                                 'preprocess_rolling_norm_n_obvs': 20 * 24 * 60,
-                                 # }
-                             }
-                             },
-                        },
-            'ports': {},
+                                # ###PAUL TODO: consider refactoring sources to feature_params['sources'][source]
+                                #
+                                # }                  dictionary started above, but not used for now
+                                # would also include a dictionary for preprocessing sepratley....
+                                # 'preprocessing': {
+                                'preprocess_rolling_norm_n_obvs': 20 * 24 * 60,
+                                # }
+                            }
+                            },
+                    },
+        'ports': {},
         }
 
 

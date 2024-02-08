@@ -34,59 +34,9 @@ services:
     restart: always
     command: python3.10 -u update_trading_summary.py
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# version: "3.8"
-
-# x-base-config: &base
-#   image: algos:latest   # this could be updated to be automated 
-#   network_mode: bridge
-#   env_file:
-#     - /home/paul/src/algos/.env
-
-# services:
-#   data_scrape_binance_us:
-#     <<: *base
-#     restart: always
-#     command: python3.10 -u data_trade_scraper.py --exchange binance_us
-#     # entrypoint: /bin/bash  # debugging line 
-#     # tty: true  # debugging line 
-#   data_scrape_kraken:
-#     <<: *base
-#     restart: always
-#     command: python3.10 -u data_trade_scraper.py --exchange kraken
-
-
-
-
-
-
-
-
-
-
-
-  # data_update_trading_summary:
-  #   <<: *base
-  #   command: python -u update_trading_summary.py
-
+  # ### TODO: get these up 
+  # ##
+  # #
   # data_update_signal:
   #   <<: *base
   #   command: python -u update_signal.py  # --signal_name btc_sig_1
@@ -95,7 +45,7 @@ services:
   #   <<: *base 
   #   command: python -u live_framework_v2.py # --signal_name 
 
-  # # ### old stuff that I would like to explore more before deleting 
+  # # ### want to replace this functionality 
   # #
   # #
   # filebeat:

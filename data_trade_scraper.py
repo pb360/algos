@@ -9,7 +9,9 @@ time.tzset()
 sys.path.insert(0, '..')
 
 from algos.config import params
-from algos.utils import init_ch_client, init_ccxt_client
+from algos.utils import ( init_ch_client,
+                          init_ccxt_client,
+                          async_wait_for_next_execution, ) 
 import asyncio
 import datetime
 
@@ -26,11 +28,11 @@ class TradeProcessor:
         self.ccxt_client = ccxt_client
         self.params = params
         self.exchange = params['state']['exchange']
-        self.symbols = self.params['active_services']['trading_summaries'][self.exchange]
-        self.processing_interval =  self.params['active_services']['trading_summaries']['processing_interval']
+        self.symbols = self.params['active_services']['trade_collect']['exchanges'][self.exchange]
+        self.trade_db_write_delay =  self.params['active_services']['trade_collect']['trade_db_write_delay']
+        self.trade_process_interval =  self.params['active_services']['trade_collect']['trade_process_interval']
         
         self.accumulated_trades = []
-        
 
     async def fetch_and_accumulate_trades_for_symbol(self, symbol):
         """Fetch and accumulate trades for a single symbol."""
@@ -57,7 +59,7 @@ class TradeProcessor:
 
     async def process_trade_data(self):
         ch_formatted_trades = []
-        print(f"exchange: {self.exchange} had {len(self.accumulated_trades)} in last {self.processing_interval} seconds",
+        print(f"exchange: {self.exchange} had {len(self.accumulated_trades)} in the last minute",
               flush=True) 
         for trade in self.accumulated_trades: 
             if trade['id'] is None: 
@@ -79,19 +81,15 @@ class TradeProcessor:
                             ch_formatted_trades, 
                             types_check=True, )
         except Exception as e:
-            print(f"Critical error occurred: {e}", flush=True)
+            print(f"Critical error: \n\n {e} \n\n", flush=True)
             raise   # Reraise the exception to exit the script
     
     async def process_trades_periodically(self):
         while True:
-            # try:
-            if self.accumulated_trades:
+            await async_wait_for_next_execution(delay_seconds=self.trade_db_write_delay, interval=self.trade_process_interval)
+            if self.accumulated_trades:  # if list isn't empty, process it 
                 await self.process_trade_data()
                 self.accumulated_trades.clear()
-            await asyncio.sleep(self.processing_interval)
-            # except:
-            #     import pdb
-            #     pdb.set_trace()
 
 async def main():
     args = parse_args()

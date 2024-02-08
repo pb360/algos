@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, '..')  # ###TODO RUN FROM TOP DIR CHECK       for local imports from the top directory
 sys.path.insert(0, '../..')  # ###TODO RUN FROM TOP DIR CHECK    quick fix, it works...  DELETE LATER DELETE LATER 
 
+import asyncio
 from clickhouse_driver import Client as CH_Client
 import datetime
 from datetime import timedelta
@@ -45,13 +46,6 @@ from algos.config import params
 dotenv.load_dotenv()  # ###PAUL TODO: do i want to move this somewhere into the params hook? 
 data_dir = params['dirs']['data_dir']
 
-# # ### variable definitions
-# #
-# #
-# params = config.params
-
-from ccxt import binanceus
-
 
 def get_secret(key):
     if key not in os.environ:
@@ -72,7 +66,6 @@ def init_ch_client(send_receive_timeout=120*60, max_execution_time=120*60):
     
     return ch_client
     
-
     
 def init_ccxt_client(exchange='binance_us', type='standard'):
     # Mapping configuration for exchanges
@@ -119,33 +112,39 @@ def init_ccxt_client(exchange='binance_us', type='standard'):
     return ccxt_client
 
 
-# def init_ccxt_client(exchange='binance_us', type=-'standard'):
-#     """create ccxt_client of desired exchange standard, or pro (for asyncio functionality) 
+def wait_for_next_execution(delay_seconds, interval='1min'):
+    """Waits until the next execution time, which is the start of the next minute plus a delay.
+    
+    Note, may want to make functionality to not do something every minute. 
+    """
 
-#     NOTE: NOT ALL EXCHANGES HAVE ONLY A public and secret, DO NOT CHANGE FLOW, each exchange must be created under its own conditional 
-#     """
+    if interval == '1min':
+        # Calculate the next minute mark after the current time plus delay
+        next_execution_time = (pd.to_datetime(datetime.datetime.now()).floor('min') \
+                            + timedelta(minutes=1) \
+                            + timedelta(seconds=delay_seconds)
+                            ).to_pydatetime()
+        
+        # Wait until the next execution time
+        while datetime.datetime.now() < next_execution_time:
+            time.sleep(0.5)  # Sleep in short intervals to stay responsive
+    
+    return next_execution_time
 
-#     if exchange == 'binance_us': 
-#         if type == 'standard': 
-#             from ccxt import binanceus as CCXT_Client 
-#         if type == 'pro': 
-#             from ccxt.pro import binanceus as CCXT_Client 
-#         ccxt_client = CCXT_Client({'apiKey': get_secret('BINANCE_DATA_1_PUBLIC'),
-#                                     'secret': get_secret('BINANCE_DATA_1_PRIVATE'), })
-            
-#     if exchange == 'kraken': 
-#         if type == 'standard': 
-#             from ccxt import kraken as CCXT_Client 
-#         if type == 'pro': 
-#             from ccxt.pro import kraken as CCXT_Client 
-#         ccxt_client = CCXT_Client({'apiKey': get_secret('KRAKEN_ALL_BUT_WITHDRAW_PUBLIC'),
-#                                     'secret': get_secret('KRAKEN_ALL_BUT_WITHDRAW_PRIVATE'), })
-            
-#     else:
-#         print(f"exchange: {exchange} not supported!!!" * 2)
-#         raise ValueError
 
-#     return ccxt_client
+async def async_wait_for_next_execution(delay_seconds, interval='1min'):
+    """ Asynchronously waits until the start of the next minute plus a specified delay.
+    """
+    
+    if interval == '1min':
+        now = datetime.datetime.now()
+        next_execution_time = (now + timedelta(minutes=1)).replace(second=0, microsecond=0) \
+                               + timedelta(seconds=delay_seconds) 
+    
+        while datetime.datetime.now() < next_execution_time:
+            await asyncio.sleep(1) 
+
+    return next_execution_time
 
 
 def convert_date_format(date, output_type):
@@ -1667,7 +1666,6 @@ def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Dec
     """
     precision: int = int(round(-math.log(step_size, 10), 0))
     return float(round(quantity, precision))
-
 
 
 def get_mutual_min_max_datetimes(pandas_objects):
