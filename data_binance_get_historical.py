@@ -425,7 +425,170 @@ def check_continuity_of_trades_convert_to_summary_rewrite_missing_data(exchange_
     return None 
 
 
-if __name__ == "__main__":
+def query_trades_each_day_make_trading_summary_push_to_clickhouse(exchange,
+                                                                  start_date,
+                                                                  end_date,
+                                                                  pairs_list,
+                                                                  pair=None,
+                                                                  backup_pair=None,
+                                                                  ):
+    """
+    input:
+    pairs_list [(pair, backup_pair), ...] ---- or use one pair and backup_pair
+    """
+
+    if type(start_date) != datetime.datetime:
+        convert_date_format(start_date, 'datetime')
+    if type(end_date) != datetime.datetime:
+        convert_date_format(end_date, 'datetime')
+
+    date_range_arr = pd.date_range(start=start_date, end=end_date, freq='D')
+
+    missing_dates_filled = []
+    failed_dates = []
+
+    if pair != None:
+        pairs_list = [(pair, backup_pair)]
+
+    for pair, backup_pair in pairs_list:
+        for i in range(date_range_arr.shape[0] - 1):
+            iter_start_date = date_range_arr[i]
+            iter_end_date = date_range_arr[i + 1]
+            if i % 5 == 0:
+                print(f"iter {i} ---- {pair} for ---- {iter_start_date} --> iter_end_date: {iter_end_date}")
+
+            try:
+                trades = get_trades_data(exchange=exchange,
+                                         symbol=pair,
+                                         start_date=iter_start_date,
+                                         end_date=iter_end_date,
+                                         source='EAORS')
+
+                if type(trades) == int or trades.shape[0] < 100:
+                    if trades == 0:
+                        print(f"    - no trades for iter_start_date: {iter_start_date} --> iter_end_date: "
+                              f"{iter_end_date}")
+
+                    trades = get_trades_data(exchange=exchange,
+                                             symbol=backup_pair,
+                                             start_date=iter_start_date,
+                                             end_date=iter_end_date,
+                                             source='EAORS')
+
+                    if type(trades) == int or trades.shape[0] < 100:
+                        raise ValueError
+
+                    missing_dates_filled.append((iter_start_date, iter_end_date))
+
+                trading_summary = convert_trades_df_to_trading_summary(trades)
+                trading_summary = fill_trading_summary_interpolating_missing_minutes(trading_summary)
+
+                push_trading_summary_to_clickhouse(trading_summary, exchange, pair)
+
+                if trading_summary.shape[0] < 1440:
+                    import pdb
+                    pdb.set_trace()
+
+            except:
+                print(f"    - failed on {iter_start_date} --> iter_end_date: {iter_end_date}")
+                failed_dates.append((iter_start_date, iter_end_date))
+
+    return failed_dates
+
+
+# # ### START:  SINGLE TICKER DEPTH FIRST VERSION ---- really for BTC mainly as it has so much data 
+    # # ##          SINGLE TICKER DEPTH FIRST VERSION 
+    # # #           SINGLE TICKER DEPTH FIRST VERSION 
+    parser = argparse.ArgumentParser(description='process input parameters')
+
+    # Define arguments
+    parser.add_argument('--exchange', type=str, required=True, help='Exchange name (e.g., binance, binance_us)')
+    parser.add_argument('--ccxt_pair', type=str, required=True, help='Currency pair (e.g., BTCUSDT, BTCUSD)')
+    parser.add_argument('--start_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='Start date in YYYY-MM-DD format')
+    parser.add_argument('--end_date', type=lambda d: datetime.datetime.strptime(d, '%Y-%m-%d'), required=True, help='End date in YYYY-MM-DD format')
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Use arguments
+    exchange = args.exchange
+    ccxt_pair = args.ccxt_pair
+    start_date = args.start_date
+    end_date = args.end_date
+
+    # download_binance_trades(
+    download_binance_trades_multithreaded(
+        exchange=exchange, 
+        ccxt_pair=ccxt_pair,
+        start_date=start_date,
+        end_date=end_date,
+        output="verbose",
+        pickle_failed_days=True,
+        n_workers=18,
+    )
+
+    # # #         SINGLE TICKER DEPTH FIRST VERSION 
+    # # ##        SINGLE TICKER DEPTH FIRST VERSION 
+    # # ### END:  SINGLE TICKER DEPTH FIRST VERSION 
+
+    
+    
+    # ### START:  MULTI THREADED BREADTH FIRST (many tickers, one date ) 
+    # ##
+    # # 
+    trades_to_download = [
+                # {'exchange': 'binance', 'ccxt_pair': 'BTC/USDT',    'start_date': (2021, 8, 14),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'ETH/USDT',    'start_date': (2019, 1, 27),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'LINK/USDT',   'start_date': (2019, 1, 16),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'KDA/USDT',    'start_date': (2022, 3, 11),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'ROSE/USDT',   'start_date': (2020, 11, 19),  'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'ICP/USDT',    'start_date': (2021, 6, 10),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'AVAX/USDT',   'start_date': (2021, 6, 10),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'SOL/USDT',    'start_date': (2020, 8, 11),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'BNB/USDT',    'start_date': (2017, 11, 6),   'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'BNB/USDT',    'start_date': (2019, 7, 5),    'end_date': (2023, 12, 18)},
+                {'exchange': 'binance', 'ccxt_pair': 'GRT/USDT',    'start_date': (2020, 12, 17),  'end_date': (2023, 12, 18)},
+
+                                        
+                # https://data.binance.vision/?prefix=data/spot/daily/trades/BTCUSDT/
+                # https://www.binance.us/institutions/market-history
+                
+                # {'exchange': 'binance_us', 'ccxt_pair': 'BTC/USD',     'start_date': (2019, 9, 17), 'end_date': (2023, 7, 15)},   # USD PAIRS RUN TILL (2023, 7, 15) 
+                # {'exchange': 'binance_us', 'ccxt_pair': 'ETH/USD',     'start_date': (2019, 9, 17), 'end_date': (2023, 7, 15)},   # USD PAIRS RUN TILL (2023, 7, 15) 
+                # {'exchange': 'binance_us', 'ccxt_pair': 'LINK/USD',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 15)}, 
+                # {'exchange': 'binance_us', 'ccxt_pair': 'KDA/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'ROSE/USD',   'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'ICP/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'AVAX/USD',   'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'SOL/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'BNB/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'GRT/USD',    'start_date': (2019, 9, 17),  'end_date': (2023, 7, 15)},
+
+                # {'exchange': 'binance_us', 'ccxt_pair': 'BTC/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'ETH/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'LINK/USDT',    'start_date': (2019, 9, 17), 'end_date': (2023, 12, 15)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'KDA/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'ROSE/USDT',   'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'ICP/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'AVAX/USDT',   'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'SOL/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'BNB/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                # {'exchange': 'binance_us', 'ccxt_pair': 'GRT/USDT',    'start_date': (2019, 9, 17),  'end_date': (2023, 12, 19)},
+                ]
+
+    # Use ThreadPoolExecutor to execute the function in multiple threads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+
+        # Map the download_wrapper function to the list of dictionaries
+        executor.map(download_wrapper, trades_to_download)
+    # # 
+    # ##
+    # ### MULTI THREADED BREADTH FIRST (many tickers, one date ) 
+
+    print('done')
+
+
+def main():
     # # ### START:  SINGLE TICKER DEPTH FIRST VERSION ---- really for BTC mainly as it has so much data 
     # # ##          SINGLE TICKER DEPTH FIRST VERSION 
     # # #           SINGLE TICKER DEPTH FIRST VERSION 
@@ -516,3 +679,7 @@ if __name__ == "__main__":
     # ### MULTI THREADED BREADTH FIRST (many tickers, one date ) 
 
     print('done')
+
+
+if __name__ == "__main__":
+    main()

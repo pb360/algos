@@ -1,16 +1,27 @@
 import os
+import platform
 import sys
 import time
 # ### time zone change... this must happen first and utils must be imported first
 os.environ['TZ'] = 'UTC'
 time.tzset()
 
-# local imports
-sys.path.insert(0, '..')  # for local imports from the top directory
-from algos.machine_specific.config_machine_specific import params_machine_specific
 
 from copy import deepcopy
-import platform
+import dotenv
+import os
+
+
+def get_secret(key):  # this is here and utils to avoid a circular import
+    # import pdb
+    # pdb.set_trace()
+    if key not in os.environ:
+        raise KeyError(f"Key {key} not found!")
+    return os.environ[key]
+
+
+dotenv.load_dotenv()
+machine_name = get_secret('MACHINE_NAME')
 
 
 # ### function definitions... must be here as config is imported into utils, not the other way around
@@ -28,12 +39,10 @@ def reverse_dict(d):
     return new_dict
 
 
-active_services = params_machine_specific['active_services']
-
-# ### important constants ###PAUL_todo
+# ### important constants
 #
 #
-constants = {'os': str(platform.system()),  # ###PAUL alot relies on this, this is kindof the thing that should be here
+constants = {'os': str(platform.system()),  
              'email_port': 1025,
              }
 
@@ -484,6 +493,275 @@ data_format['binance'] = data_format_binance
 data_format['binanceus'] = data_format_binanceus
 data_format['kucoin'] = data_format_kucoin
 data_format['ccxt'] = data_format_ccxt
+
+
+desired_features_dict = {
+    "buy_to_sell_count_ratio": {"interval_lens": [1, 3, 10, 28, 59, 119, 360],
+                                "function_name": "get_ratio_of_metrics_rolling_sums",
+                                # note, if the argument is str it is written "'string'"
+                                "kwargs": {"df": "trading_summary",
+                                           "metric_1": "'buyer_is_maker'",
+                                           "metric_2": "'buyer_is_taker'",
+                                           }
+                                },
+
+    "buy_to_sell_vol_ratio": {"interval_lens": [1, 3, 10, 28, 59, 119, 360, 1440, ],
+                              "function_name": "get_ratio_of_metrics_rolling_sums",
+                              "kwargs": {"df": "trading_summary",
+                                         "metric_1": "'buy_base_vol'",
+                                         "metric_2": "'sell_base_vol'",
+                                         },
+                              },
+
+    "momentum": {"interval_lens": [1, 3, 10, 28, 59, 119, 240, 1200, 4320, 14400],
+                 "function_name": "calculate_momentum",
+                 "kwargs": {"df": "trading_summary",
+                            "col": "'vwap'",
+                            },
+                 },
+
+    "rsi": {'interval_lens': [10, 28, 59, 240, 1200, 4320, 14400, 56000],
+            'function_name': 'calc_rsi',
+            'kwargs': {'series': "trading_summary['vwap']"},
+            },
+
+    # ###PAUL this is not what is wanted...
+    # rolling variance is a good replacement for what this was trying to do
+    # "roll_std_price": {'interval_lens': [15, 28, 59, 119, 240, 1200, 4320, 14400],
+    #                    'function_name': 'calc_rolling_std',
+    #                    'kwargs': {'series': "prices['vwap']"},
+    # },
+    "roll_std_vol": {'interval_lens': [15, 28, 59, 119, 240, 1200, 4320, 14400],
+                     'function_name': 'calc_rolling_std',
+                     'kwargs': {'series': "prices['total_base_vol']"},
+                     },
+
+    # ###PAUL TODO: ROLLING STD OF VOLATILITY
+    #
+    #
+
+    # more complex metrics below this line
+    # _=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_
+
+    'macd': {'function_name': 'calc_macd',
+             'kwargs': {'series': "prices['vwap']",
+                        },
+             'span_tuples': [(12, 26, 9), (4, 26, 9), (13, 26, 1), (12, 26, 3)],
+             'multipliers': [1, 5, 15, 60, 150, 1600],
+             },
+
+    # EXAMPLE: keep this feature_name it is skipped by the code writer if left as is
+    # _=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_
+    'feature_name': {'interval_lens': [30, 60, 120, ],
+                     'function_name': 'function_to_make_metric',
+                     'kwargs': {'col_name': 'input_str',
+                                'metric_1': 'input_str',
+                                'metric_2': 'input_str',
+                                }
+                     },
+}
+
+
+if machine_name == 'blackbox':
+    active_services = \
+        {
+            # not sure if this is how trading summary managment should be done i.e. each desired asset is at
+            # params['active_services']['trading_summaries'][<exchange>][<pair>]  # note this is by pair not symbol
+            'trading_summaries': {'processing_interval': 10,  # number of seconds interval length to collect trades then push to table 
+                                  # ###PAUL TODO: consider processing trades at the end
+                                  'binance_us': ['BTC/USDT', 'KDA/USDT', 'ETH/USDT',  'LINK/USDT', 'ROSE/USDT', 'ICP/USDT', 'AVAX/USDT', 'SOL/USDT', 'BNB/USDT', 'DOGE/USDT', 'GRT/USDT', ],
+                                  'kraken': ['BTC/USDT', 'ETH/USDT', 'LINK/USDT',             'AVAX/USDT', 'SOL/USDT', 'DOGE/USDT', 
+                                             'BTC/USD',  'ETH/USD',  'LINK/USD',  'ICP/USD',  'AVAX/USD',  'SOL/USD',  'DOGE/USD',  'GRT/USD', ],
+                                  # ###PAUL TODO: add KDA  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                  # 'kucoin': ['BTC-USDT', ],
+                                  # running with binance causes an issue becasue no live collection for this.. 
+                                  },
+            'signals': {'prod_1____BTC_USDT_trades_only_data':
+                            {'signal_name': 'prod_1____BTC_USDT_trades_only_data',
+                             'exchange': 'binance',
+                             'pairs': ['BTC-TUSD'],
+                             # intended to replace symbol, as signals will have more than one pair soon
+                             'symbol': 'BTC-USDT',  # TODO: depricate this for `pairs` shown above
+                             'mins_between_signal_updates': 2,
+                             'signal_make_delay': 10,  # seconds
+                             # TODO: the pipeline where this input, `desired_features_dict` writes code to `make_feature_set_printed_fn`
+                             'desired_features_dict': desired_features_dict,
+                             },
+                        'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18':
+                            {'signal_name': 'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18',
+                             # 'exchange': 'binance',    # handled
+                             # 'pairs': ['BTC-TUSD'],
+                             # intended to replace symbol, as signals will have more than one pair soon
+                             'symbol': 'BTC-USDT',  # TODO: depricate this for `pairs` shown above
+                             'mins_between_signal_updates': 2,
+                             'signal_make_delay': 30,  # seconds
+
+                             # TODO: the pipeline where this input, `desired_features_dict` writes code to `make_feature_set_printed_fn`
+                             'desired_features_dict': desired_features_dict,
+
+                             # TODO: `eaors_trades` relies on the same pair only appearing once, this is unrealistic as we may want the same pair from two exchanges.
+                             # seems like the best approach would be [exchange][pair] ... with the note that this would not support spot vs futures.
+                             # to future proof, it would be necessary to use ['eaors_trades']['spot/futures'][exchange][pair] then walk down that tree starting at `eaors_trades`
+                             'feature_params': {
+
+                                 'eaors_trades': {  # 'data_source' : {source_specific_processing_information},
+                                     'BTC-USDT': {'desired_features_dict': desired_features_dict,
+                                                  'exchange': 'binance',
+                                                  'start_date': (2018, 1, 1),
+                                                  'end_date': (2023, 7, 18),
+                                                  'alternative_data_pair': None,
+                                                  },
+                                     'BTC-TUSD': {'desired_features_dict': desired_features_dict,
+                                                  'exchange': 'binance',
+                                                  'start_date': (2018, 1, 1),
+                                                  'end_date': (2023, 7, 18),
+                                                  'alternative_data_pair': 'BTC-USDT',
+                                                  'alternative_data_exchange': 'binance',
+                                                  'alternative_start_date': (2018, 1, 1),
+                                                  'alternative_end_date': (2023, 2, 15),
+                                                  },
+                                     'ETH-USDT': {'desired_features_dict': desired_features_dict,
+                                                  'exchange': 'binance',
+                                                  'start_date': (2018, 1, 1),
+                                                  'end_date': (2023, 7, 18),
+                                                  'alternative_data_pair': None,
+                                                  },
+                                     'ETH-TUSD': {'desired_features_dict': desired_features_dict,
+                                                  'exchange': 'binance',
+                                                  'start_date': (2018, 1, 1),
+                                                  'end_date': (2023, 7, 18),
+                                                  'alternative_data_pair': None,
+                                                  'alternative_data_exchange': 'binance',
+                                                  'alternative_start_date': (2018, 1, 1),
+                                                  'alternative_end_date': (2023, 2, 15),
+                                                  },
+                                 },
+
+                                 # 'eaors_orderbook': {},
+                                 # 'l_map': {},
+                                 # 'sp500': {},
+                                 # 'commodities': {},
+                                 # 'forex': {'DXY': {'desired_features_dict': desired_features_dict},  # could be nearly identical to EAORS trade pipeline
+
+                                 'utc_time': True,
+
+                                 # ###PAUL TODO: consider refactoring sources to feature_params['sources'][source]
+                                 #
+                                 # }                  dictionary started above, but not used for now
+                                 # would also include a dictionary for preprocessing sepratley....
+                                 # 'preprocessing': {
+                                 'preprocess_rolling_norm_n_obvs': 20 * 24 * 60,
+                                 # }
+                             }
+                             },
+                        },
+            'ports': {},
+        }
+
+
+if machine_name == 'whitebox':  # ###TODO put trading summary and collection on whitebox, blackbox is update. 
+    active_services = \
+        {
+            'ports': {'prod_1____BTC_USDT_trades_only_data':
+                          {'port_name': f"prod_1____BTC_USDT_trades_only_data",
+                           'signal_name': f"signal_dict____2023_08_23___mlp_rolling____to_2023_07_18",
+                           'exchange': 'binance',     # TODO: get rid of this infavor of multi exchange setup
+                           'exchanges': ['binance'],  # TODO: support this fully then get rid of the above
+                           'pairs_traded': ['BTC-TUSD'],
+                           'assets_in_port': {'BTC', 'TUSD'},  # ###PAUL TODO: generate this off pairs traded list?
+                           'mins_between_decision_check': 1,
+                           'check_signal_delay': 50,  # seconds
+                           'diff_thresh': 11,  # min volume in $ (should be liq...) for order to be placed
+                           'print_alert_n_iters': 1,
+                           'decision_delay': 35,
+                           'decision_params': {  # TODO: implement in `algos/data/live/ports/decision_params.json
+                               'fee': 0.01,  # TODO: need to grab from port name
+                               'max_workers': 70,
+                               'cool_down': 15,
+                               'threshold': -0.09999999999999998,
+                               'pred_dist': 0.25,
+                               'price_dist': 0.0185,
+                               'stop_limit': 0.045,
+                               'overrides': ['stop_limit'],
+                               'any_two': [],
+                               'to_neutral_threshold': 0.375,
+                               'to_neutral_pred_dist': 0.14999999999999997,
+                               'to_neutral_price_dist': 0.0022500000000000003,
+                               'to_neutral_stop_limit': 0.0205,
+                               'to_neutral_overrides': ['stop_limit'],
+                               'to_neutral_any_two': []},
+                           'positions_table_info': {  # all fields are shown below, commented out items figured RTI
+                               # 'timestamp': '',
+                               # 'strategy': 'peak_bottom',
+                               'algo': 'prod_1____BTC_USDT_trades_only_data',
+                               'sub_account': 'maxs_binance',
+                               # 'leg_group_id': '',  # leg_group_id = int(datetime.utcnow().timestamp() * 1000)
+                               # 'instrument': '',
+                               'exchange': 'binance',
+                               # 'size': '',
+                               # 'mid_price': '',
+                               # 'currency_price': '',
+                               # 'currency_name': '',
+                               'funding_pnl': 0,
+                               'margin': 0,
+                               'ignore': False,
+                               # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+                               'adjustment': False,
+                               # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+                            },
+                           },
+                      },
+            'ports': {'signal_dict____2023_08_23___mlp_rolling____to_2023_07_18':
+                          {'port_name': f"signal_dict____2023_08_23___mlp_rolling____to_2023_07_18",
+                           'signal_name': f"signal_dict____2023_08_23___mlp_rolling____to_2023_07_18",
+                           'exchange': 'binance',  # TODO: get rid of this infavor of multi exchange setup
+                           'exchanges': ['binance'],  # TODO: support this fully then get rid of the above
+                           'pairs_traded': ['BTC-TUSD'],
+                           'allocation_method': 'all BTC',
+                           'assets_in_port': {'BTC', 'TUSD'},  # ###PAUL TODO: generate this off pairs traded list?
+                           'mins_between_decision_check': 1,
+                           'check_signal_delay': 50,  # seconds
+                           'diff_thresh': 11,  # min volume in $ (should be liq...) for order to be placed
+                           'print_alert_n_iters': 1,
+                           'decision_delay': 35,
+                           'decision_params': {  # TODO: implement in `algos/data/live/ports/decision_params.json
+                               'fee': 0.01,  # TODO: need to grab from port name
+                               'max_workers': 70,
+                               'cool_down': 15,
+                               'threshold': -0.09999999999999998,
+                               'pred_dist': 0.25,
+                               'price_dist': 0.0185,
+                               'stop_limit': 0.045,
+                               'overrides': ['stop_limit'],
+                               'any_two': [],
+                               'to_neutral_threshold': 0.375,
+                               'to_neutral_pred_dist': 0.14999999999999997,
+                               'to_neutral_price_dist': 0.0022500000000000003,
+                               'to_neutral_stop_limit': 0.0205,
+                               'to_neutral_overrides': ['stop_limit'],
+                               'to_neutral_any_two': []},
+                           'positions_table_info': {  # all fields are shown below, commented out items figured RTI
+                               # 'timestamp': '',
+                               # 'strategy': 'peak_bottom',
+                               'algo': 'prod_1____BTC_USDT_trades_only_data',
+                               'sub_account': 'maxs_binance',
+                               # 'leg_group_id': '',  # leg_group_id = int(datetime.utcnow().timestamp() * 1000)
+                               # 'instrument': '',
+                               'exchange': 'binance',
+                               # 'size': '',
+                               # 'mid_price': '',
+                               # 'currency_price': '',
+                               # 'currency_name': '',
+                               'funding_pnl': 0,
+                               'margin': 0,
+                               'ignore': False,
+                               # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+                               'adjustment': False,
+                               # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+                           },
+                           },
+                      },
+        }
 
 
 # ### initialize ---- parameters and create the dictionary
