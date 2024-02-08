@@ -4,7 +4,7 @@ dirname=$PWD
 result="${dirname%"${dirname##*[!/]}"}" # extglob-free multi-trailing-/ trim
 result="${result##*/}" # remove everything before the last / (like basename)
 
-if [ "$result" != "hoth" ]; then
+if [ "$result" != "algos" ]; then
     echo 'ERROR: Run this command from the algos root directory!'
     return 1
 fi
@@ -15,7 +15,7 @@ else
     tag=$USER
 fi
 
-HOOTH_COMMIT=$(git rev-parse HEAD)
+ALGOS_COMMIT=$(git rev-parse HEAD)
 SHORT_HASH=$(git rev-parse --short HEAD)
 
 docker build \
