@@ -1,16 +1,13 @@
+# TIME ZONE CHANGE ---- KEEP THIS AT THE TOP
 import os
-import platform
-import sys
 import time
-
-# ### time zone change... this must happen first and utils must be imported first
 os.environ["TZ"] = "UTC"
 time.tzset()
-
+# TIME ZONE CHANGE ---- KEEP THIS AT THE TOP
 
 from copy import deepcopy
+import platform
 import dotenv
-import os
 
 
 def get_secret(key):  # this is here and utils to avoid a circular import
@@ -19,7 +16,6 @@ def get_secret(key):  # this is here and utils to avoid a circular import
     if key not in os.environ:
         raise KeyError(f"Key {key} not found!")
     return os.environ[key]
-
 
 dotenv.load_dotenv()
 machine_name = get_secret("MACHINE_NAME")
@@ -531,55 +527,58 @@ if machine_name == "blackbox":
 # ###TODO put trading summary and collection on whitebox, blackbox should only do pytorch work
 if machine_name == "whitebox":
     active_services = {
-        # 'ports': {'prod_1____BTC_USDT_trades_only_data':
-        #               {'port_name': f"prod_1____BTC_USDT_trades_only_data",
-        #                'signal_name': f"signal_dict____2023_08_23___mlp_rolling____to_2023_07_18",
-        #                'exchange': 'binance',     # TODO: get rid of this infavor of multi exchange setup
-        #                'exchanges': ['binance'],  # TODO: support this fully then get rid of the above
-        #                'pairs_traded': ['BTC-TUSD'],
-        #                'assets_in_port': {'BTC', 'TUSD'},  # ###PAUL TODO: generate this off pairs traded list?
-        #                'mins_between_decision_check': 1,
-        #                'check_signal_delay': 50,  # seconds
-        #                'diff_thresh': 11,  # min volume in $ (should be liq...) for order to be placed
-        #                'print_alert_n_iters': 1,
-        #                'decision_delay': 35,
-        #                'decision_params': {  # TODO: implement in `algos/data/live/ports/decision_params.json
-        #                    'fee': 0.01,  # TODO: need to grab from port name
-        #                    'max_workers': 70,
-        #                    'cool_down': 15,
-        #                    'threshold': -0.09999999999999998,
-        #                    'pred_dist': 0.25,
-        #                    'price_dist': 0.0185,
-        #                    'stop_limit': 0.045,
-        #                    'overrides': ['stop_limit'],
-        #                    'any_two': [],
-        #                    'to_neutral_threshold': 0.375,
-        #                    'to_neutral_pred_dist': 0.14999999999999997,
-        #                    'to_neutral_price_dist': 0.0022500000000000003,
-        #                    'to_neutral_stop_limit': 0.0205,
-        #                    'to_neutral_overrides': ['stop_limit'],
-        #                    'to_neutral_any_two': []},
-        #                'positions_table_info': {  # all fields are shown below, commented out items figured RTI
-        #                    # 'timestamp': '',
-        #                    # 'strategy': 'peak_bottom',
-        #                    'algo': 'prod_1____BTC_USDT_trades_only_data',
-        #                    'sub_account': 'maxs_binance',
-        #                    # 'leg_group_id': '',  # leg_group_id = int(datetime.utcnow().timestamp() * 1000)
-        #                    # 'instrument': '',
-        #                    'exchange': 'binance',
-        #                    # 'size': '',
-        #                    # 'mid_price': '',
-        #                    # 'currency_price': '',
-        #                    # 'currency_name': '',
-        #                    'funding_pnl': 0,
-        #                    'margin': 0,
-        #                    'ignore': False,
-        #                    # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
-        #                    'adjustment': False,
-        #                    # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
-        #                 },
-        #                },
-        #           },
+        "ports": {
+            # "prod_1____BTC_USDT_trades_only_data": {
+            #     "type": "signal_decision_algo_v1", 
+            #     "port_name": f"prod_1____BTC_USDT_trades_only_data",
+            #     "signal_name": f"signal_dict____2023_08_23___mlp_rolling____to_2023_07_18",
+            #     "exchange": "binance",  # TODO: get rid of this infavor of multi exchange setup
+            #     "exchanges": ["binance"],  # TODO: support this fully then get rid of the above
+            #     "pairs_traded": ["BTC-TUSD"],
+            #     "assets_in_port": {"BTC", "TUSD"},  # ###PAUL TODO: generate this off pairs traded list?
+            #     "mins_between_decision_check": 1,
+            #     "check_signal_delay": 50,  # seconds
+            #     "diff_thresh": 11,  # min volume in $ (should be liq...) for order to be placed
+            #     "print_alert_n_iters": 1,
+            #     "decision_delay": 35,
+            #     "decision_params": {  # TODO: implement in `algos/data/live/ports/decision_params.json
+            #         "fee": 0.01,  # TODO: need to grab from port name
+            #         "max_workers": 70,
+            #         "cool_down": 15,
+            #         "threshold": -0.09999999999999998,
+            #         "pred_dist": 0.25,
+            #         "price_dist": 0.0185,
+            #         "stop_limit": 0.045,
+            #         "overrides": ["stop_limit"],
+            #         "any_two": [],
+            #         "to_neutral_threshold": 0.375,
+            #         "to_neutral_pred_dist": 0.14999999999999997,
+            #         "to_neutral_price_dist": 0.0022500000000000003,
+            #         "to_neutral_stop_limit": 0.0205,
+            #         "to_neutral_overrides": ["stop_limit"],
+            #         "to_neutral_any_two": [],
+            #     },
+            #     "positions_table_info": {  # all fields are shown below, commented out items figured RTI
+            #         # 'timestamp': '',
+            #         # 'strategy': 'peak_bottom',
+            #         "algo": "prod_1____BTC_USDT_trades_only_data",
+            #         "sub_account": "maxs_binance",
+            #         # 'leg_group_id': '',  # leg_group_id = int(datetime.utcnow().timestamp() * 1000)
+            #         # 'instrument': '',
+            #         "exchange": "binance",
+            #         # 'size': '',
+            #         # 'mid_price': '',
+            #         # 'currency_price': '',
+            #         # 'currency_name': '',
+            #         "funding_pnl": 0,
+            #         "margin": 0,
+            #         "ignore": False,
+            #         # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+            #         "adjustment": False,
+            #         # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+            #     },
+            # },
+        },
     }
 
 

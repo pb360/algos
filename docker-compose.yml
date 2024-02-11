@@ -34,16 +34,16 @@ services:
     restart: always
     command: python3.10 -u update_trading_summary.py
 
-  live_framework: 
-    build:
-      context: .  # Ensures consistency in build context
-      dockerfile: Dockerfile
-    image: algos:latest  # Reuse the same image for consistency
-    network_mode: bridge
-    env_file:
-      - /home/paul/src/algos/.env
-    restart: always
-    command: python3.10 -u update_trading_summary.py
+  # live_framework: 
+  #   build:
+  #     context: .  # Ensures consistency in build context
+  #     dockerfile: Dockerfile
+  #   image: algos:latest  # Reuse the same image for consistency
+  #   network_mode: bridge
+  #   env_file:
+  #     - /home/paul/src/algos/.env
+  #   restart: always
+  #   command: python3.10 -u live_framework_v2.py --port simple_stochastic_1
 
 
   # ### TODO: get these up 
