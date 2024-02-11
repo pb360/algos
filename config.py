@@ -528,9 +528,8 @@ if machine_name == "blackbox":
         },
     }
 
-if (
-    machine_name == "whitebox"
-):  # ###TODO put trading summary and collection on whitebox, blackbox should only do pytorch work
+# ###TODO put trading summary and collection on whitebox, blackbox should only do pytorch work
+if machine_name == "whitebox":
     active_services = {
         # 'ports': {'prod_1____BTC_USDT_trades_only_data':
         #               {'port_name': f"prod_1____BTC_USDT_trades_only_data",
