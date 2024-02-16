@@ -1,8 +1,10 @@
 # TIME ZONE CHANGE ---- KEEP THIS AT THE TOP
 import os
 import time
+import sys
 os.environ["TZ"] = "UTC"
 time.tzset()
+sys.path.insert(0, "..")  # for local imports from the top directory
 # TIME ZONE CHANGE ---- KEEP THIS AT THE TOP
 
 from copy import deepcopy
@@ -28,7 +30,7 @@ import requests
 from typing import Union
 
 # # ### local packages
-from .config import params
+from algos.config import params
 
 dotenv.load_dotenv()  # ###PAUL TODO: do i want to move this somewhere into the params hook? 
 data_dir = params['dirs']['data_dir']
@@ -54,23 +56,28 @@ def init_ch_client(send_receive_timeout=120*60, max_execution_time=120*60):
     return ch_client
     
     
-def init_ccxt_client(exchange='binance_us', type='standard'):
+def init_ccxt_client(exchange='binance_us', type='standard', api_key_names=('pubic', 'private')):
+    """
+    """
+
     # Mapping configuration for exchanges
     exchange_config = {
-        'binance_us': {
+        'binance_us': { 
             'module': 'binanceus',
             'credentials': {
-                'apiKey': get_secret('BINANCE_DATA_1_PUBLIC'),
-                'secret': get_secret('BINANCE_DATA_1_PRIVATE'),
+                'apiKey': get_secret(api_key_names[0]),
+                'secret': get_secret(api_key_names[1]),
             }
         },
+
         'kraken': {
             'module': 'kraken',
             'credentials': {
-                'apiKey': get_secret('KRAKEN_ALL_BUT_WITHDRAW_PUBLIC'),
-                'secret': get_secret('KRAKEN_ALL_BUT_WITHDRAW_PRIVATE'),
+                'apiKey': get_secret(api_key_names[0]),
+                'secret': get_secret(api_key_names[1]),
             }
         }
+
     }
 
     # Validate exchange
@@ -746,23 +753,6 @@ def get_data_file_path(data_type, pair, date='live', port=None, signal=None, exc
             elif port is not None:
                 if data_type in {'closed_order', 'closed_orders', 'orders_closed', 'closed', }:
                     fp = ports_data_dir + port + '/orders/' + exchange + '/closed/'
-        else:
-            return IOError
-
-    elif date != 'live':  # date is actually supplied
-
-        # live maintained data (historical, but still folder is managed in real time)
-        if exchange is not None and port is None:
-            if data_type == 'price' or data_type == 'prices':
-                fp = live_data_dir + 'price/' + exchange + '/' + pair \
-                     + '/prices----' + exchange + '_' + pair + suffix
-            elif data_type == 'trade' or data_type == 'trades':
-                fp = live_data_dir + 'trades_daily/' + exchange + '/' + pair \
-                     + '/trades----' + exchange + '_' + pair + suffix
-            elif data_type == 'book':
-                fp = live_data_dir + 'book/' + exchange + '/' + pair \
-                     + '/book----' + exchange + '_' + pair + suffix
-
         else:
             return IOError
 

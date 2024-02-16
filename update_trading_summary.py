@@ -1,7 +1,7 @@
 # ### local imports
 import sys
+# sys.path.insert(0, "..") 
 
-sys.path.insert(0, "..")  # for local imports from the top directory
 from algos.config import params
 from algos.utils import (
     init_ch_client,
@@ -26,9 +26,7 @@ def main():
     num_updates = -1
 
     while True:
-        _ = wait_for_next_execution(
-            delay_seconds=summary_process_delay, interval=trade_process_interval
-        )
+        _ = wait_for_next_execution(delay_seconds=summary_process_delay, interval=trade_process_interval)
 
         for exchange in pairs_by_exchange.keys():
             num_updates += 1
@@ -41,9 +39,7 @@ def main():
             for pair in pairs_by_exchange[exchange]:
                 try:
                     print(f"    - pair: {pair} ---- exchange: {exchange}")
-                    update_trading_summary_table(
-                        exchange=exchange, symbol=pair, ch_client=ch_client
-                    )
+                    update_trading_summary_table(exchange=exchange, symbol=pair, ch_client=ch_client)
                 except Exception as e:
                     print(f"highest level exception in `update_trading_summary`")
                     print(f"{e}")

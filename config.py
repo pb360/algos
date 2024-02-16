@@ -47,8 +47,7 @@ constants = {
 # this is used in get_data_fp()... not worth trying to get rid of it
 algos_dir = ""
 
-dirs = {  # ###PAUL TODO: once depriciated `dirs` are removed consider what can be moved to machine specific
-    #         TODO: and if a root directory can be established and put there. for now dont make it DRY
+dirs = {
     "data_dir": "/home/paul/src/algos/data/",
     "live_data_dir": "/home/paul/src/algos/data/live/",
     "ports_data_dir": "/home/paul/src/algos/data/live/ports/",
@@ -361,6 +360,8 @@ desired_features_dict = {
 if machine_name == "blackbox":
     active_services = {
         "trade_collect": {
+            "api_keys": {"binance_us":  ("BINANCE_DATA_1_PUBLIC", "BINANCE_DATA_1_PRIVATE"),
+                         "kraken": ("KRAKEN_ALL_BUT_WITHDRAW_PUBLIC", "KRAKEN_ALL_BUT_WITHDRAW_PRIVATE")}, 
             "exchanges": {
                 "binance_us": [
                     "BTC/USDT",
@@ -470,38 +471,37 @@ if machine_name == "blackbox":
         },
         "ports": {
             "simple_stochastic_1": {
-                "port_name": f"prod_1____BTC_USDT_trades_only_data",
-                "signal_name": None,
+                "port_name": f"simple_stochastic_1",
+                "signal_name": None, 
+                "inventory_method": "stochastic_rebalance",
                 "exchange": "binance_us",
+                "api_key_names": ("BINANCE_TRADE_0_PUBLIC", "BINANCE_TRADE_0_PRIVATE"),
                 "exchanges": None,  # for multi exchange portfolios, be sure to swap above to None (one must be)
-                "pairs_traded": ["BTC-USDT"],
-                "assets_in_port": {
-                    "BTC",
-                    "USDT",
-                },  # ###PAUL TODO: generate this off pairs traded list?
+                "pairs_traded": ["BTC/USDT", "ETH/USDT", "LINK/USDT", "KDA/USDT", ],
+                "assets_in_port": set(),  # ###PAUL TODO: remove line later -- generated via `get_set_of_assets_in_port()`
                 "mins_between_decision_check": 1,
-                "check_signal_delay": 50,  # seconds
+                "decision_delay": 20,  # delay in second from start of minute 
                 "diff_thresh": 11,  # min volume in $ (should be liq...) for order to be placed
+                # ###PAUL TODO: ^^^^ make an option for this to be in % of position 
                 "print_alert_n_iters": 1,
-                "decision_delay": 35,
-                "decision_params": {  # TODO: implement in `algos/data/live/ports/decision_params.json
-                    "fee": 0.01,  # TODO: need to grab from port name
-                    "max_workers": 70,
-                    "cool_down": 15,
-                    "threshold": -0.09999999999999998,
-                    "pred_dist": 0.25,
-                    "price_dist": 0.0185,
-                    "stop_limit": 0.045,
-                    "overrides": ["stop_limit"],
-                    "any_two": [],
-                    "to_neutral_threshold": 0.375,
-                    "to_neutral_pred_dist": 0.14999999999999997,
-                    "to_neutral_price_dist": 0.0022500000000000003,
-                    "to_neutral_stop_limit": 0.0205,
-                    "to_neutral_overrides": ["stop_limit"],
-                    "to_neutral_any_two": [],
+                "decision_params": {  
+                    # "fee": 0.01,  
+                    # "max_workers": 70,
+                    # "cool_down": 15,
+                    # "threshold": -0.09999999999999998,
+                    # "pred_dist": 0.25,
+                    # "price_dist": 0.0185,
+                    # "stop_limit": 0.045,
+                    # "overrides": ["stop_limit"],
+                    # "any_two": [],
+                    # "to_neutral_threshold": 0.375,
+                    # "to_neutral_pred_dist": 0.14999999999999997,
+                    # "to_neutral_price_dist": 0.0022500000000000003,
+                    # "to_neutral_stop_limit": 0.0205,
+                    # "to_neutral_overrides": ["stop_limit"],
+                    # "to_neutral_any_two": [],
                 },
-                "positions_table_info": {  # all fields are shown below, commented out items figured RTI}
+                "positions_table_info": {  # COMMENTED KEY VALUE PAIRS ARE FIGURED IN REAL TIME WHEN UPDATING POSITIONS TABLE
                     # 'timestamp': '',
                     # 'strategy': 'peak_bottom',
                     "algo": "prod_1____BTC_USDT_trades_only_data",
@@ -515,10 +515,8 @@ if machine_name == "blackbox":
                     # 'currency_name': '',
                     "funding_pnl": 0,
                     "margin": 0,
-                    "ignore": False,
-                    # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
+                    "ignore": False,  
                     "adjustment": False,
-                    # ###PAUL TODO: verify this is in table right (its lowercase false) for other peoples enteries
                 },
             },
         },

@@ -103,8 +103,10 @@ async def main():
     exchange = args.exchange
     params["state"] = {"exchange": exchange}
 
+    api_key_names = params["active_services"]["trade_collect"]["api_keys"][exchange]
+
     ch_client = init_ch_client()
-    ccxt_client = init_ccxt_client(exchange=params["state"]["exchange"], type="pro")
+    ccxt_client = init_ccxt_client(exchange=params["state"]["exchange"], type="pro", api_key_names=api_key_names)
 
     # symbols=['BTC/USDT', 'KDA/USDT', 'ETH/USDT',  'LINK/USDT', 'ROSE/USDT', 'ICP/USDT', 'AVAX/USDT', 'SOL/USDT', 'BNB/USDT', 'DOGE/USDT', 'GRT/USDT', ]
     processor = TradeProcessor(ch_client, ccxt_client, params)

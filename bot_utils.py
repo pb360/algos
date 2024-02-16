@@ -8,10 +8,12 @@ assumption of operating this bot
 - `state_dict` ---- for things whose state change ---- managed activley by the service utilizing the `state_dict`
 """
 
+import sys
+sys.path.insert(0, "..")
 
-from .config import params
-from .decision import (decide_live,) 
-from .utils import (
+from algos.config import params
+from algos.decision import decide_live
+from algos.utils import (
     convert_date_format,
     get_data_file_path,
     check_if_dir_exists_and_make,
@@ -30,7 +32,6 @@ import os
 import pandas as pd
 import pickle
 import time
-import sys
 
 dotenv.load_dotenv()
 
@@ -191,9 +192,9 @@ def get_primary_pricing_pair_per_asset(params):
 
     for symbol in params["port"]["set_of_assets_in_port"]:
         if symbol in ["BTC"]:
-            params["port"]["pricing_pair_per_asset"][symbol] = "BTC-TUSD"
-        if symbol in ["TUSD", "USDT"]:
-            # ###PAUL TODO: NEED TO FIGURE OUT STABLE COIN PRICES, OR JUST GET A SOURCE
+            params["port"]["pricing_pair_per_asset"][symbol] = "BTC-USDT"
+        if symbol in ["TUSD", "USDT", "USD"]:
+            # ###PAUL TODO: consider tracking stable prices... likely want an "oracle" vs basing on exchange's trading
             params["port"]["pricing_pair_per_asset"][symbol] = "STABLE"
 
 
@@ -321,7 +322,7 @@ def load_cached_state_dict(params):
         )
 
     with open(state_dict_fp, "rb") as f:
-        state_dict = pickle.load(f)  # <<<------- COPY PASTE DESIRED VARIABLE HERE
+        state_dict = pickle.load(f)
     return state_dict
 
 
@@ -417,8 +418,6 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
 def update_bag_dicts(state_dict, ch_client, params):
     """updates desired bags"""
 
-    portfolio_method = "LS"
-
     # TODO: need to account for having a base asset shared among two pairs - EX: ETH-TUSD, ETH-BTC,
     # TODO: the quote asset is already "handled" because its derived from `value_for_pair` and `value_of_base`
     for pair in params["port"]["pairs_traded"]:
@@ -456,7 +455,9 @@ def update_bag_dicts(state_dict, ch_client, params):
         state_dict["bag_actual"][pair]["quote"] = quote_qty
         state_dict["bag_actual"][pair]["quote_in_usd"] = qty_quote_in_usd
 
-        if portfolio_method == "LS":
+        inventory_method = params["port"]["inventory_method"]
+
+        if inventory_method == "LS_replication":
             if "LS" not in state_dict:
                 print(f"resetting long short portfolio managment \n" * 10)
                 state_dict["LS"] = {}
@@ -589,15 +590,13 @@ def update_bag_dicts(state_dict, ch_client, params):
             state_dict["LS"][pair]["BTC_before_trade_prior_iter"] = state_dict["LS"][pair]["BTC_before_trade"]
             state_dict["LS"][pair]["TUSD_before_trade_prior_iter"] = state_dict["LS"][pair]["TUSD_before_trade"]
 
-        elif portfolio_method == "5050_split":
+        elif inventory_method == "stochastic_with_signal":
             # ### DESIRED BAG update
             #
             desired_position = state_dict["desired_position"][pair]
             if desired_position in {"long"}:  # 'buy', 'buy_again'  TODO: priority leveled ordering
                 base_mult = 1
-            elif desired_position in {
-                "neutral",
-            }:
+            elif desired_position in {"neutral"}:
                 base_mult = 0.5
             elif desired_position in {"short"}:  # 'sell', 'sell_again', TODO: priority leveled ordering
                 base_mult = 0
@@ -609,28 +608,12 @@ def update_bag_dicts(state_dict, ch_client, params):
             state_dict["bag_desired"][pair]["quote"] = state_dict["bag_max"][pair]["quote"] * quote_mult
             state_dict["bag_desired"][pair]["quote_in_usd"] = state_dict["bag_max"][pair]["quote_in_usd"] * quote_mult
 
-        elif portfolio_method == "initial_short_notional":
-
-            desired_position = state_dict["desired_position"][pair]
-            if desired_position in {"buy", "buy_again", "long"}:
-                base_mult = 1
-            elif desired_position in {
-                "neutral",
-            }:
-                initial_btc_short_notionel = 0.0016336132257326755  # done at initial price of $30,607
-                # TODO: ###PAUL_TODO. this is a big one. when setting up a new port would need to make a cleaner
-                # TODO: way to get this done
-                base_mult = initial_btc_short_notionel / state_dict["bag_max"][pair]["base"]
-
-            elif desired_position in {"sell", "sell_again", "short"}:
-                base_mult = 0
-            quote_mult = 1 - base_mult
-
-            state_dict["bag_desired"][pair]["base"] = state_dict["bag_max"][pair]["base"] * base_mult
-            state_dict["bag_desired"][pair]["base_in_quote"] = state_dict["bag_max"][pair]["base_in_quote"] * base_mult
-            state_dict["bag_desired"][pair]["base_in_usd"] = state_dict["bag_max"][pair]["base_in_usd"] * base_mult
-            state_dict["bag_desired"][pair]["quote"] = state_dict["bag_max"][pair]["quote"] * quote_mult
-            state_dict["bag_desired"][pair]["quote_in_usd"] = state_dict["bag_max"][pair]["quote_in_usd"] * quote_mult
+        elif inventory_method == "stochastic_rebalance":
+            state_dict["bag_desired"][pair]["base"] = state_dict["bag_max"][pair]["base"]
+            state_dict["bag_desired"][pair]["base_in_quote"] = state_dict["bag_max"][pair]["base_in_quote"]
+            state_dict["bag_desired"][pair]["base_in_usd"] = state_dict["bag_max"][pair]["base_in_usd"]
+            state_dict["bag_desired"][pair]["quote"] = state_dict["bag_max"][pair]["quote"]
+            state_dict["bag_desired"][pair]["quote_in_usd"] = state_dict["bag_max"][pair]["quote_in_usd"]
 
 
 def update_account_balances(ccxt_client, state_dict):
@@ -672,20 +655,29 @@ def update_port_holdings_and_value(ccxt_client, ch_client, state_dict, trading_s
 def update_desired_positions_dict(trading_summaries, signal_dfs_dict, state_dict, params):
     """adjusts state_dict['desired_position'] (dict): {'BTCUSDT':'long', 'LINKUSDT':neutral, 'XRPUSDT':'short'}"""
 
-    for pair in params["port"]["pairs_traded"]:
-        triggered_actions = decide_live(
-            state_dict=state_dict,
-            signal=signal_dfs_dict[pair],
-            prices=trading_summaries[pair]["vwap"],
-            requests_dict=params["port"]["requests_dict"],
-            pair=pair,
-            debug_triggers=False,
-        )
+    if params["port"]["inventory_method"] == "stochastic_rebalance": 
+        for pair in params["port"]["pairs_traded"]:
+            state_dict["desired_position"][pair] = "long"
 
-        if len(triggered_actions) > 0:  # NOTE: only update desired position if an action is triggered
-            action = triggered_actions[-1]
-            position = "neutral" if action in ["exit_short", "exit_long"] else action
-            state_dict["desired_position"][pair] = position  # [short, neutral, long]
+    if params["port"]["inventory_method"] == "stochastic_with_signal": 
+        print(f"""need to implement params["port"]["inventory_method"] == "stochastic_with_signal" """)
+        raise NotImplemented
+
+    if params["port"]["inventory_method"] == "LS_replication": 
+        for pair in params["port"]["pairs_traded"]:
+            triggered_actions = decide_live(
+                state_dict=state_dict,
+                signal=signal_dfs_dict[pair],
+                prices=trading_summaries[pair]["vwap"],
+                requests_dict=params["port"]["decision_params"],
+                pair=pair,
+                debug_triggers=False,
+            )
+
+            if len(triggered_actions) > 0:  # NOTE: only update desired position if an action is triggered
+                action = triggered_actions[-1]
+                position = "neutral" if action in ["exit_short", "exit_long"] else action
+                state_dict["desired_position"][pair] = position  # [short, neutral, long]
 
 
 def make_ccxt_order_info_dict(response):
@@ -1008,6 +1000,7 @@ def update_last_time_checked(trading_summaries, signal_dfs_dict, state_dict, par
 
 
 def figure_price_qty_for_order(pair, diff, position, state_dict, params):
+    """DEPRICATED, REPLACED BY `handle_ordering_after_state_update()` REMOVE AFTER CONSIDERING IMPLICATIONS"""
     # info needed whether buying or selling
     last_price_t = state_dict["last_prices_by_pair_in_quote"][pair]
     mid_vwap = last_price_t
@@ -1319,12 +1312,16 @@ def print_signal_update(state_dict, params):
 
 
 def reassess_bags_and_orders(ccxt_client, ch_client, trading_summaries, signal_dfs_dict, state_dict, params):
-    """ """
+    """ 
+    """
+
     check_for_closed_orders(ccxt_client, state_dict, params=params)  # quick enough to do at the beginning too
 
     update_trading_summaries(trading_summaries, state_dict, params=params, ch_client=ch_client)
     trading_summary_collection_check(trading_summaries, state_dict, params)
-    update_signals(signal_dfs_dict, state_dict, params=params)
+    if params["port"]["signal_name"] != None: 
+        update_signals(signal_dfs_dict, state_dict, params=params)
+    
     update_desired_positions_dict(trading_summaries, signal_dfs_dict, state_dict, params)
     update_port_holdings_and_value(ccxt_client, ch_client, state_dict, trading_summaries, params)
     handle_ordering_after_state_update(
@@ -1343,3 +1340,7 @@ def reassess_bags_and_orders(ccxt_client, ch_client, trading_summaries, signal_d
     state_dict["iter_count"] += 1
 
     return None
+
+
+if __name__ == "__main__":
+    print(params.keys())
