@@ -1,11 +1,4 @@
-import argparse
-import os
-import time
 import sys
-
-# ### i like to make these things happen first despite convention
-os.environ["TZ"] = "UTC"
-time.tzset()
 sys.path.insert(0, "..")
 
 from algos.config import params
@@ -14,6 +7,8 @@ from algos.utils import (
     init_ccxt_client,
     async_wait_for_next_execution,
 )
+
+import argparse
 import asyncio
 import datetime
 

@@ -40,14 +40,14 @@ def main():
     port_running = sys.argv[1]
     # bring the portfolio's parameters "foward" for easier referencing ---- script only utilizes `params['port']`
     params["port"] = deepcopy(params["active_services"]["ports"][port_running])
-    params["port"]["decision_params"] = make_requests_dict(params["port"]["decision_params"])
+        
+    if params["port"]["signal_name"] != None: 
+        params["port"]["decision_params"] = make_requests_dict(params["port"]["decision_params"])
 
     ch_client = init_ch_client()
-    # ###PAUL TODO: need to handle sub accounts approach for this... likely best an argument in params
-    # ###PAUL TODO: would need to follow through in init_ccxt_client()
     ccxt_client = init_ccxt_client(exchange=params["port"]["exchange"],
                                    type="standard",
-                                   account_name=params["port"]["api_key_names"])
+                                   api_key_names=params["port"]["api_key_names"])
 
     # setup for running portfolio by filling params and a directory check for portfolio tracking
     make_pair_info_df(ccxt_client=ccxt_client, state_dict=None, params=params)

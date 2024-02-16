@@ -657,7 +657,7 @@ def update_desired_positions_dict(trading_summaries, signal_dfs_dict, state_dict
 
     if params["port"]["inventory_method"] == "stochastic_rebalance": 
         for pair in params["port"]["pairs_traded"]:
-            state_dict["desired_position"][pair] = "long"
+            state_dict["desired_position"][pair] = "long" 
 
     if params["port"]["inventory_method"] == "stochastic_with_signal": 
         print(f"""need to implement params["port"]["inventory_method"] == "stochastic_with_signal" """)

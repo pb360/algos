@@ -1,11 +1,8 @@
-# TIME ZONE CHANGE ---- KEEP THIS AT THE TOP
-import os
-import time
 import sys
-os.environ["TZ"] = "UTC"
-time.tzset()
-sys.path.insert(0, "..")  # for local imports from the top directory
-# TIME ZONE CHANGE ---- KEEP THIS AT THE TOP
+sys.path.insert(0, "..")
+
+from algos.config import params
+
 
 from copy import deepcopy
 import dotenv
@@ -19,6 +16,7 @@ import dotenv
 import json
 import importlib
 import lttb
+import os
 import math
 import numpy as np
 import pandas as pd
@@ -29,8 +27,6 @@ import re
 import requests
 from typing import Union
 
-# # ### local packages
-from algos.config import params
 
 dotenv.load_dotenv()  # ###PAUL TODO: do i want to move this somewhere into the params hook? 
 data_dir = params['dirs']['data_dir']
@@ -322,18 +318,18 @@ def convert_symbol(symbol, in_exchange, out_exchange, params=params):
         else:
             universal_pair = params['universe']['universal']['to_universal'][in_exchange][symbol]
 
-        try:
-            return params['universe']['universal']['from_universal'][out_exchange][universal_pair]
+        # try:
+        return params['universe']['universal']['from_universal'][out_exchange][universal_pair]
 
-        except KeyError:
-            import pdb;
-            pdb.set_trace()
-            # handle the case of tether pairs from exchanges that also have a separate USD (non tether quote)
-            if 'ether' in universal_pair:
-                universal_pair = universal_pair.replace('ether', '')  # for tether, not ETH
-                return params['universe']['universal']['from_universal'][out_exchange][universal_pair]
-            else:  # there is a problem
-                raise KeyError
+        # except KeyError:
+        #     import pdb;
+        #     pdb.set_trace()
+        #     # handle the case of tether pairs from exchanges that also have a separate USD (non tether quote)
+        #     if 'ether' in universal_pair:
+        #         universal_pair = universal_pair.replace('ether', '')  # for tether, not ETH
+        #         return params['universe']['universal']['from_universal'][out_exchange][universal_pair]
+        #     else:  # there is a problem
+        #         raise KeyError
 
 
 def get_date_list(start_date, end_date, output_type='datetime.datetime', step_size='day'):
