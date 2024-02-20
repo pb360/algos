@@ -25,6 +25,7 @@ import pickle
 import pytz
 import re
 import requests
+import time
 from typing import Union
 
 
@@ -55,6 +56,12 @@ def init_ch_client(send_receive_timeout=120*60, max_execution_time=120*60):
 def init_ccxt_client(exchange='binance_us', type='standard', api_key_names=('pubic', 'private')):
     """
     """
+
+    if api_key_names in {None, 'default', ('pubic', 'private')}:
+        if exchange == 'binance_us':
+            api_key_names = ("BINANCE_TRADE_0_PUBLIC", "BINANCE_TRADE_0_PRIVATE")
+        elif exchange == 'kraken':
+            api_key_names = ("KRAKEN_ALL_BUT_WITHDRAW_PUBLIC", "KRAKEN_ALL_BUT_WITHDRAW_PRIVATE")
 
     # Mapping configuration for exchanges
     exchange_config = {

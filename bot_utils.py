@@ -186,17 +186,19 @@ def get_primary_pricing_pair_per_asset(params):
     ###PAUL_usd_denomination TODO: unified true USD denomination work to be done here
         * TODO: make a DF for `assets_in_port` (differently indexed than pair_info_df which is done by pair)
         * TODO: this could go in `state_dict` as I think I want to keep prices here...
+
+        TODO: BIG NOTE IN CAPS TO GRAB ATTENTION, I DON'T LIKE THAT THIS NEEDS ACTIVE ADJUSTMENT ON A PER PORTFOLIO BASIS
+        THINGS THAT NEED THIS KINDOF ATTENTION SHOULD BE HOUSED SOLELY IN CONFIGS WITH SPARING EXCEPTIONS 
     """
 
     params["port"]["pricing_pair_per_asset"] = {}
 
     for symbol in params["port"]["set_of_assets_in_port"]:
-        if symbol in ["BTC"]:
-            params["port"]["pricing_pair_per_asset"][symbol] = "BTC-USDT"
-        if symbol in ["TUSD", "USDT", "USD"]:
+        if symbol in {"BTC", "ETH", "BNB", "XRP", "ADA", "LTC", "LINK", "XLM", "DOGE", "KDA"}:
+            params["port"]["pricing_pair_per_asset"][symbol] = symbol + "/USDT"
+        elif symbol in ["TUSD", "USDT", "USD"]:
             # ###PAUL TODO: consider tracking stable prices... likely want an "oracle" vs basing on exchange's trading
             params["port"]["pricing_pair_per_asset"][symbol] = "STABLE"
-
 
 # ### functions for `state_dict`
 #
@@ -213,7 +215,7 @@ def initialize_positions_dict(state_dict, params):
 def initialize_port_allocation_dict(state_dict, params):
     """initialized the proportion of assets in the trading account that go to each pair"""
 
-    method = params["port"]["allocation_method"]
+    method = params["port"]["inventory_method"]
     port_allocation_dict = {}
 
     if method == "default":
@@ -233,7 +235,7 @@ def initialize_port_allocation_dict(state_dict, params):
                 port_allocation_dict[pair] = 1
             else:
                 port_allocation_dict[pair] = 0
-    elif method == "uniform":
+    elif method in {"stochastic_rebalance", "uniform"}:
         num_pairs = len(params["port"]["pairs_traded"])
         for pair in params["port"]["pairs_traded"]:
             port_allocation_dict[pair] = 1 / num_pairs
@@ -364,9 +366,8 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
     port_value_running_sum = 0
     positions_list = []
     for symbol in params["port"]["set_of_assets_in_port"]:
-        state_dict["port_holdings_dict"][symbol] = state_dict["account_balances"][
-            symbol
-        ]  # gets holdings for that base asset / ticker
+        # gets holdings for that base asset / ticker
+        state_dict["port_holdings_dict"][symbol] = state_dict["account_balances"][symbol]  
         pricing_pair = params["port"]["pricing_pair_per_asset"][symbol]
 
         if pricing_pair == "STABLE":  # ###PAUL_usd_denomination  # TODO: stables, stables, stables
@@ -387,7 +388,6 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
         position = deepcopy(params["port"]["positions_table_info"])
         position.update(
             {
-                "strategy": "peak_bottom____spot",
                 "timestamp": ts,
                 "leg_group_id": int(ts.timestamp() * 1000),
                 "instrument": symbol,

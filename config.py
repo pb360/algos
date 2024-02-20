@@ -1,6 +1,7 @@
 # TIME ZONE CHANGE ---- PARAMS IS ALWAYS THE FIRST IMPORT IN EVERYTHING ---- KEEP THIS AT THE TOP
 import os
 import time
+
 os.environ["TZ"] = "UTC"
 time.tzset()
 # TIME ZONE CHANGE ---- PARAMS IS ALWAYS THE FIRST IMPORT IN EVERYTHING ---- KEEP THIS AT THE TOP
@@ -16,6 +17,7 @@ def get_secret(key):  # this is here and utils to avoid a circular import
     if key not in os.environ:
         raise KeyError(f"Key {key} not found!")
     return os.environ[key]
+
 
 dotenv.load_dotenv()
 machine_name = get_secret("MACHINE_NAME")
@@ -58,7 +60,7 @@ dirs = {
 #
 
 universe = {
-    "trade_collection_historical": {
+    "trade_collection_historical": {  # ###PAUL TODO: move this elsewhere (not an active service, but historical?)
         # SOURCE: https://data.binance.vision/?prefix=data/spot/BTCUSDT
         "binance": [
             {"symbol": "BTC/USDT", "start_date": (2021, 8, 14), "end_date": None},
@@ -137,13 +139,341 @@ universe = {
             {"symbol": "GRT/USDT", "start_date": (2019, 9, 17), "end_date": None},
         ],
     },
-    "trade_collection_live": {
-        "binance_us": [
-            "BTC/USDT",
-        ]
-    },
-    "orderbook_collection": {"binance_us": ["KDA-USDT"]},
 }
+
+universe_binance = {
+    "exchange": "binance",
+    # websocket communication for exchange... this is how requests are sent
+    "pair_collection_list": [
+        "adausdt@trade",
+        "adabtc@trade",
+        "ampusdt@trade",
+        "ampbtc@trade",
+        "api3usdt@trade",
+        "api3btc@trade",
+        "batusdt@trade",
+        "batbtc@trade",
+        "bnbusdt@trade",
+        "bnbbtc@trade",
+        "btcusdt@trade",
+        "btctusd@trade",
+        "dogeusdt@trade",
+        "dogebtc@trade",
+        "ethusdt@trade",
+        "ethbtc@trade",
+        "fluxusdt@trade",
+        "fluxbtc@trade",
+        "hbarusdt@trade",
+        "hbarbtc@trade",
+        "kdausdt@trade",
+        "kdabtc@trade",
+        "linkusdt@trade",
+        "linkbtc@trade",
+        "ltcusdt@trade",
+        "ltcbtc@trade",
+        "usdcusdt@trade",
+        "vidtbusd@trade",
+        "vitdbtc@trade",
+        "xlmusdt@trade",
+        "xlmbtc@trade",
+        "xrpusdt@trade",
+        "xrpbtc@trade",
+        "xtzusdt@trade",
+        "xtzbtc@trade",
+        "xtzeth@trade",
+    ],
+    # trade communication for exchange... this string is what is sent for trade requests
+    "symbols_tracked": [
+        "ADAUSDT",
+        "ADABTC",
+        "AMPUSDT",
+        "AMPBTC",
+        "API3USDT",
+        "API3BTC",
+        "BNBUSDT",
+        "BNBBTC",
+        "BATUSDT",
+        "BATBTC",
+        "BTCUSDT",
+        "BTCTUSD",
+        "DOGEUSDT",
+        "DOGEBTC",
+        "ETHUSDT",
+        "ETHBTC",
+        "FLUXUSDT",
+        "FLUXBTC",
+        "HBARUSDT",
+        "HBARBTC",
+        "KDAUSDT",
+        "KDABTC",
+        "LINKUSDT",
+        "LINKBTC",
+        "LTCUSDT",
+        "LTCBTC",
+        "USDCUSDT",
+        "VIDTBUSD",
+        "VIDTBTC",
+        "XLMUSDT",
+        "XLMBTC",
+        "XRPUSDT",
+        "XRPBTC",
+        "XTZUSDT",
+        "XTZBTC",
+        "XTZETH",
+    ],
+    # how to convert the pair in exchange format to universal
+    "convert_dict": {
+        "universal": {
+            "ADAUSDT": "ADA-USDT",
+            "ADABTC": "ADA-BTC",
+            "AMPUSDT": "AMP-USDT",
+            "AMPBTC": "AMP-BTC",
+            "API3USDT": "API3-USDT",
+            "API3BTC": "API3-BTC",
+            "BNBUSDT": "BNB-USDT",
+            "BNBBTC": "BNB-BTC",
+            "BATUSDT": "BAT-USDT",
+            "BATBTC": "BAT-BTC",
+            "BTCUSDT": "BTC-USDT",  # this doesnt exist either 'BTCBTC',
+            "BTCTUSD": "BTC-TUSD",
+            "DOGEUSDT": "DOGE-USDT",
+            "DOGEBTC": "DOGE-BTC",
+            "ETHUSDT": "ETH-USDT",
+            "ETHBTC": "ETH-BTC",
+            "FLUXUSDT": "FLUX-USDT",
+            "FLUXBTC": "FLUX-BTC",
+            "HBARUSDT": "HBAR-USDT",
+            "HBARBTC": "HBAR-BTC",
+            "KDAUSDT": "KDA-USDT",
+            "KDABTC": "KDA-BTC",
+            "LINKUSDT": "LINK-USDT",
+            "LINKBTC": "LINK-BTC",
+            "LTCUSDT": "LTC-USDT",
+            "LTCBTC": "LTC-BTC",
+            "USDCUSDT": "USDC-USDT",
+            "VIDTBUSD": "VIDT-BUSD",
+            "VIDTBTC": "VIDT-BTC",
+            "XLMUSDT": "XLM-USDT",
+            "XLMBTC": "XLM-BTC",
+            "XRPUSDT": "XRP-USDT",
+            "XRPBTC": "XRP-BTC",
+            "XTZUSDT": "XTZ-USDT",
+            "XTZBTC": "XTZ-BTC",
+            "XTZETH": "XTZ-ETH",
+        },
+    },
+}
+universe_binance_us = {
+    "exchange": "binance_us",
+    # how they are fed into the websocket function (as is)
+    "pair_collection_list": [
+        "adausdt@trade",
+        "adabtc@trade",
+        "adausd@trade",
+        "ampusd@trade",
+        "api3usdt@trade",
+        "batusd@trade",
+        "bnbusdt@trade",
+        "bnbbtc@trade",
+        "bnbusd@trade",
+        "btcusdt@trade",
+        "btcbtc@trade",
+        "btcusd@trade",
+        "dogeusdt@trade",
+        "dogebtc@trade",
+        "dogeusd@trade",
+        "ethusdt@trade",
+        "ethbtc@trade",
+        "ethusd@trade",
+        "fluxusd@trade",
+        "hbarusd@trade",
+        "linkusdt@trade",
+        "linkbtc@trade",
+        "linkusd@trade",
+        "ltcusdt@trade",
+        "ltcbtc@trade",
+        "ltcusd@trade",
+        "usdcusdt@trade",
+        "xlmusdt@trade",
+        "xlmbtc@trade",
+        "xlmusd@trade",
+        "xtzbtc@trade",
+        "xtzusd@trade",
+    ],
+    # trade communication for exchange... this string is what is sent for trade requests
+    "symbols_tracked": [
+        "ADAUSDT",
+        "ADABTC",
+        "ADAUSD",
+        "AMPUSD",
+        "API3USDT",
+        "BATUSD",
+        "BNBUSDT",
+        "BNBBTC",
+        "BNBUSD",
+        "BTCUSDT",
+        "BTCUSD",
+        "DOGEUSDT",
+        "DOGEUSD",
+        "ETHUSDT",
+        "ETHBTC",
+        "ETHUSD",
+        "FLUXUSD",
+        "HBARUSD",
+        "KDAUSDT"
+        "LINKUSDT",
+        "LINKBTC",
+        "LINKUSD",
+        "LTCUSDT",
+        "LTCBTC",
+        "LTCUSD",
+        "USDCUSDT",
+        "XLMUSDT",
+        "XLMUSD",
+        "XTZBTC",
+        "XTZUSD",
+    ],
+    # how to convert the pair in exchange format to universal
+    "convert_dict": {
+        "universal": {
+            "ADAUSDT": "ADA/USDT",
+            "ADABTC": "ADA/BTC",
+            "ADAUSD": "ADA/USDT",
+            "AMPUSD": "AMP/USDT",
+            "API3USDT": "API3/USDT",
+            "BATUSD": "BAT/USDT",
+            "BNBUSDT": "BNB/USDT",
+            "BNBBTC": "BNB/BTC",
+            "BNBUSD": "BNB/USDT",
+            "BTCUSDT": "BTC/USDT",
+            "BTCUSD": "BTC/USDT",
+            "DOGEUSDT": "DOGE/USDT",
+            "DOGEUSD": "DOGE/USDT",
+            "ETHUSDT": "ETH/USDT",
+            "ETHBTC": "ETH/BTC",
+            "ETHUSD": "ETH/USDT",
+            "FLUXUSD": "FLUX/USDT",
+            "HBARUSD": "HBAR/USDT",
+            "KDAUSDT": "KDA/USDT",
+            "LINKUSDT": "LINK/USDT",
+            "LINKBTC": "LINK/BTC",
+            "LINKUSD": "LINK/USDT",
+            "LTCUSDT": "LTC/USDT",
+            "LTCBTC": "LTC/BTC",
+            "LTCUSD": "LTC/USDT",
+            "USDCUSDT": "USDC/USDT",
+            "XLMUSDT": "XLM/USDT",
+            "XLMUSD": "XLM/USDT",
+            "XTZBTC": "XTZ/BTC",
+            "XTZUSD": "XTZ/USDT",
+        },
+    },
+}
+
+universe_kucoin = {
+    "exchange": "kucoin",
+    # how they are fed into the websocket function (as is)
+    # identical list as  pair_collection_list  above (for kucoin unlike binance)
+    "pair_collection_list": [
+        "BTC-USDT",
+        "DAG-USDT",
+        "ETH-USDT",
+        "FIL-USDT",
+        "ICP-USDT",
+        "KAVA-USDT",
+        "KDA-USDT",
+        "LINK-USDT",
+        "LUNC-USDT",
+        "LTC-USDT",
+        "NOIA-USDT",
+        "QRDO-USDT",
+        "REQ-USDT",
+        "RSR-USDT",
+        "TEL-USDT",
+        "VRA-USDT",
+        "VIDT-USDT",
+        "XLM-USDT",
+        "XMR-USDT",
+        "XPR-USDT",
+        "XRP-USDT",
+        "XTZ-USDT",
+    ],
+    # ###PAUL should be able to get rid of this by using list(convert_dict.keys())
+    # trade communication for exchange... this string is what is sent for trade requests
+    "symbols_tracked": [
+        "BTC-USDT",
+        "DAG-USDT",
+        "ETH-USDT",
+        "FIL-USDT",
+        "ICP-USDT",
+        "KAVA-USDT",
+        "KDA-USDT",
+        "LINK-USDT",
+        "LTC-USDT",
+        "LUNC-USDT",
+        "NOIA-USDT",
+        "QRDO-USDT",
+        "REQ-USDT",
+        "RSR-USDT",
+        "TEL-USDT",
+        "VRA-USDT",
+        "VIDT-USDT",
+        "XLM-USDT",
+        "XMR-USDT",
+        "XPR-USDT",
+        "XRP-USDT",
+        "XTZ-USDT",
+    ],
+    # how to convert the pair in exchange format to universal
+    "convert_dict": {
+        "universal": {
+            "BTC-USDT": "BTC-USDT",
+            "DAG-USDT": "DAG-USDT",
+            "ETH-USDT": "ETH-USDT",
+            "FIL-USDT": "FIL-USDT",
+            "ICP-USDT": "ICP-USDT",
+            "KAVA-USDT": "KAVA-USDT",
+            "KDA-USDT": "KDA-USDT",
+            "LINK-USDT": "LINK-USDT",
+            "LUNC-USDT": "LUNC-USDT",
+            "LTC-USDT": "LTC-USDT",
+            "NOIA-USDT": "NOIA-USDT",
+            "QRDO-USDT": "QRDO-USDT",
+            "REQ-USDT": "REQ-USDT",
+            "RSR-USDT": "RSR-USDT",
+            "TEL-USDT": "TEL-USDT",
+            "VRA-USDT": "VRA-USDT",
+            "VIDT-USDT": "VIDT-USDT",
+            "XLM-USDT": "XLM-USDT",
+            "XMR-USDT": "XMR-USDT",
+            "XPR-USDT": "XPR-USDT",
+            "XRP-USDT": "XRP-USDT",
+            "XTZ-USDT": "XTZ-USDT",
+        }
+    },
+}
+# ### make the universal universe dict entry
+# ### the value of all these dictionaries set to deep copies for their relative exchanges... reverse_dict generates
+# ### the reverse dictionary flipping keys and values... this minimizes errors as only 1 conversion dict per exchange
+#
+#
+
+universal = {
+    "from_universal": {
+        "binance": deepcopy(reverse_dict(universe_binance["convert_dict"]["universal"])),
+        "binance_us": deepcopy(reverse_dict(universe_binance_us["convert_dict"]["universal"])),
+        "kucoin": deepcopy(reverse_dict(universe_kucoin["convert_dict"]["universal"])),
+    },
+    "to_universal": {
+        "binance": deepcopy(universe_binance["convert_dict"]["universal"]),
+        "binance_us": deepcopy(universe_binance_us["convert_dict"]["universal"]),
+        "kucoin": deepcopy(universe_kucoin["convert_dict"]["universal"]),
+    },
+}
+universe["universal"] = universal
+universe["binance"] = universe_binance
+universe["binance_us"] = universe_binance_us
+universe["kucoin"] = universe_kucoin
 
 
 # ### data format ---- for pretty much everything in the repo
@@ -151,6 +481,252 @@ universe = {
 #
 data_format = dict()
 
+# ### TODO: DEPRICATE DATA FORMAT.... delete all except CCXT cause it exists now 
+# data format for
+data_format_binance = {
+    'websocket_trade_columns': {'e': 'event_type',
+                                'E': 'msg_time',
+                                's': 'ticker',
+                                't': 'trade_id',
+                                'p': 'price',
+                                'q': 'quantity',
+                                'b': 'buy_order_id',
+                                'a': 'sell_order_id',
+                                'T': 'trade_time',
+                                'm': 'buyer_is_maker',
+                                'M': 'ignore'
+                                },
+    'websocket_trade_example': {"e": "trade",  # message type
+                                "E": 1609300202081,  # message time
+                                "s": "BNBBTC",  # Symbol
+                                "t": 12345,  # Trade ID
+                                "p": "0.001",  # Price
+                                "q": "100",  # Quantity
+                                "b": 88,  # Buyer order ID
+                                "a": 50,  # Seller order ID
+                                "T": 123456785,  # Trade time
+                                "m": True,  # Is the buyer the market maker?
+                                "M": True,
+                                # Ignore...  some legacy thing on binance side
+                                },
+    'book_response_structure': {'structure': '###PAUL do this later'},
+    'book_response_example': {'structure': '###PAUL do this later'},
+    'trade_col_name_list': ['msg_time', 'ticker', 'trade_id', 'price', 'quantity',
+                            'buy_order_id', 'sell_order_id', 'trade_time', 'buyer_is_maker'
+                            ],
+    'trade_name_and_type': {'msg_time': float,
+                            'ticker': str,
+                            'trade_id': int,
+                            'price': float,
+                            'quantity': float,
+                            'buy_order_id': int,
+                            'sell_order_id': int,
+                            'trade_time': float,
+                            'buyer_is_maker': bool,
+                            },
+    'price_name_and_type': {'buyer_is_maker': int,
+                            'buyer_is_taker': int,
+                            'buy_vol': float,
+                            'sell_vol': float,
+                            'buy_base_asset': float,
+                            'sell_base_asset': float,
+                            'buy_vwap': float,
+                            'sell_vwap': float
+                            },
+    'order_col_name_list': ['orderId', 'ticker', 'clientOrderId', 'placedTime', 'price', 'origQty',
+                            'executedQty', 'cummulativeQuoteQty', 'side', 'status', 'ord_type', 'updateTime',
+                            ],
+    'order_col_name_type': {'orderId': int,
+                            'ticker': str,
+                            'clientOrderId': str,
+                            'placedTime': int,
+                            'price': float,
+                            'origQty': float,
+                            'executedQty': float,
+                            'cummulativeQuoteQty': float,
+                            'side': str,
+                            'status': str,
+                            'ord_type': str,
+                            'updateTime': int
+                            },
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': float,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': float,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
+                                },
+}
+# ###PAUL just a copy paster from binance foreign, needs editing
+data_format_binance_us = {
+    'websocket_trade_columns': {'e': 'event_type',
+                                'E': 'msg_time',
+                                's': 'ticker',
+                                't': 'trade_id',
+                                'p': 'price',
+                                'q': 'quantity',
+                                'b': 'buy_order_id',
+                                'a': 'sell_order_id',
+                                'T': 'trade_time',
+                                'm': 'buyer_is_maker',
+                                'M': 'ignore'
+                                },
+    'websocket_trade_example': {"e": "trade",  # message type
+                                "E": 1609300202081,  # message time
+                                "s": "BNBBTC",  # Symbol
+                                "t": 12345,  # Trade ID
+                                "p": "0.001",  # Price
+                                "q": "100",  # Quantity
+                                "b": 88,  # Buyer order ID
+                                "a": 50,  # Seller order ID
+                                "T": 123456785,  # Trade time
+                                "m": True,  # Is the buyer the market maker?
+                                "M": True,
+                                # Ignore...  some legacy thing on binance side
+                                },
+    'book_response_structure': {'structure': '###PAUL do this later'},
+    'book_response_example': {'structure': '###PAUL do this later'},
+    'trade_col_name_list': ['msg_time', 'ticker', 'trade_id', 'price', 'quantity',
+                            'buy_order_id', 'sell_order_id', 'trade_time', 'buyer_is_maker'
+                            ],
+    'trade_name_and_type': {'msg_time': float,
+                            'ticker': str,
+                            'trade_id': int,
+                            'price': float,
+                            'quantity': float,
+                            'buy_order_id': int,
+                            'sell_order_id': int,
+                            'trade_time': float,
+                            'buyer_is_maker': bool,
+                            },
+    'price_name_and_type': {'buyer_is_maker': int,
+                            'buyer_is_taker': int,
+                            'buy_vol': float,
+                            'sell_vol': float,
+                            'buy_base_asset': float,
+                            'sell_base_asset': float,
+                            'buy_vwap': float,
+                            'sell_vwap': float
+                            },
+    'order_col_name_list': ['orderId', 'ticker', 'clientOrderId', 'placedTime', 'price', 'origQty',
+                            'executedQty', 'cummulativeQuoteQty', 'side', 'status', 'ord_type', 'updateTime',
+                            ],
+    'order_col_name_type': {'orderId': int,
+                            'ticker': str,
+                            'clientOrderId': str,
+                            'placedTime': int,
+                            'price': float,
+                            'origQty': float,
+                            'executedQty': float,
+                            'cummulativeQuoteQty': float,
+                            'side': str,
+                            'status': str,
+                            'ord_type': str,
+                            'updateTime': int
+                            },
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': float,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': float,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
+                                },
+}
+data_format_kucoin = {
+    'websocket_trade_columns': {'type': 'event_type',
+                                'will do this manually via time.time()': 'msg_time',
+                                'symbol': 'ticker',
+                                'tradeId': 'trade_id',
+                                'price': 'price',
+                                'size': 'quantity',
+                                'derived from maker / taker / side in real time': 'buy_order_id',
+                                'derived from maker / taker / side in real time': 'sell_order_id',
+                                'time': 'trade_time',
+                                'derived from maker / taker / side in real time': 'buyer_is_maker',
+                                },
+    'websocket_trade_example': {'symbol': 'KDA-USDT',
+                                'side': 'sell',
+                                'type': 'match',
+                                'makerOrderId': '624f101441645900017c716e',
+                                'sequence': '1621541091162',
+                                'size': '12.6875',
+                                'price': '6.4292',
+                                'takerOrderId': '624f101832db560001eb370e',
+                                'time': '1649348632148020952',
+                                'tradeId': '624f1018785778509c13a3d6'
+                                },
+    'book_response_structure': {'structure': '###PAUL do this later'},
+    'book_response_example': {'structure': '###PAUL do this later'},
+    'trade_col_name_list': ['msg_time', 'ticker', 'trade_id', 'price', 'quantity',
+                            'buy_order_id', 'sell_order_id', 'trade_time', 'buyer_is_maker'
+                            ],
+    'trade_name_and_type': {'msg_time': float,
+                            'ticker': str,
+                            'trade_id': str,
+                            'price': float,
+                            'quantity': float,
+                            'buy_order_id': str,
+                            'sell_order_id': str,
+                            'trade_time': float,
+                            'buyer_is_maker': bool,
+                            },
+    'price_name_and_type': {'buyer_is_maker': int,
+                            'buyer_is_taker': int,
+                            'buy_vol': float,
+                            'sell_vol': float,
+                            'buy_base_asset': float,
+                            'sell_base_asset': float,
+                            'buy_vwap': float,
+                            'sell_vwap': float
+                            },
+    # ###PAUL_todo TODO order managment for kucoin
+    'order_col_name_list': ['orderId', 'ticker', 'clientOrderId', 'placedTime', 'price', 'origQty',
+                            'executedQty', 'cummulativeQuoteQty', 'side', 'status', 'ord_type', 'updateTime',
+                            ],
+    # ###PAUL_todo TODO order managment for kucoin
+    'order_col_name_type': {'orderId': int,
+                            'ticker': str,
+                            'clientOrderId': str,
+                            'placedTime': int,
+                            'price': float,
+                            'origQty': float,
+                            'executedQty': float,
+                            'cummulativeQuoteQty': float,
+                            'side': str,
+                            'status': str,
+                            'ord_type': str,
+                            'updateTime': int
+                            },
+    'order_filters_col_name_list': ['universal_symbol', 'id', 'base', 'precision_amount', 'quote',
+                                    'precision_price', 'limits_price_min', 'limits_price_max',
+                                    'limits_amount_min', 'limits_amount_max', 'limits_cost_min'],
+    'order_filters_name_type': {'id': str,  # us  corresponding to symbols_tracked
+                                'base': str,  # 'BTC' in 'BTCUSDT'
+                                'precision_amount': float,  # num of decimals for base
+                                'quote': str,  # 'USD' in 'BTCUSD'
+                                'precision_price': float,  # num of decimals for quote
+                                'limits_price_min': float,  # min price for BASE in QUOTE
+                                'limits_price_max': float,  # max price for BASE asset in QUOTE
+                                'limits_amount_min': float,  # min order of BASE asset allowed
+                                'limits_amount_max': float,  # max order of BASE asset allowed
+                                'limits_cost_min': float,  # min order in terms of QUOTE asset
+                                },
+}  ###PAUL just a copy paster from binance foreign, needs editing
+###PAUL just a copy paster from binance foreign, needs editing
 
 # data format for
 data_format_ccxt = {
@@ -270,6 +846,9 @@ data_format_ccxt = {
     },
 }
 
+data_format['binance'] = data_format_binance
+data_format['binance_us'] = data_format_binance_us
+data_format['kucoin'] = data_format_kucoin
 data_format["ccxt"] = data_format_ccxt
 
 
@@ -360,8 +939,10 @@ desired_features_dict = {
 if machine_name == "blackbox":
     active_services = {
         "trade_collect": {
-            "api_keys": {"binance_us":  ("BINANCE_DATA_1_PUBLIC", "BINANCE_DATA_1_PRIVATE"),
-                         "kraken": ("KRAKEN_ALL_BUT_WITHDRAW_PUBLIC", "KRAKEN_ALL_BUT_WITHDRAW_PRIVATE")}, 
+            "api_keys": {
+                "binance_us": ("BINANCE_DATA_1_PUBLIC", "BINANCE_DATA_1_PRIVATE"),
+                "kraken": ("KRAKEN_ALL_BUT_WITHDRAW_PUBLIC", "KRAKEN_ALL_BUT_WITHDRAW_PRIVATE"),
+            },
             "exchanges": {
                 "binance_us": [
                     "BTC/USDT",
@@ -472,20 +1053,25 @@ if machine_name == "blackbox":
         "ports": {
             "simple_stochastic_1": {
                 "port_name": f"simple_stochastic_1",
-                "signal_name": None, 
+                "signal_name": None,
                 "inventory_method": "stochastic_rebalance",
                 "exchange": "binance_us",
                 "api_key_names": ("BINANCE_TRADE_0_PUBLIC", "BINANCE_TRADE_0_PRIVATE"),
-                "exchanges": None,  # for multi exchange portfolios, be sure to swap above to None (one must be)
-                "pairs_traded": ["BTC/USDT", "ETH/USDT", "LINK/USDT", "KDA/USDT", ],
+                "exchanges": ["binance_us"],  # for multi exchange portfolios, be sure to swap above to None (one must be)
+                "pairs_traded": [
+                    "BTC/USDT",
+                    "ETH/USDT",
+                    "LINK/USDT",
+                    "KDA/USDT",
+                ],
                 "assets_in_port": set(),  # ###PAUL TODO: remove line later -- generated via `get_set_of_assets_in_port()`
                 "mins_between_decision_check": 1,
-                "decision_delay": 20,  # delay in second from start of minute 
+                "decision_delay": 20,  # delay in second from start of minute
                 "diff_thresh": 11,  # min volume in $ (should be liq...) for order to be placed
-                # ###PAUL TODO: ^^^^ make an option for this to be in % of position 
+                # ###PAUL TODO: ^^^^ make an option for this to be in % of position
                 "print_alert_n_iters": 1,
-                "decision_params": {  
-                    # "fee": 0.01,  
+                "decision_params": {
+                    # "fee": 0.01,
                     # "max_workers": 70,
                     # "cool_down": 15,
                     # "threshold": -0.09999999999999998,
@@ -503,19 +1089,19 @@ if machine_name == "blackbox":
                 },
                 "positions_table_info": {  # COMMENTED KEY VALUE PAIRS ARE FIGURED IN REAL TIME WHEN UPDATING POSITIONS TABLE
                     # 'timestamp': '',
-                    # 'strategy': 'peak_bottom',
-                    "algo": "prod_1____BTC_USDT_trades_only_data",
-                    "sub_account": "maxs_binance",
+                    'strategy': "stochastic_rebalance",  # currently using inventory_method, may want to change 
+                    "algo": "BTC, ETH, LINK, KDA",
+                    "sub_account": "binance_us____algos_0",
                     # 'leg_group_id': '',  # leg_group_id = int(datetime.utcnow().timestamp() * 1000)
                     # 'instrument': '',
-                    "exchange": "binance",
+                    "exchange": "binance_us",
                     # 'size': '',
                     # 'mid_price': '',
                     # 'currency_price': '',
                     # 'currency_name': '',
                     "funding_pnl": 0,
                     "margin": 0,
-                    "ignore": False,  
+                    "ignore": False,
                     "adjustment": False,
                 },
             },
@@ -527,7 +1113,7 @@ if machine_name == "whitebox":
     active_services = {
         "ports": {
             # "prod_1____BTC_USDT_trades_only_data": {
-            #     "type": "signal_decision_algo_v1", 
+            #     "type": "signal_decision_algo_v1",
             #     "port_name": f"prod_1____BTC_USDT_trades_only_data",
             #     "signal_name": f"signal_dict____2023_08_23___mlp_rolling____to_2023_07_18",
             #     "exchange": "binance",  # TODO: get rid of this infavor of multi exchange setup

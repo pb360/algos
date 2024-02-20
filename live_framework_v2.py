@@ -12,6 +12,7 @@ import datetime
 from datetime import timedelta
 import pandas as pd
 import sys
+import time
 
 
 # ### local imports
@@ -84,35 +85,35 @@ def main():
         now = pd.to_datetime(datetime.datetime.now())
         if now > next_time_to_check:
 
-            try:
-                num_updates += 1
+            # try:
+            num_updates += 1
 
-                print(f"\n\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-                print(f" - running iter {num_updates} of reassessing bags on this PID ")
+            print(f"\n\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+            print(f" - running iter {num_updates} of reassessing bags on this PID ")
 
-                reassess_bags_and_orders(
-                    ccxt_client=ccxt_client,
-                    ch_client=ch_client,
-                    trading_summaries=trading_summaries,
-                    signal_dfs_dict=signal_dfs_dict,
-                    state_dict=state_dict,
-                    params=params,
-                )
+            reassess_bags_and_orders(
+                ccxt_client=ccxt_client,
+                ch_client=ch_client,
+                trading_summaries=trading_summaries,
+                signal_dfs_dict=signal_dfs_dict,
+                state_dict=state_dict,
+                params=params,
+            )
 
-                next_time_to_check = (
-                    now.floor("min") + timedelta(minutes=1) + timedelta(seconds=params["port"]["decision_delay"])
-                ).to_pydatetime()
-            except SocketTimeoutError:
-                print("Caught a ClickHouse socket timeout error. Skipping to next iteration.")
-                continue  # This will skip the current iteration and move on to the next
+            next_time_to_check = (
+                now.floor("min") + timedelta(minutes=1) + timedelta(seconds=params["port"]["decision_delay"])
+            ).to_pydatetime()
+            # except SocketTimeoutError:
+            #     print("Caught a ClickHouse socket timeout error. Skipping to next iteration.")
+            #     continue  # This will skip the current iteration and move on to the next
 
-            except ClickHouseError:
-                print("Caught a general ClickHouse error. Skipping to next iteration.")
-                continue  # This will skip the current iteration and move on to the next
+            # except ClickHouseError:
+            #     print("Caught a general ClickHouse error. Skipping to next iteration.")
+            #     continue  # This will skip the current iteration and move on to the next
 
-            except Exception as e:
-                print(f"Caught a non-ClickHouse error: \n\n {e}")
-                raise RuntimeError
+            # except Exception as e:
+            #     print(f"Caught a non-ClickHouse error: \n\n {e}")
+            #     raise RuntimeError
 
         time.sleep(1)
 

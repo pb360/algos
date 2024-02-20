@@ -37,7 +37,7 @@ ORDER BY (timestamp, id);
 CREATE TABLE IF NOT EXISTS algos_db.TradingSummary
 (
     timestamp DateTime64,  -- summary metrics for the close of the minute
-    exchange VARCHAR(12),
+    exchange VARCHAR(),
     symbol VARCHAR(12),
     open Float64,
     high Float64,
@@ -77,6 +77,25 @@ CREATE TABLE IF NOT EXISTS algos_db.AlgosSignals
 ORDER BY timestamp;
 
 
+CREATE TABLE IF NOT EXISTS algos_db.Positions
+(
+    timestamp DateTime64,
+    strategy String,
+    algo String,
+    sub_account String,
+    leg_group_id Int64,
+    instrument String,
+    exchange String,
+    size Float64,
+    mid_price Float64,
+    currency_price Float64,
+    currency_name String,
+    funding_pnl Float64,
+    margin Float64,
+    ignore UInt8,
+    adjustment UInt8
+) ENGINE = MergeTree
+ORDER BY timestamp;
 
 
 --------------------         POSITIONS TABLE    example entry from python dict        --------------------

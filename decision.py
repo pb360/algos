@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, "..")
 
-from algos import params
+from algos.config import params
 from algos.utils import find_runs, convert_date_format
 
 from copy import deepcopy
