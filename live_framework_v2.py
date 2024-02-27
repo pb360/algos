@@ -37,7 +37,6 @@ from algos.bot_utils import (
 
 
 def main():
-
     port_running = sys.argv[1]
     # bring the portfolio's parameters "foward" for easier referencing ---- script only utilizes `params['port']`
     params["port"] = deepcopy(params["active_services"]["ports"][port_running])

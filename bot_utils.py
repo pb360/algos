@@ -20,7 +20,7 @@ from algos.utils import (
     convert_symbol,
     query_trading_summary,
     query_signal_by_name,
-    round_step_size,
+    round_by_step_or_decimal,
 )
 
 from copy import deepcopy
@@ -342,9 +342,36 @@ def update_trading_summary(pair, trading_summaries, state_dict, params, ch_clien
     trading_summaries[pair] = trading_summary
 
 
+
+def trading_summary_collection_check(trading_summaries, state_dict, params):
+    all_pairs_empty = True
+    for pair in params["port"]["pairs_traded"]:
+        if trading_summaries[pair].shape[0] > 0:
+            all_pairs_empty = False
+
+    if all_pairs_empty:
+        try:
+            state_dict["consecutive_all_pair_empty"] += 1
+        except KeyError:
+            state_dict["consecutive_all_pair_empty"] = 0
+        print(
+            f"    - `all_pairs_empty` ---- leaving to see if it happens # ###PAUL_del_later \n"
+            f"       state_dict['consecutive_all_pair_empty'] ---- {state_dict['consecutive_all_pair_empty']}\n" * 5
+        )
+        if state_dict["consecutive_all_pair_empty"] > 5:
+            print(f"state_dict['consecutive_all_pair_empty'] is over the limit!!!!!!")
+            import ipdb
+            ipdb.set_trace()
+            
+    else:
+        state_dict["consecutive_all_pair_empty"] = 0
+
+
 def update_trading_summaries(trading_summaries, state_dict, params, ch_client=None):
     for pair in params["port"]["pairs_traded"]:
         update_trading_summary(pair, trading_summaries, state_dict, params, ch_client=ch_client)
+
+    trading_summary_collection_check(trading_summaries, state_dict, params)
 
 
 def update_signals(signal_dfs_dict, state_dict, params):
@@ -373,7 +400,13 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
         if pricing_pair == "STABLE":  # ###PAUL_usd_denomination  # TODO: stables, stables, stables
             state_dict["last_prices_by_symbol_in_usd"][symbol] = float(1)
         else:
-            symbol_price_in_quote = trading_summaries[pricing_pair]["vwap"].iloc[-1]  # TODO: dont hard code 'vwap'
+
+            try:
+                symbol_price_in_quote = trading_summaries[pricing_pair]["vwap"].iloc[-1]  # TODO: dont hard code 'vwap'
+            except:
+                import pdb;      # ###PAUL TODO: DELETE LATER
+                pdb.set_trace()  # ###PAUL TODO: DELETE LATER
+    
             state_dict["last_prices_by_pair_in_quote"][pricing_pair] = symbol_price_in_quote
 
             quote_price_in_usd = 1  # ###PAUL_usd_denomination # TODO: stables, stables, stables
@@ -412,7 +445,8 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
     )
 
     state_dict["port_value"] = port_value_running_sum
-    state_dict["positions_df"] = positions_df
+    state_dict["positions_df"] = positions_df  # ###PAUL TODO: update this on a per pair basis in the for loop above, this means 
+    # ###PAUL TODO: that the positions won't be overridden in the case that that a new trading summary hasn't been seen for a pair 
 
 
 def update_bag_dicts(state_dict, ch_client, params):
@@ -633,6 +667,7 @@ def update_port_holdings_and_value(ccxt_client, ch_client, state_dict, trading_s
        - value is determined from bags, all holdings are not included in value nor touched by the bot by default
     """
 
+
     if trading_summaries[params["port"]["pairs_traded"][0]].shape[0] == 0:
         return
 
@@ -752,7 +787,7 @@ def process_placed_order(placed_order_res, state_dict, params):
     # parse the placed order response
     order_info_dict = make_ccxt_order_info_dict(response=placed_order_res)
     order_id = placed_order_res["id"]
-    symbol = placed_order_res["symbol"].replace("/", "-")  # some exchanges ccxt returns a '/' instead of '-'
+    symbol = placed_order_res["symbol"]
 
     # add the new order to the dictionary tracking open orders
     state_dict["order_open_dict"][(order_id, symbol)] = order_info_dict
@@ -799,8 +834,8 @@ def place_order(ccxt_client, B_or_S, pair, o_type, base_qty, price, state_dict, 
     info = params["pair_info_df"].loc[pair]
 
     # most important / relevant checks
-    base_qty = round_step_size(quantity=base_qty, step_size=info["precision_amount"])
-    price = round_step_size(quantity=price, step_size=info["precision_price"])
+    base_qty = round_by_step_or_decimal(quantity=base_qty, num_decimal=int(info["precision_amount"]), direction="down")
+    price = round_by_step_or_decimal(quantity=price, step_size=info["precision_price"])
 
     # exchange rules
     if base_qty < info["limits_amount_min"] or base_qty > info["limits_amount_max"]:
@@ -990,11 +1025,15 @@ def update_last_time_checked(trading_summaries, signal_dfs_dict, state_dict, par
     """updates the 'last_time_checked' per pair... multi ticker supported TODO: but multi exchange"""
 
     for pair in params["port"]["pairs_traded"]:
-        if trading_summaries[pair].shape[0] == 0 or signal_dfs_dict[pair].shape[0] == 0:
-            continue  # because nothing now could have been seen, we are stick at the same time.
-        trading_summary_time = trading_summaries[pair].index[-1]
-        signal_time = signal_dfs_dict[pair].index[-1]
-        state_dict["last_time_checked"][pair] = min(trading_summary_time, signal_time)
+        if signal_dfs_dict:  # if we are using a signal based strategy this will not be empty and do the following
+            if trading_summaries[pair].shape[0] == 0 or signal_dfs_dict[pair].shape[0] == 0:
+                continue  # because nothing now could have been seen, we are stick at the same time.
+            trading_summary_time = trading_summaries[pair].index[-1]
+            signal_time = signal_dfs_dict[pair].index[-1]
+            state_dict["last_time_checked"][pair] = min(trading_summary_time, signal_time)
+
+        else:  # we are just concerned with 
+            state_dict["last_time_checked"][pair] = trading_summaries[pair].index[-1]
 
     return None
 
@@ -1113,131 +1152,107 @@ def print_update_on_bot(state_dict, signal_dfs_dict, params):  # utility that on
         f" ---- port: ' {params['port']['port_name']} ---- exchange: {params['port']['exchange']}\n"
     )
 
-    try:
-        signal_value = signal_dfs_dict["BTC-TUSD"].iloc[-1]["value"]
-    except:
-        signal_value = "signal empty this iteration"
-
-    print(f"    - current signal value --> {signal_value}")
     print(f"    - last_prices_by_pair_in_quote ---- {state_dict['last_prices_by_pair_in_quote']}")
     print(f"    - last_prices_by_symbol_in_usd ---- {state_dict['last_prices_by_symbol_in_usd']}\n")
 
-    print(
-        f"    - decision params \n"
-        f"        - long / short \n"
-        f"            - threshold: {params['port']['decision_params']['threshold']}"
-        f"  ----  pred_dist: {params['port']['decision_params']['pred_dist']} \n"
-        f"            - price_dist: {params['port']['decision_params']['price_dist']}"
-        f"  ----  stop_limit: {params['port']['decision_params']['stop_limit']} \n"
-        f"        - exit long / short \n"
-        f"            - threshold: {params['port']['decision_params']['to_neutral_threshold']}"
-        f"  ----  pred_dist: {params['port']['decision_params']['to_neutral_pred_dist']} \n"
-        f"            - price_dist: {params['port']['decision_params']['to_neutral_price_dist']}"
-        f"  ----  pred_dist: {params['port']['decision_params']['to_neutral_stop_limit']}\n"
-    )
+    if params['port']['decision_params']:  # if the dict here isn't empty, print the following 
+        print(
+            f"    - decision params \n"
+            f"        - long / short \n"
+            f"            - threshold: {params['port']['decision_params']['threshold']}"
+            f"  ----  pred_dist: {params['port']['decision_params']['pred_dist']} \n"
+            f"            - price_dist: {params['port']['decision_params']['price_dist']}"
+            f"  ----  stop_limit: {params['port']['decision_params']['stop_limit']} \n"
+            f"        - exit long / short \n"
+            f"            - threshold: {params['port']['decision_params']['to_neutral_threshold']}"
+            f"  ----  pred_dist: {params['port']['decision_params']['to_neutral_pred_dist']} \n"
+            f"            - price_dist: {params['port']['decision_params']['to_neutral_price_dist']}"
+            f"  ----  pred_dist: {params['port']['decision_params']['to_neutral_stop_limit']}\n\n\n\n\n"
+        )
 
-    print(
-        f"    - bearish: \n"
-        f"        - signal \n"
-        f"            - lowest: {state_dict['bearish']['lowest_pred'][0]}\n"
-        f"            - highest: {state_dict['bearish']['highest_pred'][0]}\n"
-        f"        - price\n"
-        f"            - lowest: {state_dict['bearish']['lowest_price']}\n"
-        f"            - highest: {state_dict['bearish']['highest_price']}\n"
-        f"        - activations\n"
-        f"            - exit_long: -- pred_dist: {state_dict['bearish']['activations']['exit_long']['pred_dist']} -- "
-        f"price_dist:  {state_dict['bearish']['activations']['exit_long']['price_dist']} -- "
-        f"stop_limit:  {state_dict['bearish']['activations']['exit_long']['stop_limit']} -- "
-        f"threshold:  {state_dict['bearish']['activations']['exit_long']['threshold']}\n"
-        f"            - short:     -- pred_dist: {state_dict['bearish']['activations']['short']['pred_dist']} -- "
-        f"price_dist:  {state_dict['bearish']['activations']['short']['price_dist']} -- "
-        f"stop_limit:  {state_dict['bearish']['activations']['short']['stop_limit']} -- "
-        f"threshold:  {state_dict['bearish']['activations']['short']['threshold']} \n"
-        f"    - bullish: \n"
-        f"        - signal\n"
-        f"            - lowest: {state_dict['bullish']['lowest_pred'][0]}\n"
-        f"            - highest: {state_dict['bullish']['highest_pred'][0]}\n"
-        f"        - price\n"
-        f"            - lowest: {state_dict['bullish']['lowest_price']}\n"
-        f"            - highest: {state_dict['bullish']['highest_price']}\n"
-        f"        - activations\n"
-        f"            - exit_short: -- pred_dist: {state_dict['bullish']['activations']['exit_short']['pred_dist']} -- "
-        f"price_dist:  {state_dict['bullish']['activations']['exit_short']['price_dist']} -- "
-        f"stop_limit:  {state_dict['bullish']['activations']['exit_short']['stop_limit']} -- "
-        f"threshold:  {state_dict['bullish']['activations']['exit_short']['threshold']}\n"
-        f"            - long:       -- pred_dist: {state_dict['bullish']['activations']['long']['pred_dist']} -- "
-        f"price_dist:  {state_dict['bullish']['activations']['long']['price_dist']} -- "
-        f"stop_limit:  {state_dict['bullish']['activations']['long']['stop_limit']} -- "
-        f"threshold:  {state_dict['bullish']['activations']['long']['threshold']} "
-    )
+
+    if signal_dfs_dict:  # if dictionary isn't empty print these out 
+        try:
+            signal_value = signal_dfs_dict["BTC-TUSD"].iloc[-1]["value"]
+        except:
+            signal_value = "signal empty this iteration"
+
+        print(f"    - current signal value --> {signal_value}")
+        print(
+            f"    - bearish: \n"
+            f"        - signal \n"
+            f"            - lowest: {state_dict['bearish']['lowest_pred'][0]}\n"
+            f"            - highest: {state_dict['bearish']['highest_pred'][0]}\n"
+            f"        - price\n"
+            f"            - lowest: {state_dict['bearish']['lowest_price']}\n"
+            f"            - highest: {state_dict['bearish']['highest_price']}\n"
+            f"        - activations\n"
+            f"            - exit_long: -- pred_dist: {state_dict['bearish']['activations']['exit_long']['pred_dist']} -- "
+            f"price_dist:  {state_dict['bearish']['activations']['exit_long']['price_dist']} -- "
+            f"stop_limit:  {state_dict['bearish']['activations']['exit_long']['stop_limit']} -- "
+            f"threshold:  {state_dict['bearish']['activations']['exit_long']['threshold']}\n"
+            f"            - short:     -- pred_dist: {state_dict['bearish']['activations']['short']['pred_dist']} -- "
+            f"price_dist:  {state_dict['bearish']['activations']['short']['price_dist']} -- "
+            f"stop_limit:  {state_dict['bearish']['activations']['short']['stop_limit']} -- "
+            f"threshold:  {state_dict['bearish']['activations']['short']['threshold']} \n"
+            f"    - bullish: \n"
+            f"        - signal\n"
+            f"            - lowest: {state_dict['bullish']['lowest_pred'][0]}\n"
+            f"            - highest: {state_dict['bullish']['highest_pred'][0]}\n"
+            f"        - price\n"
+            f"            - lowest: {state_dict['bullish']['lowest_price']}\n"
+            f"            - highest: {state_dict['bullish']['highest_price']}\n"
+            f"        - activations\n"
+            f"            - exit_short: -- pred_dist: {state_dict['bullish']['activations']['exit_short']['pred_dist']} -- "
+            f"price_dist:  {state_dict['bullish']['activations']['exit_short']['price_dist']} -- "
+            f"stop_limit:  {state_dict['bullish']['activations']['exit_short']['stop_limit']} -- "
+            f"threshold:  {state_dict['bullish']['activations']['exit_short']['threshold']}\n"
+            f"            - long:       -- pred_dist: {state_dict['bullish']['activations']['long']['pred_dist']} -- "
+            f"price_dist:  {state_dict['bullish']['activations']['long']['price_dist']} -- "
+            f"stop_limit:  {state_dict['bullish']['activations']['long']['stop_limit']} -- "
+            f"threshold:  {state_dict['bullish']['activations']['long']['threshold']} \n\n\n\n"
+        )
 
     for bag_type in ["bag_max", "bag_actual", "bag_desired"]:
         print(f"    - {bag_type}")
         for key, value in state_dict[bag_type].items():
             print(f"        - {key}:  {value}")
 
-    print(f"    - mock portfolio")
-    print(
-        f"        - BTC: {state_dict['LS']['BTC-TUSD']['mocked_port_BTC_target_current']} -- "
-        f"TUSD: {state_dict['LS']['BTC-TUSD']['mocked_port_TUSD_target_current']} -- "
-        f"total_value: {state_dict['LS']['BTC-TUSD']['mocked_port_value_before_trade']}"
-    )
+    if params["port"]["inventory_method"] == "LS_replication":
+        print(f"    - mock portfolio")
+        print(
+            f"        - BTC: {state_dict['LS']['BTC-TUSD']['mocked_port_BTC_target_current']} -- "
+            f"TUSD: {state_dict['LS']['BTC-TUSD']['mocked_port_TUSD_target_current']} -- "
+            f"total_value: {state_dict['LS']['BTC-TUSD']['mocked_port_value_before_trade']} \n\n\n"
+        )
 
     print(f"\n")
-
-
-def trading_summary_collection_check(trading_summaries, state_dict, params):
-    all_pairs_empty = True
-    for pair in params["port"]["pairs_traded"]:
-        if trading_summaries[pair].shape[0] > 0:
-            all_pairs_empty = False
-
-    if all_pairs_empty:
-        try:
-            state_dict["consecutive_all_pair_empty"] += 1
-        except KeyError:
-            state_dict["consecutive_all_pair_empty"] = 0
-        print(
-            f"    - `all_pairs_empty` ---- leaving to see if it happens # ###PAUL_del_later \n"
-            f"       state_dict['consecutive_all_pair_empty'] ---- {state_dict['consecutive_all_pair_empty']}\n" * 5
-        )
-        if state_dict["consecutive_all_pair_empty"] > 5:
-            print(f"state_dict['consecutive_all_pair_empty'] is over the limit!!!!!!")
-            import ipdb
-
-            ipdb.set_trace()
-    else:
-        state_dict["consecutive_all_pair_empty"] = 0
 
 
 def handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dict, params):
     """for each pair, considers updated state of portfolio and signal, creats an order or  closes and opens new orders"""
 
     for pair in params["port"]["pairs_traded"]:
+        base = params['pair_info_df'].loc[pair]['base']
+        quote = params['pair_info_df'].loc[pair]['quote']
+        
         actual_base_in_quote_value = state_dict["bag_actual"][pair]["base_in_usd"]
         desired_base_in_quote_value = state_dict["bag_desired"][pair]["base_in_usd"]
         diff = desired_base_in_quote_value - actual_base_in_quote_value
-        if -params["port"]["diff_thresh"] < diff < params["port"]["diff_thresh"]:
-            continue  # order less than `diff_threash` (~$9)... skips to next iteration of for loop
 
         if diff >= params["port"]["diff_thresh"]:
             B_or_S = "buy"
         elif diff <= -params["port"]["diff_thresh"]:
             B_or_S = "sell"
+        else:  # WE HAVE -->  -params["port"]["diff_thresh"] < diff < params["port"]["diff_thresh"]
+            continue  # to next interation of the loop because order quantity is too small 
 
         print("order_stage_1 ---- pair: " + str(pair))
         print("order_stage_1 ---- diff: " + str(diff))
 
-        desired_position = state_dict["desired_position"][pair]  # `desired_position` in ['short', neutral, long]
-
-        print("order_stage_2 ---- pair: " + pair)
-
         ###PAUL TODO: consider orderbook for prices, currently using most recent buy / sell vwap #
-        # TODO: that works fine for BTC but not well for less liquid tickers (especially with fees)
-        open_orders = get_open_orders(
-            pair=pair,
-            state_dict=state_dict,
-        )
+        #       TODO: that works fine for BTC but not well for less liquid tickers (especially with fees)
+        open_orders = get_open_orders(pair=pair, state_dict=state_dict)
 
         # for this strategy we should only have one order open for a pair at a time for the full value of diff
         num_open = len(open_orders)
@@ -1271,11 +1286,21 @@ def handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dic
         if order_price is not None:  # we are ordering
             qty = math.fabs(state_dict["bag_desired"][pair]["base"] - state_dict["bag_actual"][pair]["base"])
 
-            # ### TEMP METHOD TO ENSURE ORDER NOT TOO BIG FOR THE MOCK PORTFOLIO... NEED TO CLEAN THIS UP
+            # ### the is an interesting paradigm with `bag_actual` where the value is assigned to it based on the total port value 
+            #     if one pair goes over this value, the actual quote will be negative. This should should remain, the behavior 
+            #     is desirable, however the name of "actual" maybe misleading, and should be reconsidered. 
             if B_or_S == "buy":
-                max_orderable_qty = state_dict["bag_actual"][pair]["quote"] / state_dict["last_prices_by_pair_in_quote"][pair]
+                max_by_pair = state_dict["bag_actual"][pair]["quote"] / state_dict["last_prices_by_pair_in_quote"][pair]
+                max_by_holdings = state_dict["port_holdings_dict"][quote]["free"] 
+                max_orderable_qty = min(max_by_pair, max_by_holdings)
+                
             if B_or_S == "sell":
-                max_orderable_qty = state_dict["bag_actual"][pair]["base"]
+                max_by_pair = state_dict["bag_actual"][pair]["base"]
+                max_by_holdings = state_dict["port_holdings_dict"][base]["free"] 
+                max_orderable_qty = min(max_by_pair, max_by_holdings)
+
+            if max_orderable_qty * state_dict["last_prices_by_symbol_in_usd"][base] < 11: 
+                continue   # if biggest order less than $11 don't order...  $10 is usually minimum order
 
             qty = min(qty, 0.999 * max_orderable_qty)
             print(f"order_stage_3 ---- price:  {order_price}")
@@ -1301,6 +1326,11 @@ def handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dic
             except InsufficientFunds:
                 print(f"order_post_attempt ---- attempted to place order with insufficient funds")
 
+            # we only update our holdings / bags dict once per round of orders, to avoid trying to order with the quote asset we don't
+            # have, we will update the quote asset holdings after the order is placed, selling something will cause fewer problems
+                # which for now I am willing to let the try except catch above. 
+            if B_or_S == "buy": 
+                state_dict["port_holdings_dict"][quote]["free"] -= qty
 
 def print_signal_update(state_dict, params):
     print(
@@ -1318,15 +1348,13 @@ def reassess_bags_and_orders(ccxt_client, ch_client, trading_summaries, signal_d
     check_for_closed_orders(ccxt_client, state_dict, params=params)  # quick enough to do at the beginning too
 
     update_trading_summaries(trading_summaries, state_dict, params=params, ch_client=ch_client)
-    trading_summary_collection_check(trading_summaries, state_dict, params)
-    if params["port"]["signal_name"] != None: 
+    
+    if params["port"]["signal_name"] != None:  # ###PAUL TODO: consider cleaning up handling of signal_dfs_dict when not used
         update_signals(signal_dfs_dict, state_dict, params=params)
     
     update_desired_positions_dict(trading_summaries, signal_dfs_dict, state_dict, params)
     update_port_holdings_and_value(ccxt_client, ch_client, state_dict, trading_summaries, params)
-    handle_ordering_after_state_update(
-        ccxt_client=ccxt_client, trading_summaries=trading_summaries, state_dict=state_dict, params=params
-    )
+    handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dict, params)
 
     time.sleep(0.1)  # gives small time for highly likely orders to fill before checking
     check_for_closed_orders(ccxt_client, state_dict, params=params)

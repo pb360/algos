@@ -11,7 +11,7 @@ from clickhouse_driver import Client as CH_Client
 import datetime
 from datetime import timedelta
 import dateutil
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_UP, ROUND_DOWN
 import dotenv
 import json
 import importlib
@@ -1531,14 +1531,29 @@ def remove_duplicates_from_trading_summary():
     ch_client.execute(query)
 
 
-def round_step_size(quantity: Union[float, Decimal], step_size: Union[float, Decimal]) -> float:
-    """Rounds a given quantity to a specific step size
-    :param quantity: required
-    :param step_size: required
-    :return: decimal
+def round_by_step_or_decimal(quantity, step_size=None, num_decimal=None, direction=None):
+    """Rounds a given quantity to a specific step size or number of decimals.
+
+    :param direction: optional, direction of rounding ('up', 'down', or None)
     """
-    precision: int = int(round(-math.log(step_size, 10), 0))
-    return float(round(quantity, precision))
+    if step_size is not None and num_decimal is not None:
+        raise ValueError("step_size and num_decimal cannot be used simultaneously")
+
+    quantity = Decimal(str(quantity))
+    if direction == 'up':
+        rounding_mode = ROUND_UP
+    elif direction == 'down':
+        rounding_mode = ROUND_DOWN
+    else:
+        rounding_mode = ROUND_HALF_UP
+
+    if step_size is not None:
+        step_size = Decimal(str(step_size))
+        return float((quantity / step_size).quantize(Decimal('1'), rounding=rounding_mode) * step_size)
+    elif num_decimal is not None:
+        return float(quantity.quantize(Decimal('1.' + '0' * num_decimal), rounding=rounding_mode))
+    else:
+        return float(quantity)
 
 
 def get_mutual_min_max_datetimes(pandas_objects):
