@@ -1551,6 +1551,7 @@ def round_by_step_or_decimal(quantity, step_size=None, num_decimal=None, directi
         step_size = Decimal(str(step_size))
         return float((quantity / step_size).quantize(Decimal('1'), rounding=rounding_mode) * step_size)
     elif num_decimal is not None:
+        num_decimal = int(num_decimal)
         return float(quantity.quantize(Decimal('1.' + '0' * num_decimal), rounding=rounding_mode))
     else:
         return float(quantity)

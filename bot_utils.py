@@ -249,6 +249,7 @@ def initialize_port_allocation_dict(state_dict, params):
 
 
 def initialize_bag_dicts(state_dict, params):
+    # bag stuff
     state_dict["bag_max"] = {}
     state_dict["bag_actual"] = {}
     state_dict["bag_desired"] = {}
@@ -258,6 +259,11 @@ def initialize_bag_dicts(state_dict, params):
         state_dict["bag_actual"][pair] = {"base": 0, "base_in_quote": 0, "quote": 0}
         state_dict["bag_desired"][pair] = {"base": 0, "base_in_quote": 0, "quote": 0}
 
+    # portfolio value related items 
+    state_dict["port_value"] = 0
+    state_dict["port_holdings_dict"] = {}  
+    state_dict["last_prices_by_symbol_in_usd"] = {}  # eventually will want a more advanced way of creating this
+    state_dict["last_prices_by_pair_in_quote"] = {}  # eventually will want a more advanced way of creating this
 
 def initalize_last_time_checked(state_dict, params):
     state_dict["last_time_checked"] = {}
@@ -338,9 +344,8 @@ def update_trading_summary(pair, trading_summaries, state_dict, params, ch_clien
         exchange=params["port"]["exchange"], symbol=pair, start_date=start_date, end_date=None, ch_client=ch_client
     )
 
-    # merge the new prices with the old prices
+    # set the new trading summary in the dictionary 
     trading_summaries[pair] = trading_summary
-
 
 
 def trading_summary_collection_check(trading_summaries, state_dict, params):
@@ -378,7 +383,7 @@ def update_signals(signal_dfs_dict, state_dict, params):
     """also handles initialization of the `signal_dfs_dict`"""
 
     for pair in params["port"]["pairs_traded"]:
-        last_decision_time = state_dict["last_time_checked"][pair]  # TODO: multi exchange
+        last_decision_time = state_dict["last_time_checked"][pair]
         last_decision_time = convert_date_format(last_decision_time, "pandas")
         signal_name = params["active_services"]["ports"][params["port"]["port_name"]]["signal_name"]
         new_signal = query_signal_by_name(signal_name, start_date=last_decision_time, end_date=None)
@@ -392,6 +397,7 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
 
     port_value_running_sum = 0
     positions_list = []
+
     for symbol in params["port"]["set_of_assets_in_port"]:
         # gets holdings for that base asset / ticker
         state_dict["port_holdings_dict"][symbol] = state_dict["account_balances"][symbol]  
@@ -400,17 +406,23 @@ def get_usd_value_of_port_holdings_and_positions(trading_summaries, ch_client, s
         if pricing_pair == "STABLE":  # ###PAUL_usd_denomination  # TODO: stables, stables, stables
             state_dict["last_prices_by_symbol_in_usd"][symbol] = float(1)
         else:
+            if trading_summaries[pricing_pair].shape[0] > 0: 
+                
+                try:  # ###PAUL TODO: DELETE LATER
+                    symbol_price_in_quote = trading_summaries[pricing_pair]["vwap"].iloc[-1]  # TODO: dont hard code 'vwap'
+                except:  # ###PAUL TODO: DELETE LATER
+                    print(f"this should never have happened due to the continue catch above... run then delete later")  
+                    import pdb;      # ###PAUL TODO: DELETE LATER
+                    pdb.set_trace()  # ###PAUL TODO: DELETE LATER
+        
+                state_dict["last_prices_by_pair_in_quote"][pricing_pair] = symbol_price_in_quote
 
-            try:
-                symbol_price_in_quote = trading_summaries[pricing_pair]["vwap"].iloc[-1]  # TODO: dont hard code 'vwap'
-            except:
-                import pdb;      # ###PAUL TODO: DELETE LATER
-                pdb.set_trace()  # ###PAUL TODO: DELETE LATER
-    
-            state_dict["last_prices_by_pair_in_quote"][pricing_pair] = symbol_price_in_quote
-
-            quote_price_in_usd = 1  # ###PAUL_usd_denomination # TODO: stables, stables, stables
-            symbol_in_usd = symbol_price_in_quote * quote_price_in_usd
+            # ###PAUL TODO: HUGE ONE TO GET DONE, CURRENTLY ONLY TRADE IN USDT QUOTE, BUT THIS IS A PROBLEM CAUSER
+            # ###PAUL TODO: HUGE ONE TO GET DONE, CURRENTLY ONLY TRADE IN USDT QUOTE, BUT THIS IS A PROBLEM CAUSER
+            quote_price_in_usd = 1  # ###PAUL_usd_denomination # TODO: stables, stables, stable
+            # ###PAUL TODO: HUGE ONE TO GET DONE, CURRENTLY ONLY TRADE IN USDT QUOTE, BUT THIS IS A PROBLEM CAUSER
+            # ###PAUL TODO: HUGE ONE TO GET DONE, CURRENTLY ONLY TRADE IN USDT QUOTE, BUT THIS IS A PROBLEM CAUSER
+            symbol_in_usd = state_dict["last_prices_by_pair_in_quote"][pricing_pair] * quote_price_in_usd
             state_dict["last_prices_by_symbol_in_usd"][symbol] = symbol_in_usd
 
         last_price = state_dict["last_prices_by_symbol_in_usd"][symbol]
@@ -667,16 +679,6 @@ def update_port_holdings_and_value(ccxt_client, ch_client, state_dict, trading_s
        - value is determined from bags, all holdings are not included in value nor touched by the bot by default
     """
 
-
-    if trading_summaries[params["port"]["pairs_traded"][0]].shape[0] == 0:
-        return
-
-    # hard reset all these
-    state_dict["port_value"] = 0
-    state_dict["port_holdings_dict"] = {}  # {'free':free, 'locked':locked, 'total':total} NEEDS RESET EACH ITER
-    state_dict["last_prices_by_symbol_in_usd"] = {}  # eventually will want a more advanced way of creating this
-    state_dict["last_prices_by_pair_in_quote"] = {}  # eventually will want a more advanced way of creating this
-
     # get actual holdings on exchange
     update_account_balances(ccxt_client, state_dict)
 
@@ -703,7 +705,7 @@ def update_desired_positions_dict(trading_summaries, signal_dfs_dict, state_dict
             triggered_actions = decide_live(
                 state_dict=state_dict,
                 signal=signal_dfs_dict[pair],
-                prices=trading_summaries[pair]["vwap"],
+                prices=trading_summaries[pair]["vwap"],  # when order price is changed, we may want to change decision price (to a running 3-5 min ewa)
                 requests_dict=params["port"]["decision_params"],
                 pair=pair,
                 debug_triggers=False,
@@ -720,9 +722,9 @@ def make_ccxt_order_info_dict(response):
 
     # things that gotta be done first
     order_info_dict = dict()
-
     order_info_dict["id"] = response["id"]
-    order_info_dict["symbol"] = response["symbol"].replace("/", "-")  # fetch order may come with '/'...
+    # order_info_dict["symbol"] = response["symbol"].replace("/", "-")  # fetch order may come with '/'...
+    order_info_dict["symbol"] = response["symbol"]
     order_info_dict["clientOrderId"] = response["clientOrderId"]
     order_info_dict["timestamp"] = response["timestamp"]
     order_info_dict["price"] = response["price"]
@@ -835,7 +837,7 @@ def place_order(ccxt_client, B_or_S, pair, o_type, base_qty, price, state_dict, 
 
     # most important / relevant checks
     base_qty = round_by_step_or_decimal(quantity=base_qty, num_decimal=int(info["precision_amount"]), direction="down")
-    price = round_by_step_or_decimal(quantity=price, step_size=info["precision_price"])
+    price = round_by_step_or_decimal(quantity=price, num_decimal=info["precision_price"])
 
     # exchange rules
     if base_qty < info["limits_amount_min"] or base_qty > info["limits_amount_max"]:
@@ -975,8 +977,9 @@ def close_orders_for_assets_in_port_if_not_tracked(ccxt_client, state_dict, para
     all_opens = ccxt_client.fetch_open_orders()
 
     for open_order in all_opens:
-        pair = open_order["symbol"].replace("/", "-")
-        base_asset, quote_asset = pair.split("-")
+        # pair = open_order["symbol"].replace("/", "-")  # ###PAUL TODO: constant vigilance using "/" instead of "-"
+        pair = open_order["symbol"]
+        base_asset, quote_asset = pair.split("/")
         # delete this order unless we are already tracking it
         if base_asset in params["port"]["assets_in_port"] or quote_asset in params["port"]["assets_in_port"]:
             order_key = (open_order["id"], f"{base_asset}-{quote_asset}")
@@ -1022,17 +1025,21 @@ def get_open_orders(pair, state_dict):
 
 
 def update_last_time_checked(trading_summaries, signal_dfs_dict, state_dict, params):
-    """updates the 'last_time_checked' per pair... multi ticker supported TODO: but multi exchange"""
+    """updates per pair
+    TODO: want to consider per exchange also, but the mechanics of that would require a much larger refactor so let it lie for now.  
+    """
 
     for pair in params["port"]["pairs_traded"]:
         if signal_dfs_dict:  # if we are using a signal based strategy this will not be empty and do the following
             if trading_summaries[pair].shape[0] == 0 or signal_dfs_dict[pair].shape[0] == 0:
-                continue  # because nothing now could have been seen, we are stick at the same time.
+                continue  # because nothing new could have been seen, we are stick at the same time.
             trading_summary_time = trading_summaries[pair].index[-1]
             signal_time = signal_dfs_dict[pair].index[-1]
             state_dict["last_time_checked"][pair] = min(trading_summary_time, signal_time)
 
         else:  # we are just concerned with 
+            if trading_summaries[pair].shape[0] == 0:
+                continue  # because nothing new could have been seen, we are stick at the same time.
             state_dict["last_time_checked"][pair] = trading_summaries[pair].index[-1]
 
     return None
@@ -1102,7 +1109,8 @@ def check_for_orders_and_close_unrelated(ccxt_client, state_dict, params):
     # put list of keys: tuples (order_id, universal_symbol) from exchange collected
     open_orders_on_exchange = []
     for res in open_orders_res_list:
-        exchange_symbol = res["symbol"].replace("/", "-")
+        # exchange_symbol = res["symbol"].replace("/", "-")
+        exchange_symbol = res["symbol"]
         universal_symbol = convert_symbol(exchange_symbol, in_exchange=params["port"]["exchange"], out_exchange="universal")
 
         order_id = res["id"]
@@ -1110,7 +1118,7 @@ def check_for_orders_and_close_unrelated(ccxt_client, state_dict, params):
 
         open_orders_on_exchange.append(tup)
 
-    # loop through the open_order_dict, remove entry if the order is not in the orders on the exchange
+    # loop through the order_open_dict, remove entry if the order is not in the orders on the exchange
     keys_to_delete = []
     for key in state_dict["order_open_dict"]:
         if key not in open_orders_on_exchange:
@@ -1133,9 +1141,9 @@ def check_for_closed_orders(ccxt_client, state_dict, params):
     # |    status    |  kucoin   |   binance(us)  |  ### ccxt converts varying format status to open or closed...
     # |     open     |  'open'   |   'open'       |  ### where as binance uses FILLED, PARTIALLY_FILLED, etc...
     # |    closed    | 'closed'  |   'closed'     |  ### kucoin uses isActive: [True, False]
-    temp_open_order_dict = deepcopy(state_dict["order_open_dict"])
+    temp_order_open_dict = deepcopy(state_dict["order_open_dict"])
 
-    for key, value in temp_open_order_dict.items():
+    for key, value in temp_order_open_dict.items():
         order_id, universal_symbol = key
         exchange_symbol = convert_symbol(universal_symbol, in_exchange="universal", out_exchange=params["port"]["exchange"])
         order_res = ccxt_client.fetch_order(id=order_id, symbol=exchange_symbol)
@@ -1257,19 +1265,21 @@ def handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dic
         # for this strategy we should only have one order open for a pair at a time for the full value of diff
         num_open = len(open_orders)
         if num_open == 0:
-            order_price = trading_summaries[pair]["vwap"].iloc[-1]
+            order_price = state_dict["last_prices_by_pair_in_quote"][pair]
         elif num_open == 1:
             # do the check if the new order is a higher priority
             order = open_orders[0]
             open_order_price = order["price"]
             if B_or_S == "buy":
-                new_price = trading_summaries[pair]["buy_vwap"].iloc[-1]
+                # new_price = trading_summaries[pair]["buy_vwap"].iloc[-1]  ###TODO: Reminder on pricing
+                new_price = state_dict["last_prices_by_pair_in_quote"][pair]
                 if new_price > open_order_price:
                     order_price = new_price
                 else:
                     order_price = None
             elif B_or_S == "sell":
-                new_price = trading_summaries[pair]["sell_vwap"].iloc[-1]
+                # new_price = trading_summaries[pair]["sell_vwap"].iloc[-1]  ###TODO: Reminder on pricing
+                new_price = state_dict["last_prices_by_pair_in_quote"][pair]
                 if new_price < open_order_price:
                     order_price = new_price
                 else:
@@ -1281,7 +1291,7 @@ def handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dic
             print(f"warning we more orders than we should \n    - num_open = {num_open}")
             for order in open_orders:
                 close_order(ccxt_client, order["id"], order["symbol"], state_dict, params)
-            order_price = trading_summaries[pair]["vwap"].iloc[-1]
+            order_price = state_dict["last_prices_by_pair_in_quote"][pair]
 
         if order_price is not None:  # we are ordering
             qty = math.fabs(state_dict["bag_desired"][pair]["base"] - state_dict["bag_actual"][pair]["base"])
@@ -1325,6 +1335,9 @@ def handle_ordering_after_state_update(ccxt_client, trading_summaries, state_dic
                 process_placed_order(order_res, state_dict, params=params)
             except InsufficientFunds:
                 print(f"order_post_attempt ---- attempted to place order with insufficient funds")
+            except ValueError: 
+                import pdb; 
+                pdb.set_trace() 
 
             # we only update our holdings / bags dict once per round of orders, to avoid trying to order with the quote asset we don't
             # have, we will update the quote asset holdings after the order is placed, selling something will cause fewer problems

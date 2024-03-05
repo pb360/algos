@@ -67,7 +67,6 @@ except FileNotFoundError:
     state_dict = {}
     state_dict['iter_count'] = 0  # should come from state dict in the case that the portfolio is restarting
     state_dict['num_total_signal_updates'] = 0
-    state_dict['last_time_checked'] = 0  # TODO: this could cause issues
     state_dict['now'] = pd.to_datetime(datetime.datetime.now())
     state_dict['num_rows_added_since_printout'] = 0
     state_dict['next_update_time'] = (state_dict['now'].floor('min') \
